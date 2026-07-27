@@ -72,6 +72,7 @@
 - 网站直接读取 Python 导出的 `frontend/public/demo-output.json`，不在前端重新计算核心指标。
 - 完成桌面 1440×1000 和移动 390×844 浏览器验证，模式切换正确，移动页面无整体横向溢出。
 - OR-Tools 安装在项目 `.venv`；全局 Anaconda 已恢复原 protobuf 5.29.3，避免影响其他项目。
+- 提交 M2 基线 commit：`0759cbe feat: add scheduling engine and dashboard prototype`。
 
 ## 4. 阶段验收记录
 
@@ -166,6 +167,7 @@
 | 2026-07-27 | 前端生产构建 | 通过 | `npm run build`，Vite 构建成功 |
 | 2026-07-27 | 浏览器桌面检查 | 通过 | 1440×1000，全页非空，三视图和未分配任务正确 |
 | 2026-07-27 | 浏览器移动检查 | 通过 | 390×844，页面 `scrollWidth = clientWidth = 390` |
+| 2026-07-27 | M2 基线提交 | 通过 | commit `0759cbe` |
 
 ## 8. 问题、风险与处理方式
 
