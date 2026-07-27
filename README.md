@@ -18,8 +18,8 @@
 
 ## 当前状态
 
-- 阶段：M0 需求冻结与仓库初始化已完成。
-- 下一阶段：M1 数据模型与仿真场景。
+- 阶段：M1 数据模型与仿真场景已完成。
+- 下一阶段：M2 FIFO 基线、硬约束检查与优化内核。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 
@@ -31,10 +31,10 @@ docs/
   project-progress.md   # 持续更新的进度、决策、验证和交接记录
   scenarios/            # 文档用场景说明
 frontend/               # React + TypeScript + Vite（M4 开始实现）
-backend/                # Python + FastAPI（M1-M3 开始实现）
-data/scenarios/         # 匿名化仿真场景
-tests/                  # 后端、前端和端到端测试
-scripts/                # 数据生成、检查和发布辅助脚本
+backend/app/            # Pydantic 数据模型与场景导入逻辑
+data/scenarios/         # 匿名化 JSON 仿真场景
+tests/                  # 数据校验、后端、前端和端到端测试
+scripts/                # 场景校验、数据生成和发布辅助脚本
 ```
 
 ## 技术路线
@@ -58,7 +58,15 @@ scripts/                # 数据生成、检查和发布辅助脚本
 
 ## 当前运行说明
 
-M0 只建立项目骨架，尚未提供可启动的前后端服务。M1 完成后会在本节补充确定的安装、启动和测试命令。
+当前版本提供数据模型、JSON 场景导入和验证命令，尚未提供可启动的 API 或前端服务。
+
+```powershell
+python -m pip install -r backend/requirements.txt
+python scripts/validate_scenario.py data/scenarios/terminal-disturbance-demo.json
+python -m pytest -q
+```
+
+验证脚本会输出场景 ID 以及区域、航班、事件、任务和资源数量。测试应显示 `6 passed`；若非法数据未被拒绝，则不得进入调度阶段。
 
 ## Git 工作流
 
