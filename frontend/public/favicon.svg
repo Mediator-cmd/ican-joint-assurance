@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="联保智调">
+  <rect width="64" height="64" rx="8" fill="#202923"/>
+  <path d="M14 18h36v6H14zm0 11h24v6H14zm0 11h36v6H14z" fill="#f4f7f4"/>
+  <rect x="42" y="29" width="8" height="6" fill="#ee7a45"/>
+</svg>

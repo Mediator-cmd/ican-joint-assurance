@@ -79,7 +79,7 @@
       "deadline_at": "2026-08-01T08:20:00+08:00",
       "duration_minutes": 8,
       "party_size": 1,
-      "priority": 1,
+      "priority": 2,
       "required_resource_type": "wheelchair"
     },
     {
@@ -123,6 +123,20 @@
       "party_size": 1,
       "priority": 2,
       "required_resource_type": "wheelchair"
+    },
+    {
+      "task_id": "TASK-005",
+      "flight_id": "FL-SIM218",
+      "task_type": "boarding_assistance",
+      "passenger_group": "urgent_connection",
+      "origin_zone_id": "TRANSFER-DESK",
+      "destination_zone_id": "GATE-E01",
+      "release_at": "2026-08-01T08:04:00+08:00",
+      "deadline_at": "2026-08-01T08:18:00+08:00",
+      "duration_minutes": 6,
+      "party_size": 1,
+      "priority": 1,
+      "required_resource_type": "wheelchair"
     }
   ],
   "resources": [
@@ -138,16 +152,6 @@
     },
     {
       "resource_id": "WC-01",
-      "resource_type": "wheelchair",
-      "home_zone_id": "TRANSFER-DESK",
-      "current_zone_id": "TRANSFER-DESK",
-      "capacity": 1,
-      "available_from": "2026-08-01T08:00:00+08:00",
-      "available_to": "2026-08-01T09:00:00+08:00",
-      "status": "available"
-    },
-    {
-      "resource_id": "WC-02",
       "resource_type": "wheelchair",
       "home_zone_id": "TRANSFER-DESK",
       "current_zone_id": "TRANSFER-DESK",

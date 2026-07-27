@@ -18,10 +18,11 @@
 
 ## 当前状态
 
-- 阶段：M1 数据模型与仿真场景已完成。
-- 下一阶段：M2 FIFO 基线、硬约束检查与优化内核。
+- 阶段：M2 调度内核与运行态网站雏形已完成。
+- 下一阶段：M3 FastAPI 业务接口与前后端联调。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
+- 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
 
 ## 目录结构
 
@@ -30,8 +31,8 @@ docs/
   project-plan.md       # 总体规划、边界和里程碑
   project-progress.md   # 持续更新的进度、决策、验证和交接记录
   scenarios/            # 文档用场景说明
-frontend/               # React + TypeScript + Vite（M4 开始实现）
-backend/app/            # Pydantic 数据模型与场景导入逻辑
+frontend/               # React + TypeScript + Vite 运行态控制台
+backend/app/            # 数据模型、事件应用、FIFO、CP-SAT 和约束检查
 data/scenarios/         # 匿名化 JSON 仿真场景
 tests/                  # 数据校验、后端、前端和端到端测试
 scripts/                # 场景校验、数据生成和发布辅助脚本
@@ -41,7 +42,7 @@ scripts/                # 场景校验、数据生成和发布辅助脚本
 
 - 前端：React、TypeScript、Vite、ECharts。
 - 后端：Python、FastAPI、Pydantic。
-- 调度：先实现 FIFO 基线，再接入 OR-Tools CP-SAT 或线性规划模型。
+- 调度：确定性 FIFO 基线与 Google OR-Tools CP-SAT 优化方案。
 - 存储：开发阶段 SQLite，保留 PostgreSQL 适配空间。
 - AI：仅负责自然语言事件理解、缺失字段追问和结果解释；调度结果必须经过确定性优化和硬约束校验。
 
@@ -58,15 +59,34 @@ scripts/                # 场景校验、数据生成和发布辅助脚本
 
 ## 当前运行说明
 
-当前版本提供数据模型、JSON 场景导入和验证命令，尚未提供可启动的 API 或前端服务。
+当前版本提供可运行的 React 网站雏形。页面数据由 Python 调度引擎生成，包含“扰动前 FIFO”“事件后 FIFO”和“CP-SAT 优化”三种视图；M3 才会把静态 JSON 读取替换为 FastAPI 请求。
+
+首次安装后端依赖：
 
 ```powershell
-python -m pip install -r backend/requirements.txt
-python scripts/validate_scenario.py data/scenarios/terminal-disturbance-demo.json
-python -m pytest -q
+New-Item -ItemType Directory -Force .tmp | Out-Null
+$env:TEMP = (Resolve-Path .tmp).Path
+$env:TMP = $env:TEMP
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
 ```
 
-验证脚本会输出场景 ID 以及区域、航班、事件、任务和资源数量。测试应显示 `6 passed`；若非法数据未被拒绝，则不得进入调度阶段。
+生成演示数据并运行后端测试：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\generate_demo_output.py
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+启动网站：
+
+```powershell
+Set-Location frontend
+npm install
+npm run dev
+```
+
+浏览器访问 `http://127.0.0.1:4173`。当前回归基线为 `19 passed`，前端应同时通过 `npm run typecheck` 和 `npm run build`。
 
 ## Git 工作流
 

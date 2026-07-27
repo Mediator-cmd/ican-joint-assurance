@@ -7,11 +7,15 @@ venv/
 .pytest_cache/
 .mypy_cache/
 *.egg-info/
+.playwright-cli/
 
 # Node / frontend
 node_modules/
 dist/
 .vite/
+.npm-cache/
+.pip-cache/
+.tmp/
 coverage/
 
 # Local configuration and secrets
@@ -27,6 +31,7 @@ coverage/
 *.log
 tmp/
 outputs/
+output/
 
 # Editors and operating-system files
 .vscode/

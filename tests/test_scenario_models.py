@@ -23,8 +23,8 @@ def test_demo_scenario_loads_with_cross_references() -> None:
     assert len(scenario.zones) == 3
     assert len(scenario.flights) == 2
     assert len(scenario.events) == 2
-    assert len(scenario.tasks) == 4
-    assert len(scenario.resources) == 5
+    assert len(scenario.tasks) == 5
+    assert len(scenario.resources) == 4
     assert {flight.display_code for flight in scenario.flights} == {"SIM102", "SIM218"}
     assert {task.flight_id for task in scenario.tasks} == {"FL-SIM102", "FL-SIM218"}
 
