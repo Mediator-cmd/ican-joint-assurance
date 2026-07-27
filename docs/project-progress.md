@@ -228,3 +228,15 @@
 ```
 
 不要删除历史记录；若决策发生变化，在“技术决策”表中更新当前结论，并在更新记录中说明变更原因。
+
+## 12. 后续完成记录
+
+### 2026-07-27 / Windows 一键启停脚本
+
+- 完成：在项目根目录增加 `启动联保智调.cmd` 和 `停止联保智调.cmd`，支持双击刷新演示数据、启动 Vite、自动选择 `4173-4199` 空闲端口、优先用 Microsoft Edge 打开页面，以及按已记录的精确 PID 停止服务进程树。
+- 关键文件：`启动联保智调.cmd`、`停止联保智调.cmd`、`scripts/start-project.ps1`、`scripts/stop-project.ps1`、`.gitignore`、`README.md`。
+- 运行记录：PID、端口、进程启动时间和项目路径写入 `.runtime/server-state.json`；标准输出和错误日志保存在 `.runtime/`，该目录不进入 Git。重复启动只打开现有服务，不创建第二个 Vite 进程。
+- 安全处理：停止前校验项目路径、PID、进程名和启动时间，避免 PID 重用导致误停；状态缺失时不扫描或结束未知 Node 进程；无效状态只清理状态文件。
+- 验证：根目录启动入口成功在 `http://127.0.0.1:4173` 返回 HTTP 200，并创建 Microsoft Edge 进程；重复启动保持同一 PID；根目录停止入口成功结束对应进程并释放监听端口。PowerShell 语法检查、`19 passed`、`npm run typecheck`、`npm run build` 和 `git diff --check` 均通过。
+- 已知边界：M2 尚无常驻 FastAPI 服务，因此当前脚本只启动 Vite 网站；M3 完成业务 API 后，需要扩展同一状态文件和停止逻辑以同时管理前后端进程。
+- 下一步：按第 9 节进入 M3 FastAPI 业务接口与前后端联调。
