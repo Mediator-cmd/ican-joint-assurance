@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+coverage/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# Databases and generated runtime files
+*.db
+*.sqlite
+*.sqlite3
+*.log
+tmp/
+outputs/
+
+# Editors and operating-system files
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+ehthumbs.db
+Desktop.ini
