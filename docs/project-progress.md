@@ -58,6 +58,7 @@
 - 添加 6 个自动化测试，覆盖合法导入、未知航班、重复资源、未知移动区域、无时区时间和损坏 JSON。
 - 记录场景语义：`flights`/`tasks` 为基线状态，`events` 为后续按时间注入的扰动流。
 - 将示例航班改为 `SIM102`、`SIM218` 虚构编码，并要求场景显式声明 `data_classification: synthetic`，防止与真实运行数据混淆。
+- 提交 M1 基线 commit：`3ecbabe feat: add validated simulation scenario models`。
 
 ## 4. 阶段验收记录
 
@@ -126,6 +127,7 @@
 | 2026-07-27 | 合法场景导入 | 通过 | 验证脚本输出 3 区域、2 航班、2 事件、4 任务、5 资源 |
 | 2026-07-27 | 数据校验测试 | 通过 | `python -m pytest -q`，`6 passed in 0.12s` |
 | 2026-07-27 | 补丁格式检查 | 通过 | `git diff --check` 无错误 |
+| 2026-07-27 | M1 基线提交 | 通过 | commit `3ecbabe` |
 
 ## 8. 问题、风险与处理方式
 
