@@ -2222,6 +2222,461 @@ td > strong {
   .constraint-grid { grid-template-columns: 1fr; }
 }
 
+/* Large-type readability layer: keep operational text readable at a glance. */
+.app-shell {
+  font-size: 16px;
+}
+
+.command-button,
+.primary-action,
+.secondary-action,
+.data-chip,
+.scenario-identity strong,
+.scenario-window strong,
+.plan-switch strong,
+.decision-copy > span,
+.decision-copy p,
+.detail-heading p,
+.event-hero p,
+.validation-summary p,
+.decision-facts span,
+.kpi-label,
+.kpi-note,
+.kpi-value small,
+.comparison-item > div span,
+.comparison-item dd,
+.filter-switch button,
+.plan-state,
+th,
+td,
+.priority-mark,
+.status-badge,
+.event-interpretation h3,
+.event-interpretation p,
+.change-values span,
+.change-values strong {
+  font-size: 16px;
+}
+
+.brand-copy span,
+.nav-item b,
+.sidebar-status > span:not(.eyebrow),
+.sidebar-status small,
+.page-heading > p:last-child,
+.eyebrow,
+.scenario-identity span:not(.live-dot),
+.scenario-window span,
+.plan-switch span,
+.section-note,
+.comparison-item dt,
+.brief-list small,
+.task-cell span,
+.cell-subtext,
+.table-hint,
+.detail-heading span:not(.status-badge),
+.resource-detail-head span:not(.load-pill),
+.event-hero span,
+.validation-summary span,
+.task-route-detail span,
+.detail-list dt,
+.basis-list dt,
+.manual-note p,
+.resource-advice p,
+.empty-state span,
+.event-state,
+.change-count,
+.event-index,
+.sequence-index,
+.event-selector span:not(.event-index),
+.impact-summary span,
+.change-row > div:first-child span,
+.overall-load span,
+.resource-identity span,
+.resource-load-column > span,
+.load-label,
+.load-pill,
+.resource-gauge > span,
+.sequence-list div > span,
+.zone-list span,
+.constraint-grid span,
+.constraint-grid b,
+.process-step > span,
+.process-step p,
+.glossary-list p,
+.safety-footer {
+  font-size: 14px;
+}
+
+.nav-item span,
+.sidebar-status > strong,
+.comparison-item > div strong,
+.brief-list strong,
+.task-cell strong,
+td > strong,
+.task-route-detail strong,
+.detail-list dd,
+.basis-list dd,
+.manual-note strong,
+.resource-advice strong,
+.empty-state strong,
+.event-selector strong,
+.change-row > div:first-child strong,
+.resource-identity strong,
+.resource-value strong,
+.sequence-list strong,
+.zone-list strong,
+.constraint-grid strong,
+.process-step strong,
+.glossary-list strong {
+  font-size: 18px;
+}
+
+.brand-mark {
+  font-size: 28px;
+}
+
+.brand-copy strong {
+  font-size: 24px;
+}
+
+.page-heading h1 {
+  font-size: 32px;
+}
+
+.section-heading h2 {
+  font-size: 22px;
+}
+
+.decision-copy h2,
+.detail-heading h2,
+.resource-detail-head h2,
+.event-hero h2,
+.validation-summary h2 {
+  font-size: 26px;
+}
+
+.decision-facts strong {
+  font-size: 24px;
+}
+
+.kpi-value {
+  font-size: 36px;
+}
+
+.impact-summary strong {
+  font-size: 22px;
+}
+
+.overall-load strong,
+.resource-gauge > strong {
+  font-size: 20px;
+}
+
+.comparison-item > div span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.zone-list {
+  grid-template-columns: 1fr;
+}
+
+.zone-list strong {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.3;
+}
+
+@media (min-width: 841px) {
+  .app-shell {
+    grid-template-columns: 248px minmax(0, 1fr);
+  }
+
+  .sidebar {
+    padding: 22px 15px 18px;
+  }
+
+  .brand-block {
+    gap: 12px;
+    padding: 0 8px 22px;
+  }
+
+  .brand-mark {
+    width: 46px;
+    height: 46px;
+  }
+
+  .sidebar nav {
+    gap: 7px;
+    margin-top: 22px;
+  }
+
+  .nav-item {
+    height: 54px;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    gap: 11px;
+    padding: 0 12px;
+  }
+
+  .nav-item b {
+    min-width: 28px;
+    height: 28px;
+  }
+
+  .sidebar-status {
+    padding: 15px 13px;
+  }
+
+  .main-content {
+    grid-template-rows: 94px 86px minmax(0, 1fr) 46px;
+  }
+
+  .topbar {
+    padding: 0 24px;
+  }
+
+  .context-bar {
+    grid-template-columns: minmax(230px, 0.9fr) auto minmax(430px, 1.2fr);
+    gap: 18px;
+    padding: 10px 24px;
+  }
+
+  .plan-switch button {
+    height: 50px;
+    padding-inline: 10px;
+  }
+
+  .workspace-body {
+    padding: 14px 18px;
+  }
+
+  .section-heading {
+    min-height: 72px;
+    padding: 12px 15px;
+  }
+
+  .decision-panel {
+    min-height: 118px;
+    grid-template-columns: 52px minmax(280px, 1fr) auto auto;
+    gap: 16px;
+    padding: 15px 18px;
+  }
+
+  .decision-symbol {
+    width: 50px;
+    height: 50px;
+  }
+
+  .decision-facts span {
+    min-width: 82px;
+    padding: 9px 10px;
+  }
+
+  .kpi-card {
+    min-height: 122px;
+    padding: 15px 16px 13px 20px;
+  }
+
+  .tasks-layout {
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+
+  .filter-switch button {
+    height: 38px;
+    padding-inline: 12px;
+  }
+
+  .plan-state {
+    height: 36px;
+    padding-inline: 10px;
+  }
+
+  table {
+    min-width: 1080px;
+  }
+
+  th,
+  td {
+    padding: 14px 13px;
+  }
+
+  .priority-mark,
+  .status-badge {
+    min-height: 31px;
+    padding-inline: 9px;
+  }
+
+  .task-detail,
+  .event-analysis,
+  .resource-detail,
+  .validation-panel,
+  .basis-panel {
+    padding: 18px;
+  }
+
+  .detail-list div,
+  .basis-list div {
+    padding: 12px 0;
+  }
+
+  .events-layout {
+    grid-template-columns: minmax(340px, 0.7fr) minmax(0, 1.3fr);
+  }
+
+  .event-selector button,
+  .resource-row,
+  .sequence-list button {
+    padding: 12px 10px;
+  }
+
+  .resources-layout {
+    grid-template-columns: minmax(0, 1.12fr) minmax(270px, 0.88fr) minmax(360px, 1fr);
+  }
+
+  .process-flow {
+    gap: 7px;
+    padding: 11px;
+  }
+
+  .process-step {
+    padding: 10px;
+  }
+}
+
+@media (min-width: 841px) and (max-width: 1160px) {
+  .context-bar {
+    grid-template-columns: minmax(180px, 0.75fr) auto minmax(360px, 1.25fr);
+    gap: 10px;
+  }
+
+  .decision-panel {
+    grid-template-columns: 50px minmax(230px, 1fr) auto;
+  }
+
+  .tasks-layout {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+}
+
+@media (min-width: 841px) and (max-width: 1050px) {
+  .resources-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+  }
+}
+
+@media (max-width: 840px) {
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+  }
+
+  .brand-copy strong {
+    font-size: 22px;
+  }
+
+  .brand-copy span {
+    font-size: 14px;
+  }
+
+  .nav-item {
+    min-width: 128px;
+    height: 48px;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+  }
+
+  .nav-item span {
+    font-size: 16px;
+  }
+
+  .nav-item b {
+    min-width: 24px;
+    height: 24px;
+    font-size: 14px;
+  }
+
+  .topbar {
+    min-height: 124px;
+    padding: 11px 13px;
+  }
+
+  .page-heading h1 {
+    font-size: 30px;
+  }
+
+  .page-heading > p:last-child {
+    max-width: 76vw;
+    font-size: 15px;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    line-height: 1.45;
+  }
+
+  .context-bar {
+    padding: 10px 12px;
+  }
+
+  .plan-switch button {
+    height: 46px;
+  }
+
+  .workspace-body {
+    padding: 10px;
+  }
+
+  .section-heading {
+    min-height: 72px;
+    padding: 11px 13px;
+  }
+
+  .decision-panel {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .decision-symbol {
+    width: 46px;
+    height: 46px;
+  }
+
+  .kpi-card {
+    min-height: 120px;
+    padding: 14px 12px 12px 17px;
+  }
+
+  .task-board {
+    min-height: 570px;
+  }
+
+  .task-detail {
+    min-height: 470px;
+  }
+
+  .event-catalog,
+  .change-audit,
+  .resource-catalog,
+  .resource-sequence,
+  .zone-overview,
+  .process-panel,
+  .basis-panel,
+  .glossary-panel {
+    min-height: 340px;
+  }
+
+  .event-analysis,
+  .resource-detail,
+  .validation-panel {
+    min-height: 460px;
+  }
+
+  .safety-footer {
+    min-height: 56px;
+    padding: 7px 10px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
