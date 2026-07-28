@@ -52,9 +52,12 @@ export interface ServiceTask {
 export interface Resource {
   resource_id: string;
   resource_type: string;
+  home_zone_id: string;
   current_zone_id: string;
   status: string;
   capacity: number;
+  available_from: string;
+  available_to: string;
 }
 
 export interface Zone {
