@@ -9,6 +9,7 @@ from threading import RLock
 
 from .audit_models import AuditAction, AuditRecord
 from .models import FlightEvent, Scenario
+from .planning_models import Plan
 
 
 class RepositoryError(RuntimeError):
@@ -52,12 +53,25 @@ class InvalidRevisionError(RepositoryError):
     pass
 
 
+class PlanAlreadyExistsError(RepositoryError):
+    pass
+
+
+class PlanNotFoundError(RepositoryError):
+    pass
+
+
+class InvalidPlanError(RepositoryError):
+    pass
+
+
 @dataclass(slots=True)
 class _ScenarioAggregate:
     baseline: Scenario
     event_catalog: dict[str, FlightEvent]
     applied_event_ids: list[str]
     revisions: dict[int, Scenario]
+    plans: dict[str, Plan]
     audit_records: list[AuditRecord]
 
     @property
@@ -111,6 +125,7 @@ class InMemoryScenarioRepository:
                 event_catalog=event_catalog,
                 applied_event_ids=[],
                 revisions={baseline.version: baseline.model_copy(deep=True)},
+                plans={},
                 audit_records=[audit_record],
             )
             return baseline.model_copy(deep=True)
@@ -273,6 +288,63 @@ class InMemoryScenarioRepository:
             aggregate.revisions[stored_revision.version] = stored_revision
             aggregate.audit_records.append(audit_record)
             return stored_revision.model_copy(deep=True)
+
+    def save_plan(
+        self,
+        scenario_id: str,
+        expected_version: int,
+        plan: Plan,
+    ) -> Plan:
+        """Persist a defensive plan copy only if the scenario version is still current."""
+
+        with self._lock:
+            aggregate = self._require_scenario(scenario_id)
+            if aggregate.current_version != expected_version:
+                raise VersionConflictError(expected_version, aggregate.current_version)
+            if plan.scenario_id != scenario_id:
+                raise InvalidPlanError("plan scenario ID does not match the aggregate")
+            if plan.scenario_version != expected_version:
+                raise InvalidPlanError("plan version does not match expected scenario version")
+            if plan.plan_id in aggregate.plans:
+                raise PlanAlreadyExistsError(
+                    f"plan {plan.plan_id} is already stored for scenario {scenario_id}"
+                )
+
+            stored_plan = plan.model_copy(deep=True)
+            audit_record = self._build_audit_record(
+                scenario_id=scenario_id,
+                action=AuditAction.PLAN_CREATED,
+                version_before=expected_version,
+                version_after=expected_version,
+                related_entity_ids=[stored_plan.plan_id],
+                summary="保障方案已生成并完成约束复核",
+            )
+            aggregate.plans[stored_plan.plan_id] = stored_plan
+            aggregate.audit_records.append(audit_record)
+            return stored_plan.model_copy(deep=True)
+
+    def get_plan(self, plan_id: str) -> Plan:
+        with self._lock:
+            for aggregate in self._scenarios.values():
+                if plan_id in aggregate.plans:
+                    return aggregate.plans[plan_id].model_copy(deep=True)
+            raise PlanNotFoundError(f"plan {plan_id} is not registered")
+
+    def list_plans(
+        self,
+        scenario_id: str,
+        scenario_version: int | None = None,
+        algorithm: str | None = None,
+    ) -> tuple[Plan, ...]:
+        with self._lock:
+            aggregate = self._require_scenario(scenario_id)
+            plans = [
+                plan
+                for plan in aggregate.plans.values()
+                if (scenario_version is None or plan.scenario_version == scenario_version)
+                and (algorithm is None or plan.algorithm == algorithm)
+            ]
+            return tuple(plan.model_copy(deep=True) for plan in plans)
 
     def list_audit_records(self, scenario_id: str) -> tuple[AuditRecord, ...]:
         with self._lock:

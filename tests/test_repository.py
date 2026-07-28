@@ -9,11 +9,14 @@ from pydantic import ValidationError
 
 from backend.app.audit_models import AuditAction, AuditRecord
 from backend.app.events import apply_events
+from backend.app.fifo_scheduler import build_fifo_plan
 from backend.app.models import FlightEvent, FlightEventType, Scenario
 from backend.app.repository import (
     EventAlreadyAppliedError,
     InMemoryScenarioRepository,
     InvalidRevisionError,
+    PlanAlreadyExistsError,
+    PlanNotFoundError,
     ScenarioAlreadyExistsError,
     VersionConflictError,
 )
@@ -261,3 +264,41 @@ def test_concurrent_commits_allow_only_one_revision() -> None:
     assert repository.list_versions(baseline.scenario_id) == (1, 2)
     assert repository.get_applied_event_ids(baseline.scenario_id) == (event_id,)
     assert len(repository.list_audit_records(baseline.scenario_id)) == 2
+
+
+def test_saved_plans_are_immutable_queryable_and_audited() -> None:
+    repository = InMemoryScenarioRepository()
+    scenario = repository.create_scenario(load_demo())
+    plan = build_fifo_plan(scenario)
+
+    stored = repository.save_plan(scenario.scenario_id, expected_version=1, plan=plan)
+    stored.metrics.assigned_tasks = 0
+    plan.metrics.assigned_tasks = 0
+
+    fetched = repository.get_plan("PLAN-TERMINAL-DISTURBANCE-01-V1-FIFO")
+    listed = repository.list_plans(scenario.scenario_id, scenario_version=1)
+    assert fetched.metrics.assigned_tasks == 4
+    assert len(listed) == 1
+    assert listed[0] == fetched
+    assert [record.action for record in repository.list_audit_records(scenario.scenario_id)] == [
+        AuditAction.SCENARIO_IMPORTED,
+        AuditAction.PLAN_CREATED,
+    ]
+
+    with pytest.raises(PlanAlreadyExistsError):
+        repository.save_plan(scenario.scenario_id, expected_version=1, plan=fetched)
+    with pytest.raises(PlanNotFoundError):
+        repository.get_plan("PLAN-MISSING")
+    assert len(repository.list_audit_records(scenario.scenario_id)) == 2
+
+
+def test_stale_plan_save_is_atomic() -> None:
+    repository = InMemoryScenarioRepository()
+    scenario = repository.create_scenario(load_demo())
+    plan = build_fifo_plan(scenario)
+
+    with pytest.raises(VersionConflictError):
+        repository.save_plan(scenario.scenario_id, expected_version=2, plan=plan)
+
+    assert repository.list_plans(scenario.scenario_id) == ()
+    assert len(repository.list_audit_records(scenario.scenario_id)) == 1

@@ -107,9 +107,9 @@ FastAPI 路由与统一错误处理
 | `GET /api/v1/scenarios` | 场景摘要列表 | `offset`、`limit` | `200 ScenarioListResponse`，包含总数和可规划摘要 |
 | `GET /api/v1/scenarios/{scenario_id}` | 查询当前或指定版本 | 可选 `version` | `200 ScenarioRecord` |
 | `POST /api/v1/scenarios/{scenario_id}/events/apply` | 应用待处理或新增结构化事件 | `expected_version`、`event_ids`、`events` | `200 ScenarioRecord` |
-| `POST /api/v1/scenarios/{scenario_id}/plans` | 生成 FIFO 或 CP-SAT 计划 | 版本、算法、求解上限 | `201 Plan` |
-| `GET /api/v1/scenarios/{scenario_id}/plans` | 查询场景计划摘要 | 可选版本/算法筛选 | `200 PlanSummary[]` |
-| `GET /api/v1/plans/{plan_id}` | 查询完整计划 | 计划 ID | `200 Plan` |
+| `POST /api/v1/scenarios/{scenario_id}/plans` | 生成 FIFO 或 CP-SAT 计划 | 版本、算法、求解上限 | `201 PlanRecord`，包含完整计划与普通语言指引 |
+| `GET /api/v1/scenarios/{scenario_id}/plans` | 查询场景计划摘要 | 可选版本/算法筛选 | `200 PlanListResponse` |
+| `GET /api/v1/plans/{plan_id}` | 查询完整计划 | 计划 ID | `200 PlanRecord` |
 | `POST /api/v1/scenarios/{scenario_id}/comparisons` | 比较两个已保存计划 | 基线和候选计划 ID | `201 PlanComparison` |
 | `GET /api/v1/scenarios/{scenario_id}/audit-records` | 查询审计时间线 | 可选 `limit` | `200 AuditRecord[]` |
 
@@ -192,7 +192,7 @@ FastAPI 默认验证错误也必须转换为上述统一格式。内部日志保
 | `backend/app/api.py` | `/api/v1` 路由定义和 HTTP 状态码 |
 | `backend/app/api_models.py` | HTTP 请求、响应和比较 Pydantic 模型 |
 | `backend/app/audit_models.py` | 与 HTTP 解耦的审计动作和审计记录模型 |
-| `backend/app/repository.py` | 线程安全内存仓库、场景聚合、版本快照和审计存储；M3-4 再扩展计划存储 |
+| `backend/app/repository.py` | 线程安全内存仓库、场景聚合、版本快照、不可变计划和审计存储 |
 | `backend/app/services.py` | 场景导入、事件重放、规划、比较和审计编排 |
 | `backend/app/demo_export.py` | 保持 M2 `DemoPayload` 契约，必要时只增加类型模型 |
 | `tests/test_api_health.py` | 应用启动、健康检查、统一错误 |
@@ -236,7 +236,7 @@ M3 完成后，现有脚本必须从“单 Vite 进程”升级为“后端 + �
 | M3-1 API 骨架 | 添加 FastAPI/Uvicorn/httpx2，应用工厂、健康检查、异常格式 | M3-0 | 健康检查和 404/422 格式测试通过 | 3 小时 | 已完成（2026-07-28） |
 | M3-2 仓库与版本 | 内存仓库、场景聚合、版本快照、事件防重复、审计模型 | M3-1 | 单元测试证明基线不可变、冲突不写入 | 5 小时 | 已完成（2026-07-28） |
 | M3-3 场景接口 | 导入、列表、当前/历史版本查询 | M3-2 | 合法、非法、重复、未找到测试通过 | 4 小时 | 已完成（2026-07-28） |
-| M3-4 事件与规划 | 事件应用、FIFO/CP-SAT 计划创建和计划查询 | M3-3 | 无双重延误，计划违规为 0 | 7 小时 | 待开始 |
+| M3-4 事件与规划 | 事件应用、FIFO/CP-SAT 计划创建和计划查询 | M3-3 | 无双重延误，计划违规为 0 | 7 小时 | 已完成（2026-07-28） |
 | M3-5 比较与演示 | 后端指标差值、审计查询、`/demo` 兼容输出 | M3-4 | 完整 API 闭环和 M2 契约测试通过 | 5 小时 | 待开始 |
 | M3-6 前端联调 | API 客户端、静态回退、数据源状态、Vite 代理 | M3-5 | API/回退/双失败三种状态可复现 | 5 小时 | 待开始 |
 | M3-7 启停升级 | 前后端服务组状态、健康等待、精确停止和日志 | M3-6 | 双击启动、Edge 打开、双服务停止通过 | 4 小时 | 待开始 |
@@ -297,4 +297,4 @@ M3 完成后，现有脚本必须从“单 Vite 进程”升级为“后端 + �
 
 ## 15. 实施起点
 
-M3-0 至 M3-3 已完成。下一执行入口为 M3-4：实现结构化事件应用、FIFO/CP-SAT 计划创建与不可变计划查询；所有方案继续通过独立硬约束检查，不在本单元接入自然语言 AI。
+M3-0 至 M3-4 已完成。下一执行入口为 M3-5：基于已保存的不可变计划实现后端指标比较、审计查询和 `/api/v1/demo` 兼容输出；继续保持确定性核心独立于自然语言 AI。

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
-from .models import DataClassification, ModelBase, RunMode, Scenario
+from .models import DataClassification, FlightEvent, ModelBase, RunMode, Scenario
+from .planning_models import Plan, PlanStatus
 
 
 class HealthResponse(ModelBase):
@@ -72,4 +74,75 @@ class ScenarioListResponse(ModelBase):
     total: int = Field(ge=0)
     offset: int = Field(ge=0)
     limit: int = Field(ge=1, le=100)
+    storage_scope: Literal["process_memory"] = "process_memory"
+
+
+class ApplyEventsRequest(ModelBase):
+    expected_version: int = Field(ge=1)
+    event_ids: list[str] = Field(default_factory=list)
+    events: list[FlightEvent] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_event_batch(self) -> ApplyEventsRequest:
+        new_event_ids = [event.event_id for event in self.events]
+        combined_ids = [*self.event_ids, *new_event_ids]
+        if not combined_ids:
+            raise ValueError("event_ids and events must include at least one event")
+        if any(not event_id for event_id in self.event_ids):
+            raise ValueError("event IDs must be non-empty")
+        if len(combined_ids) != len(set(combined_ids)):
+            raise ValueError("event IDs must be unique within one request")
+        return self
+
+
+class PlanAlgorithm(str, Enum):
+    FIFO = "fifo"
+    CP_SAT = "cp_sat"
+
+
+class CreatePlanRequest(ModelBase):
+    expected_version: int = Field(ge=1)
+    algorithm: PlanAlgorithm
+    max_time_seconds: float = Field(default=5.0, gt=0, le=30)
+
+
+class PlanGuidance(ModelBase):
+    display_name: str = Field(min_length=1)
+    status_label: str = Field(min_length=1)
+    result_summary: str = Field(min_length=1)
+    tradeoff_summary: str = Field(min_length=1)
+    recommended_action: str = Field(min_length=1)
+    calculation_basis: list[str] = Field(min_length=1)
+    requires_human_confirmation: Literal[True] = True
+
+
+class PlanRecord(ModelBase):
+    plan: Plan
+    guidance: PlanGuidance
+    storage_scope: Literal["process_memory"] = "process_memory"
+    safety_notice: str = Field(min_length=1)
+
+
+class PlanSummary(ModelBase):
+    plan_id: str = Field(min_length=1)
+    scenario_id: str = Field(min_length=1)
+    scenario_version: int = Field(ge=1)
+    algorithm: PlanAlgorithm
+    display_name: str = Field(min_length=1)
+    status: PlanStatus
+    status_label: str = Field(min_length=1)
+    assigned_tasks: int = Field(ge=0)
+    total_tasks: int = Field(ge=0)
+    urgent_task_completion_rate_pct: float = Field(ge=0, le=100)
+    average_wait_minutes: float = Field(ge=0)
+    needs_manual_handling: int = Field(ge=0)
+    constraint_conflicts: int = Field(ge=0)
+    result_summary: str = Field(min_length=1)
+    tradeoff_summary: str = Field(min_length=1)
+    recommended_action: str = Field(min_length=1)
+
+
+class PlanListResponse(ModelBase):
+    items: list[PlanSummary] = Field(default_factory=list)
+    total: int = Field(ge=0)
     storage_scope: Literal["process_memory"] = "process_memory"
