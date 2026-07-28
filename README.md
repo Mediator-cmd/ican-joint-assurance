@@ -18,8 +18,8 @@
 
 ## 当前状态
 
-- 阶段：M3 FastAPI 业务接口进行中，M3-0 至 M3-2 已完成。
-- 下一单元：M3-3 场景导入、列表和版本查询接口。
+- 阶段：M3 FastAPI 业务接口进行中，M3-0 至 M3-3 已完成。
+- 下一单元：M3-4 事件应用、FIFO/CP-SAT 计划创建和计划查询。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
@@ -94,6 +94,8 @@ python -m venv .venv
 
 - 健康检查：`http://127.0.0.1:8000/api/v1/health`
 - OpenAPI 文档：`http://127.0.0.1:8000/docs`
+- 场景列表：`http://127.0.0.1:8000/api/v1/scenarios`，首次启动自动提供一个仿真示例。
+- 场景 API 支持结构化导入、可规划摘要、数据缺口提示、分页和当前/历史版本查询。
 
 启动网站：
 
@@ -103,7 +105,7 @@ npm install
 npm run dev
 ```
 
-浏览器访问 `http://127.0.0.1:4173`。当前后端回归基线为 `35 passed`，前端应同时通过 `npm run typecheck` 和 `npm run build`。
+浏览器访问 `http://127.0.0.1:4173`。当前后端回归基线为 `46 passed`，前端应同时通过 `npm run typecheck` 和 `npm run build`。
 
 ## Git 工作流
 

@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from .models import ModelBase
+from .models import DataClassification, ModelBase, RunMode, Scenario
 
 
 class HealthResponse(ModelBase):
@@ -31,3 +31,45 @@ class ApiErrorBody(ModelBase):
 
 class ApiErrorResponse(ModelBase):
     error: ApiErrorBody
+
+
+class ScenarioOperationalSummary(ModelBase):
+    flight_count: int = Field(ge=0)
+    task_count: int = Field(ge=0)
+    resource_count: int = Field(ge=0)
+    zone_count: int = Field(ge=0)
+    pending_event_count: int = Field(ge=0)
+    applied_event_count: int = Field(ge=0)
+    ready_for_planning: bool
+    warnings: list[str] = Field(default_factory=list)
+    recommended_action: str = Field(min_length=1)
+
+
+class ScenarioSummary(ModelBase):
+    scenario_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    version: int = Field(ge=1)
+    run_mode: RunMode
+    data_classification: DataClassification
+    operational: ScenarioOperationalSummary
+
+
+class ScenarioRecord(ModelBase):
+    summary: ScenarioSummary
+    scenario: Scenario
+    current_version: int = Field(ge=1)
+    selected_version: int = Field(ge=1)
+    is_current_version: bool
+    available_versions: list[int] = Field(min_length=1)
+    pending_event_ids: list[str] = Field(default_factory=list)
+    applied_event_ids: list[str] = Field(default_factory=list)
+    storage_scope: Literal["process_memory"] = "process_memory"
+    safety_notice: str = Field(min_length=1)
+
+
+class ScenarioListResponse(ModelBase):
+    items: list[ScenarioSummary] = Field(default_factory=list)
+    total: int = Field(ge=0)
+    offset: int = Field(ge=0)
+    limit: int = Field(ge=1, le=100)
+    storage_scope: Literal["process_memory"] = "process_memory"

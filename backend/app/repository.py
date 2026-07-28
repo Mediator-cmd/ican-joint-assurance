@@ -65,6 +65,15 @@ class _ScenarioAggregate:
         return max(self.revisions)
 
 
+@dataclass(frozen=True, slots=True)
+class ScenarioStateSnapshot:
+    scenario: Scenario
+    current_version: int
+    available_versions: tuple[int, ...]
+    pending_event_ids: tuple[str, ...]
+    applied_event_ids: tuple[str, ...]
+
+
 class InMemoryScenarioRepository:
     """Store defensive scenario copies and apply revision commits atomically."""
 
@@ -130,6 +139,33 @@ class InMemoryScenarioRepository:
     def get_baseline(self, scenario_id: str) -> Scenario:
         with self._lock:
             return self._require_scenario(scenario_id).baseline.model_copy(deep=True)
+
+    def get_state_snapshot(
+        self,
+        scenario_id: str,
+        version: int | None = None,
+    ) -> ScenarioStateSnapshot:
+        with self._lock:
+            aggregate = self._require_scenario(scenario_id)
+            target_version = aggregate.current_version if version is None else version
+            try:
+                scenario = aggregate.revisions[target_version]
+            except KeyError as exc:
+                raise ScenarioVersionNotFoundError(
+                    f"scenario {scenario_id} has no version {target_version}"
+                ) from exc
+            applied_event_ids = tuple(event.event_id for event in scenario.events)
+            applied = set(applied_event_ids)
+            pending_event_ids = tuple(
+                event_id for event_id in aggregate.event_catalog if event_id not in applied
+            )
+            return ScenarioStateSnapshot(
+                scenario=scenario.model_copy(deep=True),
+                current_version=aggregate.current_version,
+                available_versions=tuple(sorted(aggregate.revisions)),
+                pending_event_ids=pending_event_ids,
+                applied_event_ids=applied_event_ids,
+            )
 
     def get_events(
         self,

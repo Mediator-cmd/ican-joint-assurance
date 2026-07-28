@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -13,9 +14,18 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .api import APP_VERSION, router
 from .api_models import ApiErrorBody, ApiErrorDetail, ApiErrorResponse
 from .errors import ApiError
+from .repository import InMemoryScenarioRepository
+from .scenario_loader import load_scenario
+from .services import ScenarioService
 
 
 logger = logging.getLogger(__name__)
+DEMO_SCENARIO_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "data"
+    / "scenarios"
+    / "terminal-disturbance-demo.json"
+)
 
 
 def _new_request_id() -> str:
@@ -115,7 +125,16 @@ def _register_exception_handlers(app: FastAPI) -> None:
         )
 
 
-def create_app() -> FastAPI:
+def create_app(
+    repository: InMemoryScenarioRepository | None = None,
+    seed_demo: bool = True,
+) -> FastAPI:
+    scenario_repository = repository or InMemoryScenarioRepository()
+    if seed_demo:
+        demo_scenario = load_scenario(DEMO_SCENARIO_PATH)
+        if demo_scenario.scenario_id not in scenario_repository.list_scenario_ids():
+            scenario_repository.create_scenario(demo_scenario)
+
     application = FastAPI(
         title="联保智调业务 API",
         description="教学仿真与辅助决策接口，不构成真实机场运行指令。",
@@ -124,6 +143,8 @@ def create_app() -> FastAPI:
         openapi_url="/api/v1/openapi.json",
         redoc_url=None,
     )
+    application.state.scenario_repository = scenario_repository
+    application.state.scenario_service = ScenarioService(scenario_repository)
 
     @application.middleware("http")
     async def add_request_id(request: Request, call_next):
