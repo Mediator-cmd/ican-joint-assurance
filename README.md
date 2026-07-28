@@ -18,8 +18,8 @@
 
 ## 当前状态
 
-- 阶段：M3 FastAPI 业务接口进行中，M3-0 契约冻结与 M3-1 API 骨架已完成。
-- 下一单元：M3-2 内存仓库、场景版本与审计模型。
+- 阶段：M3 FastAPI 业务接口进行中，M3-0 至 M3-2 已完成。
+- 下一单元：M3-3 场景导入、列表和版本查询接口。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
@@ -67,7 +67,7 @@ scripts/                # 场景校验、数据生成和发布辅助脚本
 - 双击项目根目录的 `停止联保智调.cmd`：只停止由启动脚本记录的本项目服务，不会结束其他 Node 程序。
 - 服务默认使用 `http://127.0.0.1:4173`；如果端口已占用，会自动选择 `4174-4199` 范围内的空闲端口。
 - 运行状态和本地日志保存在忽略提交的 `.runtime/` 目录。启动脚本已运行时再次双击，不会重复启动服务，只会打开现有页面。
-- M3-7 前，目前的一键脚本仍只管理 Vite 网站；FastAPI 骨架需要按下方命令单独启动。
+- M3-7 前，目前的一键脚本仍只管理 Vite 网站；FastAPI 服务需要按下方命令单独启动。
 
 首次安装后端依赖：
 
@@ -86,7 +86,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-启动当前 FastAPI 骨架：
+启动当前 FastAPI 服务：
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
@@ -103,7 +103,7 @@ npm install
 npm run dev
 ```
 
-浏览器访问 `http://127.0.0.1:4173`。当前后端回归基线为 `25 passed`，前端应同时通过 `npm run typecheck` 和 `npm run build`。
+浏览器访问 `http://127.0.0.1:4173`。当前后端回归基线为 `35 passed`，前端应同时通过 `npm run typecheck` 和 `npm run build`。
 
 ## Git 工作流
 
