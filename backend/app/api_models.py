@@ -146,3 +146,54 @@ class PlanListResponse(ModelBase):
     items: list[PlanSummary] = Field(default_factory=list)
     total: int = Field(ge=0)
     storage_scope: Literal["process_memory"] = "process_memory"
+
+
+class ComparePlansRequest(ModelBase):
+    baseline_plan_id: str = Field(min_length=1)
+    candidate_plan_id: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_distinct_plans(self) -> ComparePlansRequest:
+        if self.baseline_plan_id == self.candidate_plan_id:
+            raise ValueError("baseline and candidate plans must be different")
+        return self
+
+
+class PlanComparisonMetrics(ModelBase):
+    plan_id: str = Field(min_length=1)
+    scenario_version: int = Field(ge=1)
+    algorithm: PlanAlgorithm
+    assigned_tasks: int = Field(ge=0)
+    unassigned_tasks: int = Field(ge=0)
+    total_tasks: int = Field(ge=0)
+    task_completion_rate_pct: float = Field(ge=0, le=100)
+    critical_task_completion_rate_pct: float = Field(ge=0, le=100)
+    average_wait_minutes: float = Field(ge=0)
+    max_wait_minutes: int = Field(ge=0)
+    overall_resource_utilization_pct: float = Field(ge=0, le=100)
+    violation_count: int = Field(ge=0)
+
+
+class PlanComparisonDelta(ModelBase):
+    assigned_tasks: int
+    unassigned_tasks: int
+    total_tasks: int
+    task_completion_rate_pct: float
+    critical_task_completion_rate_pct: float
+    average_wait_minutes: float
+    max_wait_minutes: int
+    overall_resource_utilization_pct: float
+    violation_count: int
+
+
+class PlanComparison(ModelBase):
+    scenario_id: str = Field(min_length=1)
+    baseline_plan_id: str = Field(min_length=1)
+    candidate_plan_id: str = Field(min_length=1)
+    baseline_metrics: PlanComparisonMetrics
+    candidate_metrics: PlanComparisonMetrics
+    candidate_minus_baseline: PlanComparisonDelta
+    conclusion: str = Field(min_length=1)
+    recommendation: str = Field(min_length=1)
+    requires_human_confirmation: Literal[True] = True
+    safety_notice: str = Field(min_length=1)

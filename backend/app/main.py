@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -13,6 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .api import APP_VERSION, router
 from .api_models import ApiErrorBody, ApiErrorDetail, ApiErrorResponse
+from .demo_export import DEMO_SCENARIO_PATH
 from .errors import ApiError
 from .repository import InMemoryScenarioRepository
 from .scenario_loader import load_scenario
@@ -20,12 +20,6 @@ from .services import ScenarioService
 
 
 logger = logging.getLogger(__name__)
-DEMO_SCENARIO_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "data"
-    / "scenarios"
-    / "terminal-disturbance-demo.json"
-)
 
 
 def _new_request_id() -> str:

@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from .events import apply_events
 from .fifo_scheduler import build_fifo_plan
 from .models import FlightEvent, FlightEventType, Scenario
 from .optimizer import build_optimized_plan
+from .scenario_loader import load_scenario
 
 
 SAFETY_NOTICE = (
     "仅供教学仿真与辅助决策使用，不构成真实机场运行、放行、登机、改签或车辆控制指令。"
+)
+DEMO_SCENARIO_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "data"
+    / "scenarios"
+    / "terminal-disturbance-demo.json"
 )
 
 
@@ -120,3 +128,9 @@ def build_demo_payload(baseline: Scenario) -> dict[str, Any]:
             },
         },
     }
+
+
+def build_default_demo_payload() -> dict[str, Any]:
+    """Rebuild the canonical browser demo with the shared deterministic engine."""
+
+    return build_demo_payload(load_scenario(DEMO_SCENARIO_PATH))

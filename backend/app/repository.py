@@ -65,6 +65,10 @@ class InvalidPlanError(RepositoryError):
     pass
 
 
+class InvalidPlanComparisonError(RepositoryError):
+    pass
+
+
 @dataclass(slots=True)
 class _ScenarioAggregate:
     baseline: Scenario
@@ -325,10 +329,7 @@ class InMemoryScenarioRepository:
 
     def get_plan(self, plan_id: str) -> Plan:
         with self._lock:
-            for aggregate in self._scenarios.values():
-                if plan_id in aggregate.plans:
-                    return aggregate.plans[plan_id].model_copy(deep=True)
-            raise PlanNotFoundError(f"plan {plan_id} is not registered")
+            return self._find_plan(plan_id).model_copy(deep=True)
 
     def list_plans(
         self,
@@ -351,11 +352,49 @@ class InMemoryScenarioRepository:
             aggregate = self._require_scenario(scenario_id)
             return tuple(record.model_copy(deep=True) for record in aggregate.audit_records)
 
+    def record_plan_comparison(
+        self,
+        scenario_id: str,
+        baseline_plan_id: str,
+        candidate_plan_id: str,
+    ) -> AuditRecord:
+        """Validate plan ownership and append one comparison audit atomically."""
+
+        with self._lock:
+            aggregate = self._require_scenario(scenario_id)
+            if baseline_plan_id == candidate_plan_id:
+                raise InvalidPlanComparisonError("comparison plans must be different")
+
+            baseline = self._find_plan(baseline_plan_id)
+            candidate = self._find_plan(candidate_plan_id)
+            if baseline.scenario_id != scenario_id or candidate.scenario_id != scenario_id:
+                raise InvalidPlanComparisonError(
+                    "comparison plans must both belong to the requested scenario"
+                )
+
+            current_version = aggregate.current_version
+            audit_record = self._build_audit_record(
+                scenario_id=scenario_id,
+                action=AuditAction.COMPARISON_CREATED,
+                version_before=current_version,
+                version_after=current_version,
+                related_entity_ids=[baseline_plan_id, candidate_plan_id],
+                summary="已比较两套保障方案的核心指标",
+            )
+            aggregate.audit_records.append(audit_record)
+            return audit_record.model_copy(deep=True)
+
     def _require_scenario(self, scenario_id: str) -> _ScenarioAggregate:
         try:
             return self._scenarios[scenario_id]
         except KeyError as exc:
             raise ScenarioNotFoundError(f"scenario {scenario_id} is not registered") from exc
+
+    def _find_plan(self, plan_id: str) -> Plan:
+        for aggregate in self._scenarios.values():
+            if plan_id in aggregate.plans:
+                return aggregate.plans[plan_id]
+        raise PlanNotFoundError(f"plan {plan_id} is not registered")
 
     def _build_audit_record(
         self,

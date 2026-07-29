@@ -6,8 +6,12 @@ from pydantic import ValidationError
 
 from .api_models import (
     ApplyEventsRequest,
+    ComparePlansRequest,
     CreatePlanRequest,
     PlanAlgorithm,
+    PlanComparison,
+    PlanComparisonDelta,
+    PlanComparisonMetrics,
     PlanGuidance,
     PlanListResponse,
     PlanRecord,
@@ -17,6 +21,7 @@ from .api_models import (
     ScenarioRecord,
     ScenarioSummary,
 )
+from .audit_models import AuditRecord
 from .constraints import validate_plan
 from .demo_export import SAFETY_NOTICE
 from .events import EventApplicationError, apply_events
@@ -28,6 +33,7 @@ from .repository import (
     EventAlreadyAppliedError,
     EventAlreadyRegisteredError,
     InMemoryScenarioRepository,
+    InvalidPlanComparisonError,
     InvalidRevisionError,
     PlanAlreadyExistsError,
     ScenarioStateSnapshot,
@@ -113,6 +119,115 @@ def _plan_guidance(plan: Plan) -> PlanGuidance:
             "服务截止时间",
             "资源容量和重复占用检查",
         ],
+    )
+
+
+def _comparison_metrics(plan: Plan) -> PlanComparisonMetrics:
+    metrics = plan.metrics
+    return PlanComparisonMetrics(
+        plan_id=plan.plan_id,
+        scenario_version=plan.scenario_version,
+        algorithm=_plan_algorithm(plan),
+        assigned_tasks=metrics.assigned_tasks,
+        unassigned_tasks=metrics.unassigned_tasks,
+        total_tasks=metrics.total_tasks,
+        task_completion_rate_pct=metrics.task_completion_rate_pct,
+        critical_task_completion_rate_pct=metrics.critical_task_completion_rate_pct,
+        average_wait_minutes=metrics.average_wait_minutes,
+        max_wait_minutes=metrics.max_wait_minutes,
+        overall_resource_utilization_pct=metrics.overall_resource_utilization_pct,
+        violation_count=len(plan.violations),
+    )
+
+
+def _comparison_delta(
+    baseline: PlanComparisonMetrics,
+    candidate: PlanComparisonMetrics,
+) -> PlanComparisonDelta:
+    return PlanComparisonDelta(
+        assigned_tasks=candidate.assigned_tasks - baseline.assigned_tasks,
+        unassigned_tasks=candidate.unassigned_tasks - baseline.unassigned_tasks,
+        total_tasks=candidate.total_tasks - baseline.total_tasks,
+        task_completion_rate_pct=round(
+            candidate.task_completion_rate_pct - baseline.task_completion_rate_pct,
+            2,
+        ),
+        critical_task_completion_rate_pct=round(
+            candidate.critical_task_completion_rate_pct
+            - baseline.critical_task_completion_rate_pct,
+            2,
+        ),
+        average_wait_minutes=round(
+            candidate.average_wait_minutes - baseline.average_wait_minutes,
+            2,
+        ),
+        max_wait_minutes=candidate.max_wait_minutes - baseline.max_wait_minutes,
+        overall_resource_utilization_pct=round(
+            candidate.overall_resource_utilization_pct
+            - baseline.overall_resource_utilization_pct,
+            2,
+        ),
+        violation_count=candidate.violation_count - baseline.violation_count,
+    )
+
+
+def _comparison_guidance(delta: PlanComparisonDelta) -> tuple[str, str]:
+    if delta.violation_count < 0:
+        preferred = "candidate"
+    elif delta.violation_count > 0:
+        preferred = "baseline"
+    elif delta.critical_task_completion_rate_pct > 0:
+        preferred = "candidate"
+    elif delta.critical_task_completion_rate_pct < 0:
+        preferred = "baseline"
+    elif delta.task_completion_rate_pct > 0:
+        preferred = "candidate"
+    elif delta.task_completion_rate_pct < 0:
+        preferred = "baseline"
+    elif delta.average_wait_minutes < 0:
+        preferred = "candidate"
+    elif delta.average_wait_minutes > 0:
+        preferred = "baseline"
+    elif delta.max_wait_minutes < 0:
+        preferred = "candidate"
+    elif delta.max_wait_minutes > 0:
+        preferred = "baseline"
+    else:
+        preferred = "equivalent"
+
+    tradeoffs: list[str] = []
+    if delta.assigned_tasks:
+        direction = "增加" if delta.assigned_tasks > 0 else "减少"
+        tradeoffs.append(f"已安排任务{direction} {abs(delta.assigned_tasks)} 项")
+    if delta.critical_task_completion_rate_pct:
+        direction = "提高" if delta.critical_task_completion_rate_pct > 0 else "降低"
+        tradeoffs.append(
+            f"紧急任务保障率{direction} "
+            f"{abs(delta.critical_task_completion_rate_pct):.0f} 个百分点"
+        )
+    if delta.average_wait_minutes:
+        direction = "增加" if delta.average_wait_minutes > 0 else "减少"
+        tradeoffs.append(
+            f"平均等待{direction} {abs(delta.average_wait_minutes):.2f} 分钟"
+        )
+    if delta.violation_count:
+        direction = "增加" if delta.violation_count > 0 else "减少"
+        tradeoffs.append(f"约束冲突{direction} {abs(delta.violation_count)} 个")
+
+    detail = "，".join(tradeoffs) if tradeoffs else "核心指标没有变化"
+    if preferred == "candidate":
+        return (
+            f"候选方案综合优先；相较基线，{detail}。",
+            "建议优先复核候选方案，并确认等待时间、资源负载和具体任务安排后由人员决定是否采用。",
+        )
+    if preferred == "baseline":
+        return (
+            f"基线方案综合优先；候选方案相较基线，{detail}。",
+            "建议保留基线方案，并检查候选方案的保障率、冲突或等待代价后再重新规划。",
+        )
+    return (
+        "两套方案核心指标相当，没有形成明确的量化优势。",
+        "请结合具体任务、资源和执行时段进行人工复核后选择方案。",
     )
 
 
@@ -261,6 +376,48 @@ class ScenarioService:
         )
         items = [self._build_plan_summary(plan) for plan in plans]
         return PlanListResponse(items=items, total=len(items))
+
+    def compare_plans(
+        self,
+        scenario_id: str,
+        request: ComparePlansRequest,
+    ) -> PlanComparison:
+        self.repository.get_scenario(scenario_id)
+        baseline_plan = self.repository.get_plan(request.baseline_plan_id)
+        candidate_plan = self.repository.get_plan(request.candidate_plan_id)
+        if (
+            baseline_plan.scenario_id != scenario_id
+            or candidate_plan.scenario_id != scenario_id
+        ):
+            raise InvalidPlanComparisonError(
+                "comparison plans must both belong to the requested scenario"
+            )
+
+        baseline_metrics = _comparison_metrics(baseline_plan)
+        candidate_metrics = _comparison_metrics(candidate_plan)
+        delta = _comparison_delta(baseline_metrics, candidate_metrics)
+        conclusion, recommendation = _comparison_guidance(delta)
+        comparison = PlanComparison(
+            scenario_id=scenario_id,
+            baseline_plan_id=baseline_plan.plan_id,
+            candidate_plan_id=candidate_plan.plan_id,
+            baseline_metrics=baseline_metrics,
+            candidate_metrics=candidate_metrics,
+            candidate_minus_baseline=delta,
+            conclusion=conclusion,
+            recommendation=recommendation,
+            safety_notice=SAFETY_NOTICE,
+        )
+        self.repository.record_plan_comparison(
+            scenario_id,
+            baseline_plan.plan_id,
+            candidate_plan.plan_id,
+        )
+        return comparison
+
+    def list_audit_records(self, scenario_id: str, limit: int) -> list[AuditRecord]:
+        records = self.repository.list_audit_records(scenario_id)
+        return list(records[-limit:])
 
     def _build_plan_record(self, plan: Plan) -> PlanRecord:
         return PlanRecord(

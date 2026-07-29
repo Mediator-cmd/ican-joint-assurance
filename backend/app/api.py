@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Never
+from typing import Annotated, Any, Never
 
 from fastapi import APIRouter, Depends, Query, Request, status
 
@@ -10,14 +10,18 @@ from .api_models import (
     ApplyEventsRequest,
     ApiErrorDetail,
     ApiErrorResponse,
+    ComparePlansRequest,
     CreatePlanRequest,
     HealthResponse,
     PlanAlgorithm,
+    PlanComparison,
     PlanListResponse,
     PlanRecord,
     ScenarioListResponse,
     ScenarioRecord,
 )
+from .audit_models import AuditRecord
+from .demo_export import build_default_demo_payload
 from .errors import ApiError
 from .models import Scenario
 from .repository import (
@@ -25,6 +29,7 @@ from .repository import (
     EventAlreadyRegisteredError,
     EventNotFoundError,
     InvalidRevisionError,
+    InvalidPlanComparisonError,
     PlanAlreadyExistsError,
     PlanNotFoundError,
     ScenarioAlreadyExistsError,
@@ -56,6 +61,15 @@ router = APIRouter(prefix="/api/v1", responses=COMMON_ERROR_RESPONSES)
 )
 def get_health() -> HealthResponse:
     return HealthResponse(version=APP_VERSION)
+
+
+@router.get(
+    "/demo",
+    tags=["system"],
+    summary="提供与离线网站兼容的确定性演示数据",
+)
+def get_demo() -> dict[str, Any]:
+    return build_default_demo_payload()
 
 
 def get_scenario_service(request: Request) -> ScenarioService:
@@ -196,6 +210,19 @@ def _raise_domain_error(error: Exception) -> Never:
                     location=["path", "plan_id"],
                     message="请求的方案不存在",
                     type="missing_plan",
+                )
+            ],
+        ) from error
+    if isinstance(error, InvalidPlanComparisonError):
+        raise ApiError(
+            400,
+            "plan_comparison_not_allowed",
+            "只能比较当前场景下两套不同的已保存方案",
+            [
+                ApiErrorDetail(
+                    location=["body"],
+                    message="基线方案和候选方案必须不同且属于请求场景",
+                    type="invalid_plan_comparison",
                 )
             ],
         ) from error
@@ -346,4 +373,43 @@ def get_plan(
     try:
         return service.get_plan(plan_id)
     except PlanNotFoundError as error:
+        _raise_domain_error(error)
+
+
+@router.post(
+    "/scenarios/{scenario_id}/comparisons",
+    response_model=PlanComparison,
+    status_code=status.HTTP_201_CREATED,
+    tags=["plans"],
+    summary="比较两套已保存方案的核心指标和取舍",
+)
+def compare_plans(
+    scenario_id: str,
+    payload: ComparePlansRequest,
+    service: Annotated[ScenarioService, Depends(get_scenario_service)],
+) -> PlanComparison:
+    try:
+        return service.compare_plans(scenario_id, payload)
+    except (
+        ScenarioNotFoundError,
+        PlanNotFoundError,
+        InvalidPlanComparisonError,
+    ) as error:
+        _raise_domain_error(error)
+
+
+@router.get(
+    "/scenarios/{scenario_id}/audit-records",
+    response_model=list[AuditRecord],
+    tags=["audit"],
+    summary="查询不含个人信息和原始请求的场景审计时间线",
+)
+def list_audit_records(
+    scenario_id: str,
+    service: Annotated[ScenarioService, Depends(get_scenario_service)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[AuditRecord]:
+    try:
+        return service.list_audit_records(scenario_id, limit)
+    except ScenarioNotFoundError as error:
         _raise_domain_error(error)
