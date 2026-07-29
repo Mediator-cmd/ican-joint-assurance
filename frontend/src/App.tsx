@@ -17,7 +17,9 @@ import {
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import { loadDemoPayload } from "./api";
 
 import type {
   Assignment,
@@ -386,21 +388,30 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
-  const loadData = useCallback(() => {
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
     setError(null);
     setPayload(null);
-    fetch(`${import.meta.env.BASE_URL}demo-output.json?reload=${reloadToken}`)
-      .then((response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json() as Promise<DemoPayload>;
+    void loadDemoPayload({ cacheBust: String(reloadToken), signal: controller.signal })
+      .then((result) => {
+        if (active) setPayload(result.payload);
       })
-      .then(setPayload)
       .catch((reason: unknown) => {
-        setError(reason instanceof Error ? reason.message : "无法读取演示数据");
+        if (!active) return;
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : "数据服务暂不可用，请确认项目服务已启动后重试。",
+        );
       });
-  }, [reloadToken]);
 
-  useEffect(() => loadData(), [loadData]);
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [reloadToken]);
 
   const current = payload?.views[activeView];
   const taskMap = useMemo(

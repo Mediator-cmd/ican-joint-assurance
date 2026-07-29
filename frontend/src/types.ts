@@ -142,3 +142,18 @@ export interface DemoPayload {
   changes: ScenarioChange[];
   views: Record<ViewKey, DemoView>;
 }
+
+export type DemoDataSource = "api" | "static_fallback";
+
+export type DemoLoadFailureReason = "network_error" | "http_error" | "invalid_response";
+
+export interface DemoLoadFailure {
+  source: DemoDataSource;
+  reason: DemoLoadFailureReason;
+  status?: number;
+}
+
+export interface DemoLoadResult {
+  payload: DemoPayload;
+  source: DemoDataSource;
+}
