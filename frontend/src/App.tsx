@@ -14,15 +14,19 @@ import {
   Plane,
   RefreshCw,
   Route,
+  Server,
   ShieldCheck,
+  HardDrive,
   UsersRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { loadDemoPayload } from "./api";
+import { resolveSelectedId } from "./selection";
 
 import type {
   Assignment,
+  DemoDataSource,
   DemoEvent,
   DemoPayload,
   ResourceMetric,
@@ -379,6 +383,7 @@ function eventTypeLabel(event: DemoEvent): string {
 
 export default function App() {
   const [payload, setPayload] = useState<DemoPayload | null>(null);
+  const [dataSource, setDataSource] = useState<DemoDataSource | null>(null);
   const [activePage, setActivePage] = useState<PageKey>("overview");
   const [activeView, setActiveView] = useState<ViewKey>("optimized");
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("all");
@@ -394,9 +399,12 @@ export default function App() {
 
     setError(null);
     setPayload(null);
+    setDataSource(null);
     void loadDemoPayload({ cacheBust: String(reloadToken), signal: controller.signal })
       .then((result) => {
-        if (active) setPayload(result.payload);
+        if (!active) return;
+        setDataSource(result.source);
+        setPayload(result.payload);
       })
       .catch((reason: unknown) => {
         if (!active) return;
@@ -457,10 +465,32 @@ export default function App() {
   );
 
   useEffect(() => {
-    if (visibleTaskIds.length > 0 && !visibleTaskIds.includes(selectedTaskId)) {
-      setSelectedTaskId(visibleTaskIds[0]);
-    }
-  }, [selectedTaskId, visibleTaskIds]);
+    if (!current) return;
+    const nextTaskId = resolveSelectedId(selectedTaskId, visibleTaskIds);
+    if (nextTaskId !== selectedTaskId) setSelectedTaskId(nextTaskId);
+  }, [current, selectedTaskId, visibleTaskIds]);
+
+  const eventIds = useMemo(
+    () => payload?.events.map((event) => event.event_id) ?? [],
+    [payload],
+  );
+
+  useEffect(() => {
+    if (!payload) return;
+    const nextEventId = resolveSelectedId(selectedEventId, eventIds);
+    if (nextEventId !== selectedEventId) setSelectedEventId(nextEventId);
+  }, [eventIds, payload, selectedEventId]);
+
+  const resourceIds = useMemo(
+    () => current?.plan.metrics.resource_metrics.map((metric) => metric.resource_id) ?? [],
+    [current],
+  );
+
+  useEffect(() => {
+    if (!current) return;
+    const nextResourceId = resolveSelectedId(selectedResourceId, resourceIds);
+    if (nextResourceId !== selectedResourceId) setSelectedResourceId(nextResourceId);
+  }, [current, resourceIds, selectedResourceId]);
 
   const selectedEvent = payload?.events.find((event) => event.event_id === selectedEventId)
     ?? payload?.events[0];
@@ -475,7 +505,7 @@ export default function App() {
   if (error) {
     return <ErrorState message={`演示数据加载失败：${error}`} retry={() => setReloadToken((value) => value + 1)} />;
   }
-  if (!payload || !current) return <LoadingState />;
+  if (!payload || !current || !dataSource) return <LoadingState />;
 
   const metrics = current.plan.metrics;
   const changedRuleMetrics = payload.views.after_events_fifo.plan.metrics;
@@ -518,6 +548,12 @@ export default function App() {
   const algorithmLabel = current.plan.algorithm.startsWith("cp_sat")
     ? "约束优化（CP-SAT）"
     : "顺序规则（FIFO）";
+  const isApiSource = dataSource === "api";
+  const SourceIcon = isApiSource ? Server : HardDrive;
+  const sourceLabel = isApiSource ? "服务数据" : "本地演示数据";
+  const sourceDetail = isApiSource
+    ? "当前数据由本地业务服务提供"
+    : "业务服务暂未连接，当前使用内置演示数据";
 
   const decision = isOptimized
     ? {
@@ -591,10 +627,10 @@ export default function App() {
           })}
         </nav>
 
-        <div className="sidebar-status">
+        <div className={`sidebar-status${isApiSource ? "" : " is-fallback"}`}>
           <span className="eyebrow">当前运行状态</span>
           <strong>{viewInfo[activeView].label}</strong>
-          <span><i /> 调度与校验服务正常</span>
+          <span><i /> {isApiSource ? "数据服务连接正常" : "当前使用本地演示数据"}</span>
           <small>合成教学场景 · V{current.scenario.version}</small>
         </div>
       </aside>
@@ -607,6 +643,15 @@ export default function App() {
             <p>{currentPage.subtitle}</p>
           </div>
           <div className="topbar-actions">
+            <span
+              className={`source-chip ${isApiSource ? "api" : "fallback"}`}
+              title={sourceDetail}
+              aria-label={`数据来源：${sourceLabel}`}
+              role="status"
+            >
+              <SourceIcon size={17} />
+              {sourceLabel}
+            </span>
             <span className="data-chip"><ShieldCheck size={15} />合成数据</span>
             <button className="icon-button" title="重新载入演示数据" onClick={() => setReloadToken((value) => value + 1)}>
               <RefreshCw size={18} />
