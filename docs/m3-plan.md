@@ -302,4 +302,4 @@ M3-7 已将现有脚本从“单 Vite 进程”升级为“后端 + 前端”服
 
 M3-0 至 M3-9 及 M3-UI 标签式工作台已全部完成。真实 HTTP API 闭环、五页桌面/移动端、静态回退、双失败恢复、双服务联调和全量回归验收见 [m3-08-review.md](m3-08-review.md)；阶段能力、退出条件和边界汇总见 [m3-review.md](m3-review.md)；可执行接口流程见 [m3-openapi-guide.md](m3-openapi-guide.md)。
 
-下一执行入口为 [M4-0 实时运行契约冻结](m4-realtime-operations-plan.md)。M3 页面仍是一次性方案快照，不得把 M4 动态能力写成已完成。
+M4-0 实时运行契约冻结已完成，当前入口为 [M4-1 运行会话、权威时钟与 SQLite 仓库](m4-realtime-operations-plan.md)。M3 页面仍是一次性方案快照，不得把尚未实现的 M4 动态能力写成已完成。

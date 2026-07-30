@@ -18,14 +18,16 @@
 
 ## 当前状态
 
-- 阶段：M3 后端业务 API 与前后端联调已完成。
-- 下一单元：M4-0 实时运行契约冻结。
+- 阶段：M4 实时运行与动态重规划（M4-0 已完成）。
+- 下一单元：M4-1 运行会话、权威时钟与 SQLite 仓库。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
 - M3 阶段总复盘：[docs/m3-review.md](docs/m3-review.md)
 - OpenAPI/Swagger 操作指南：[docs/m3-openapi-guide.md](docs/m3-openapi-guide.md)
 - M4 实时运行计划：[docs/m4-realtime-operations-plan.md](docs/m4-realtime-operations-plan.md)
+- M4-0 运行时契约：[docs/m4-runtime-contract.md](docs/m4-runtime-contract.md)
+- M4-0 契约审查：[docs/m4-00-review.md](docs/m4-00-review.md)
 
 ## 目录结构
 
@@ -35,6 +37,7 @@ docs/
   project-progress.md   # 持续更新的进度、决策、验证和交接记录
   m3-openapi-guide.md   # Swagger 业务闭环操作说明
   m3-review.md          # M3 阶段总复盘与退出条件
+  m4-runtime-contract.md # M4 运行时模型、REST/SSE 与状态机契约
   scenarios/            # 文档用场景说明
 frontend/               # React + TypeScript + Vite 运行态控制台
 backend/app/            # 数据模型、事件应用、FIFO、CP-SAT 和约束检查
@@ -66,7 +69,7 @@ scripts/                # 场景校验、数据生成和发布辅助脚本
 
 当前版本提供可运行的 React + FastAPI 本地演示。页面优先读取 `/api/v1/demo`，服务不可用时回退到静态演示 JSON；页面包含“扰动前 FIFO”“事件后 FIFO”和“CP-SAT 优化”三种方案视图，以及五个可切换工作页。
 
-当前 M3 版本仍是一次加载三套方案快照，尚未自动推进时间或推送状态变化。M4 将实现后端权威仿真时钟、任务与资源动态状态、事件到时自动生效、滚动重规划、人工确认及 SSE 页面更新；这些能力是 M4 的硬性退出条件，静态 JSON 届时只作为明确标识的离线只读降级。
+当前可运行版本仍是一次加载三套方案快照，尚未自动推进时间或推送状态变化。M4-0 已冻结运行契约，M4-1 起实现后端权威仿真时钟、任务与资源动态状态、事件到时自动生效、滚动重规划、人工确认及 SSE 页面更新；这些能力是 M4 的硬性退出条件，静态 JSON 届时只作为明确标识的离线只读降级。
 
 ### Windows 一键启停
 

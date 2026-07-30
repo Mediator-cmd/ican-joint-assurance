@@ -92,4 +92,4 @@ M3-8 审查结束时，M3-9 是唯一下一步：完成阶段级 README 与 Open
 
 ## 8. 后续状态
 
-M3-9 已于 2026-07-30 完成，当前阶段结论见 [m3-review.md](m3-review.md)，接口复现步骤见 [m3-openapi-guide.md](m3-openapi-guide.md)。下一执行入口已切换为 [M4-0 实时运行契约冻结](m4-realtime-operations-plan.md)。
+M3-9 已于 2026-07-30 完成，当前阶段结论见 [m3-review.md](m3-review.md)，接口复现步骤见 [m3-openapi-guide.md](m3-openapi-guide.md)。M4-0 契约冻结也已完成，下一执行入口已切换为 [M4-1 运行会话、权威时钟与 SQLite 仓库](m4-realtime-operations-plan.md)。
