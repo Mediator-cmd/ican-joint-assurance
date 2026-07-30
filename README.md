@@ -18,8 +18,8 @@
 
 ## 当前状态
 
-- 阶段：M3 前后端联调，M3-0 至 M3-7 已完成。
-- 下一单元：M3-8 端到端审查；随后进行 M3-9 阶段收口。
+- 阶段：M3 前后端联调，M3-0 至 M3-8 已完成。
+- 下一单元：M3-9 阶段收口。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
