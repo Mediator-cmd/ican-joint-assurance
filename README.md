@@ -23,6 +23,7 @@
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
+- M4 实时运行计划：[docs/m4-realtime-operations-plan.md](docs/m4-realtime-operations-plan.md)
 
 ## 目录结构
 
@@ -52,7 +53,7 @@ scripts/                # 场景校验、数据生成和发布辅助脚本
 2. M1：`Scenario`、`FlightEvent`、`ServiceTask`、`Resource`、`Zone` 数据模型及最小 JSON 场景。
 3. M2：FIFO 基线、约束校验和优化内核。
 4. M3：后端业务 API。
-5. M4：运行态前端与演示流程。
+5. M4：仿真实时运行、动态重规划与演示流程。
 6. M5-M7：AI 事件理解、规模测试、比赛材料和发布。
 
 每个里程碑都要有可复现的测试、Git commit 和进度记录。不得把 `.env`、密钥、个人信息或未经授权的真实机场数据提交到仓库。
@@ -60,6 +61,8 @@ scripts/                # 场景校验、数据生成和发布辅助脚本
 ## 当前运行说明
 
 当前版本提供可运行的 React + FastAPI 本地演示。页面优先读取 `/api/v1/demo`，服务不可用时回退到静态演示 JSON；页面包含“扰动前 FIFO”“事件后 FIFO”和“CP-SAT 优化”三种方案视图，以及五个可切换工作页。
+
+当前 M3 版本仍是一次加载三套方案快照，尚未自动推进时间或推送状态变化。M4 将实现后端权威仿真时钟、任务与资源动态状态、事件到时自动生效、滚动重规划、人工确认及 SSE 页面更新；这些能力是 M4 的硬性退出条件，静态 JSON 届时只作为明确标识的离线只读降级。
 
 ### Windows 一键启停
 
