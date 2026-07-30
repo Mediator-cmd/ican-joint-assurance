@@ -88,4 +88,8 @@ Vitest 和 Vite 首次在受限沙箱内启动时均遇到 `spawn EPERM`；在�
 
 浏览器截图、`browser-audit.json`、`api-audit.json` 和可重复执行的审查脚本位于忽略提交的 `output/playwright/m3-8/`，不会把本机测试产物带入正式仓库历史。
 
-M3-9 是唯一下一步：完成阶段级 README 与 OpenAPI 使用说明复核、汇总 M3 review、检查全部退出条件，并形成 M3 收口提交。
+M3-8 审查结束时，M3-9 是唯一下一步：完成阶段级 README 与 OpenAPI 使用说明复核、汇总 M3 review、检查全部退出条件，并形成 M3 收口提交。
+
+## 8. 后续状态
+
+M3-9 已于 2026-07-30 完成，当前阶段结论见 [m3-review.md](m3-review.md)，接口复现步骤见 [m3-openapi-guide.md](m3-openapi-guide.md)。下一执行入口已切换为 [M4-0 实时运行契约冻结](m4-realtime-operations-plan.md)。

@@ -7,6 +7,7 @@ import pytest
 from fastapi import Query
 from fastapi.testclient import TestClient
 
+from backend.app.demo_export import SAFETY_NOTICE
 from backend.app.errors import ApiError
 from backend.app.main import create_app
 
@@ -31,7 +32,20 @@ def test_openapi_document_contains_health_route() -> None:
 
     assert response.status_code == 200
     document = response.json()
+    assert document["info"]["title"] == "联保智调业务 API"
+    assert SAFETY_NOTICE in document["info"]["description"]
+    assert {tag["name"] for tag in document["tags"]} == {
+        "system",
+        "scenarios",
+        "events",
+        "plans",
+        "audit",
+    }
     assert "/api/v1/health" in document["paths"]
+    assert (
+        document["paths"]["/api/v1/health"]["get"]["summary"]
+        == "检查业务 API 是否就绪"
+    )
     validation_schema = document["paths"]["/api/v1/health"]["get"]["responses"]["422"]
     assert validation_schema["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/ApiErrorResponse"

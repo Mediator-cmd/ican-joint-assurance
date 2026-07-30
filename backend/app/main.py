@@ -12,7 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .api import APP_VERSION, router
 from .api_models import ApiErrorBody, ApiErrorDetail, ApiErrorResponse
-from .demo_export import DEMO_SCENARIO_PATH
+from .demo_export import DEMO_SCENARIO_PATH, SAFETY_NOTICE
 from .errors import ApiError
 from .repository import InMemoryScenarioRepository
 from .scenario_loader import load_scenario
@@ -20,6 +20,46 @@ from .services import ScenarioService
 
 
 logger = logging.getLogger(__name__)
+
+
+OPENAPI_DESCRIPTION = f"""
+联保智调的版本化业务接口，用于匿名化仿真场景的导入、事件应用、确定性规划、方案比较与审计查询。
+
+建议按以下顺序操作：
+
+1. 查询或导入场景；
+2. 在当前版本生成 FIFO 原规则方案；
+3. 携带 `expected_version` 应用结构化事件；
+4. 在新版本生成 CP-SAT 系统优化建议；
+5. 比较两套已保存方案并查询审计记录。
+
+事件应用和计划创建受期望版本与重复提交检查保护；方案比较会校验两套方案均已保存、互不相同且属于请求场景。当前 M3 数据保存在单个后端进程内，服务重启后恢复内置仿真场景。
+
+**安全边界：{SAFETY_NOTICE}**
+""".strip()
+
+OPENAPI_TAGS = [
+    {
+        "name": "system",
+        "description": "健康检查与不修改运行状态的确定性演示数据。",
+    },
+    {
+        "name": "scenarios",
+        "description": "导入、列出并查询匿名化仿真场景及其历史版本。",
+    },
+    {
+        "name": "events",
+        "description": "按期望版本应用结构化扰动，并生成新的不可变场景版本。",
+    },
+    {
+        "name": "plans",
+        "description": "生成、查询和比较 FIFO 原规则方案与 CP-SAT 系统优化建议。",
+    },
+    {
+        "name": "audit",
+        "description": "查询不含个人信息、原始请求和本机路径的场景审计时间线。",
+    },
+]
 
 
 def _new_request_id() -> str:
@@ -131,11 +171,12 @@ def create_app(
 
     application = FastAPI(
         title="联保智调业务 API",
-        description="教学仿真与辅助决策接口，不构成真实机场运行指令。",
+        description=OPENAPI_DESCRIPTION,
         version=APP_VERSION,
         docs_url="/docs",
         openapi_url="/api/v1/openapi.json",
         redoc_url=None,
+        openapi_tags=OPENAPI_TAGS,
     )
     application.state.scenario_repository = scenario_repository
     application.state.scenario_service = ScenarioService(scenario_repository)

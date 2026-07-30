@@ -57,7 +57,7 @@ router = APIRouter(prefix="/api/v1", responses=COMMON_ERROR_RESPONSES)
     "/health",
     response_model=HealthResponse,
     tags=["system"],
-    summary="Check whether the API process is ready",
+    summary="检查业务 API 是否就绪",
 )
 def get_health() -> HealthResponse:
     return HealthResponse(version=APP_VERSION)

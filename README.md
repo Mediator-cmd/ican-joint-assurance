@@ -18,11 +18,13 @@
 
 ## 当前状态
 
-- 阶段：M3 前后端联调，M3-0 至 M3-8 已完成。
-- 下一单元：M3-9 阶段收口。
+- 阶段：M3 后端业务 API 与前后端联调已完成。
+- 下一单元：M4-0 实时运行契约冻结。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
+- M3 阶段总复盘：[docs/m3-review.md](docs/m3-review.md)
+- OpenAPI/Swagger 操作指南：[docs/m3-openapi-guide.md](docs/m3-openapi-guide.md)
 - M4 实时运行计划：[docs/m4-realtime-operations-plan.md](docs/m4-realtime-operations-plan.md)
 
 ## 目录结构
@@ -31,6 +33,8 @@
 docs/
   project-plan.md       # 总体规划、边界和里程碑
   project-progress.md   # 持续更新的进度、决策、验证和交接记录
+  m3-openapi-guide.md   # Swagger 业务闭环操作说明
+  m3-review.md          # M3 阶段总复盘与退出条件
   scenarios/            # 文档用场景说明
 frontend/               # React + TypeScript + Vite 运行态控制台
 backend/app/            # 数据模型、事件应用、FIFO、CP-SAT 和约束检查
@@ -100,6 +104,8 @@ python -m venv .venv
 - 场景列表：`http://127.0.0.1:8000/api/v1/scenarios`，首次启动自动提供一个仿真示例。
 - 场景 API 支持结构化导入、可规划摘要、数据缺口提示、分页和当前/历史版本查询。
 - 事件与计划 API 支持版本化结构事件应用、FIFO/CP-SAT 计划创建、不可变计划查询，以及普通语言结果摘要和人工确认提示。
+- Swagger 中的完整操作顺序、请求体、重复提交处理和 PowerShell 示例见 [docs/m3-openapi-guide.md](docs/m3-openapi-guide.md)。
+- M3 阶段能力、验证证据和已知边界见 [docs/m3-review.md](docs/m3-review.md)。
 
 启动网站：
 
