@@ -9,8 +9,10 @@ from threading import RLock
 from typing import Callable
 from uuid import uuid4
 
-from .models import DataClassification
-from .repository import InMemoryScenarioRepository, PlanNotFoundError
+from .audit_models import AuditAction
+from .models import DataClassification, Scenario
+from .planning_models import Plan
+from .repository import InMemoryScenarioRepository, PlanNotFoundError, RepositoryError
 from .runtime_models import (
     CreateRuntimeSessionRequest,
     ResetRuntimeSessionRequest,
@@ -29,6 +31,7 @@ from .runtime_repository import (
     RuntimeSessionRecord,
     SQLiteRuntimeSessionRepository,
 )
+from .runtime_projection import RuntimeProjectionSource, project_runtime_state
 
 
 class RuntimeServiceError(Exception):
@@ -127,6 +130,7 @@ class RuntimeSessionService:
             raise RuntimePlanHasViolationsError(
                 "runtime plan contains hard-constraint violations"
             )
+        projection_source = self._build_projection_source(scenario, plan)
 
         now = self._now()
         for _ in range(5):
@@ -147,6 +151,7 @@ class RuntimeSessionService:
                 failure=None,
                 created_at=now,
                 updated_at=now,
+                projection_source=projection_source,
             )
             try:
                 stored = self.runtime_repository.create_session(record)
@@ -437,11 +442,25 @@ class RuntimeSessionService:
         return min(projected, record.simulation_window_end)
 
     def _build_snapshot(self, record: RuntimeSessionRecord) -> RuntimeSessionSnapshot:
+        record = self._hydrate_projection_source(record)
         simulation_time = self._current_simulation_time(record)
-        next_boundary_at = (
-            record.simulation_window_end
-            if simulation_time < record.simulation_window_end
+        projection = (
+            project_runtime_state(
+                record.projection_source,
+                simulation_time,
+                record.status,
+            )
+            if record.projection_source is not None
             else None
+        )
+        next_boundary_at = (
+            projection.next_boundary_at
+            if projection is not None
+            else (
+                record.simulation_window_end
+                if simulation_time < record.simulation_window_end
+                else None
+            )
         )
         return RuntimeSessionSnapshot(
             session_id=record.session_id,
@@ -460,14 +479,59 @@ class RuntimeSessionService:
                 is_advancing=record.status is RuntimeStatus.RUNNING,
                 next_boundary_at=next_boundary_at,
             ),
-            tasks=[],
-            resources=[],
-            flights=[],
-            events=[],
+            tasks=projection.tasks if projection is not None else [],
+            resources=projection.resources if projection is not None else [],
+            flights=projection.flights if projection is not None else [],
+            events=projection.events if projection is not None else [],
             guidance=self._guidance(record),
             failure=record.failure,
             created_at=record.created_at,
             updated_at=record.updated_at,
+        )
+
+    def _build_projection_source(
+        self,
+        scenario: Scenario,
+        plan: Plan,
+    ) -> RuntimeProjectionSource:
+        applied_event_ids = {event.event_id for event in scenario.events}
+        applied_event_versions: dict[str, int] = {}
+        for audit in self.scenario_repository.list_audit_records(scenario.scenario_id):
+            if (
+                audit.action is AuditAction.EVENTS_APPLIED
+                and audit.version_after is not None
+                and audit.version_after <= scenario.version
+            ):
+                for event_id in audit.related_entity_ids:
+                    if event_id in applied_event_ids:
+                        applied_event_versions[event_id] = audit.version_after
+        return RuntimeProjectionSource(
+            scenario=scenario,
+            plan=plan,
+            event_catalog=list(
+                self.scenario_repository.get_events(scenario.scenario_id)
+            ),
+            applied_event_versions=applied_event_versions,
+        )
+
+    def _hydrate_projection_source(
+        self,
+        record: RuntimeSessionRecord,
+    ) -> RuntimeSessionRecord:
+        if record.projection_source is not None:
+            return record
+        try:
+            scenario = self.scenario_repository.get_scenario(
+                record.scenario_id,
+                record.current_scenario_version,
+            )
+            plan = self.scenario_repository.get_plan(record.active_plan_id)
+            source = self._build_projection_source(scenario, plan)
+        except (RepositoryError, ValueError):
+            return record
+        return self.runtime_repository.attach_projection_source(
+            record.session_id,
+            source,
         )
 
     @staticmethod

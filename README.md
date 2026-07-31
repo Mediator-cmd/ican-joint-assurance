@@ -18,8 +18,8 @@
 
 ## 当前状态
 
-- 阶段：M4 实时运行与动态重规划（M4-1 已完成）。
-- 下一单元：M4-2 任务、资源、航班和事件状态投影。
+- 阶段：M4 实时运行与动态重规划（M4-2 已完成）。
+- 下一单元：M4-3 事件自动生效、执行事实冻结、滚动重规划和人工确认。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
@@ -29,6 +29,7 @@
 - M4-0 运行时契约：[docs/m4-runtime-contract.md](docs/m4-runtime-contract.md)
 - M4-0 契约审查：[docs/m4-00-review.md](docs/m4-00-review.md)
 - M4-1 实现审查：[docs/m4-01-review.md](docs/m4-01-review.md)
+- M4-2 实现审查：[docs/m4-02-review.md](docs/m4-02-review.md)
 
 ## 目录结构
 
@@ -70,7 +71,7 @@ scripts/                # 场景校验、数据生成和发布辅助脚本
 
 当前版本提供可运行的 React + FastAPI 本地演示。页面优先读取 `/api/v1/demo`，服务不可用时回退到静态演示 JSON；页面包含“扰动前 FIFO”“事件后 FIFO”和“CP-SAT 优化”三种方案视图，以及五个可切换工作页。
 
-当前前端仍是一次加载三套方案快照，尚未接入运行会话控制或推送状态变化。M4-1 已提供后端 SQLite 运行会话、权威仿真时钟和开始/暂停/倍速/重置 API；M4-2 至 M4-5 将继续实现任务与资源动态投影、事件到时生效、滚动重规划、人工确认、SSE 和五页工作台联动。静态 JSON 仍只作为明确标识的离线只读降级。
+当前前端仍是一次加载三套方案快照，尚未接入运行会话控制或推送状态变化。后端已经提供 SQLite 运行会话、权威仿真时钟和开始/暂停/倍速/重置 API，并能按仿真时间确定性投影任务、资源、航班和事件状态。M4-3 至 M4-5 将继续实现事件到时应用、滚动重规划、人工确认、SSE 和五页工作台联动。静态 JSON 仍只作为明确标识的离线只读降级。
 
 ### Windows 一键启停
 
@@ -119,7 +120,7 @@ npm install
 npm run dev
 ```
 
-浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `67 passed`，前端应同时通过 `npm run typecheck` 和 `npm run build`。
+浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `107 passed`，前端应同时通过 `npm run typecheck` 和 `npm run build`。
 
 ## Git 工作流
 

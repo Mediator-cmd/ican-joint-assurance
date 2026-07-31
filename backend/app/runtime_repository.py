@@ -11,6 +11,7 @@ from threading import RLock
 from typing import Any
 
 from .runtime_models import RuntimeFailure, RuntimeStatus, SimulationSpeed
+from .runtime_projection import RuntimeProjectionSource
 
 
 class RuntimeRepositoryError(Exception):
@@ -56,6 +57,7 @@ class RuntimeSessionRecord:
     failure: RuntimeFailure | None
     created_at: datetime
     updated_at: datetime
+    projection_source: RuntimeProjectionSource | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,7 +120,8 @@ class SQLiteRuntimeSessionRepository:
                 speed INTEGER NOT NULL CHECK (speed IN (1, 5, 15)),
                 failure_json TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                projection_source_json TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_runtime_sessions_updated
@@ -146,6 +149,14 @@ class SQLiteRuntimeSessionRepository:
                 ON runtime_control_audit(session_id, audit_id ASC);
             """
         )
+        columns = {
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(runtime_sessions)").fetchall()
+        }
+        if "projection_source_json" not in columns:
+            self._connection.execute(
+                "ALTER TABLE runtime_sessions ADD COLUMN projection_source_json TEXT"
+            )
 
     def create_session(self, record: RuntimeSessionRecord) -> RuntimeSessionRecord:
         if record.revision != 1:
@@ -161,8 +172,8 @@ class SQLiteRuntimeSessionRepository:
                         current_scenario_version, initial_plan_id, active_plan_id,
                         candidate_plan_id, status, revision, simulation_time,
                         simulation_window_start, simulation_window_end, speed,
-                        failure_json, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        failure_json, created_at, updated_at, projection_source_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     values,
                 )
@@ -263,7 +274,8 @@ class SQLiteRuntimeSessionRepository:
                         active_plan_id = ?, candidate_plan_id = ?, status = ?,
                         revision = ?, simulation_time = ?,
                         simulation_window_start = ?, simulation_window_end = ?,
-                        speed = ?, failure_json = ?, created_at = ?, updated_at = ?
+                        speed = ?, failure_json = ?, created_at = ?, updated_at = ?,
+                        projection_source_json = ?
                     WHERE session_id = ? AND revision = ?
                     """,
                     (*values[1:], record.session_id, expected_revision),
@@ -289,6 +301,48 @@ class SQLiteRuntimeSessionRepository:
                 self._rollback_if_needed()
                 raise RuntimePersistenceError("runtime session update failed") from error
         return record
+
+    def attach_projection_source(
+        self,
+        session_id: str,
+        source: RuntimeProjectionSource,
+    ) -> RuntimeSessionRecord:
+        serialized = json.dumps(source.model_dump(mode="json"), ensure_ascii=False)
+        with self._lock:
+            try:
+                self._connection.execute("BEGIN IMMEDIATE")
+                row = self._connection.execute(
+                    "SELECT projection_source_json FROM runtime_sessions WHERE session_id = ?",
+                    (session_id,),
+                ).fetchone()
+                if row is None:
+                    raise RuntimeSessionNotFoundError(
+                        f"runtime session {session_id} was not found"
+                    )
+                if row["projection_source_json"] is None:
+                    self._connection.execute(
+                        """
+                        UPDATE runtime_sessions SET projection_source_json = ?
+                        WHERE session_id = ? AND projection_source_json IS NULL
+                        """,
+                        (serialized, session_id),
+                    )
+                else:
+                    existing = RuntimeProjectionSource.model_validate(
+                        json.loads(row["projection_source_json"])
+                    )
+                    if existing != source:
+                        raise RuntimePersistenceError(
+                            "runtime projection source is immutable after creation"
+                        )
+                self._connection.execute("COMMIT")
+            except (RuntimeSessionNotFoundError, RuntimePersistenceError):
+                self._rollback_if_needed()
+                raise
+            except (sqlite3.DatabaseError, ValueError, json.JSONDecodeError) as error:
+                self._rollback_if_needed()
+                raise RuntimePersistenceError("runtime projection source update failed") from error
+        return self.get_session(session_id)
 
     def recover_interrupted_sessions(self, recovered_at: datetime) -> tuple[str, ...]:
         """Pause interrupted work once and record the recovery as a durable boundary."""
@@ -372,6 +426,11 @@ class SQLiteRuntimeSessionRepository:
             if record.failure is not None
             else None
         )
+        projection_source_json = (
+            json.dumps(record.projection_source.model_dump(mode="json"), ensure_ascii=False)
+            if record.projection_source is not None
+            else None
+        )
         return (
             record.session_id,
             record.scenario_id,
@@ -389,6 +448,7 @@ class SQLiteRuntimeSessionRepository:
             failure_json,
             self._serialize_datetime(record.created_at),
             self._serialize_datetime(record.updated_at),
+            projection_source_json,
         )
 
     def _insert_audit(
@@ -453,6 +513,13 @@ class SQLiteRuntimeSessionRepository:
                 if row["failure_json"] is not None
                 else None
             )
+            projection_source = (
+                RuntimeProjectionSource.model_validate(
+                    json.loads(row["projection_source_json"])
+                )
+                if row["projection_source_json"] is not None
+                else None
+            )
             return RuntimeSessionRecord(
                 session_id=row["session_id"],
                 scenario_id=row["scenario_id"],
@@ -470,6 +537,7 @@ class SQLiteRuntimeSessionRepository:
                 failure=failure,
                 created_at=self._parse_datetime(row["created_at"]),
                 updated_at=self._parse_datetime(row["updated_at"]),
+                projection_source=projection_source,
             )
         except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
             raise RuntimePersistenceError("runtime database contains invalid session data") from error

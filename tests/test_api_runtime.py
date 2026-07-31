@@ -104,7 +104,12 @@ def test_runtime_api_controls_authoritative_clock_and_persists_boundaries(tmp_pa
     assert created["status"] == "ready"
     assert created["storage_scope"] == "sqlite"
     assert created["safety_notice"] == SAFETY_NOTICE
-    assert created["tasks"] == created["resources"] == created["events"] == []
+    assert len(created["tasks"]) == 5
+    assert len(created["resources"]) == 4
+    assert len(created["flights"]) == 2
+    assert len(created["events"]) == 2
+    assert {item["status"] for item in created["tasks"]} == {"pending", "unassigned"}
+    assert {item["status"] for item in created["events"]} == {"pending"}
     assert listed.status_code == 200
     assert listed.json()["total"] == 1
     assert listed.json()["safety_notice"] == SAFETY_NOTICE
