@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
+from typing import Callable
 from uuid import uuid4
+from datetime import datetime
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -15,6 +18,8 @@ from .api_models import ApiErrorBody, ApiErrorDetail, ApiErrorResponse
 from .demo_export import DEMO_SCENARIO_PATH, SAFETY_NOTICE
 from .errors import ApiError
 from .repository import InMemoryScenarioRepository
+from .runtime_repository import SQLiteRuntimeSessionRepository
+from .runtime_services import RuntimeSessionService
 from .scenario_loader import load_scenario
 from .services import ScenarioService
 
@@ -33,7 +38,7 @@ OPENAPI_DESCRIPTION = f"""
 4. 在新版本生成 CP-SAT 系统优化建议；
 5. 比较两套已保存方案并查询审计记录。
 
-事件应用和计划创建受期望版本与重复提交检查保护；方案比较会校验两套方案均已保存、互不相同且属于请求场景。当前 M3 数据保存在单个后端进程内，服务重启后恢复内置仿真场景。
+事件应用和计划创建受期望版本与重复提交检查保护；方案比较会校验两套方案均已保存、互不相同且属于请求场景。M4-1 运行会话控制状态保存在 SQLite，服务重启后可从列表找回并以安全暂停状态继续；场景与普通方案仍沿用 M3 进程内仓库。
 
 **安全边界：{SAFETY_NOTICE}**
 """.strip()
@@ -59,7 +64,16 @@ OPENAPI_TAGS = [
         "name": "audit",
         "description": "查询不含个人信息、原始请求和本机路径的场景审计时间线。",
     },
+    {
+        "name": "runtime",
+        "description": "创建、找回并控制具有后端权威仿真时钟的持久运行会话。",
+    },
 ]
+
+
+DEFAULT_RUNTIME_DATABASE_PATH = (
+    Path(__file__).resolve().parents[2] / ".runtime" / "runtime-sessions.sqlite3"
+)
 
 
 def _new_request_id() -> str:
@@ -162,12 +176,30 @@ def _register_exception_handlers(app: FastAPI) -> None:
 def create_app(
     repository: InMemoryScenarioRepository | None = None,
     seed_demo: bool = True,
+    runtime_repository: SQLiteRuntimeSessionRepository | None = None,
+    runtime_database_path: str | Path | None = None,
+    wall_clock: Callable[[], datetime] | None = None,
+    monotonic_clock: Callable[[], float] | None = None,
+    runtime_session_id_factory: Callable[[], str] | None = None,
+    recover_runtime_sessions: bool = True,
 ) -> FastAPI:
     scenario_repository = repository or InMemoryScenarioRepository()
     if seed_demo:
         demo_scenario = load_scenario(DEMO_SCENARIO_PATH)
         if demo_scenario.scenario_id not in scenario_repository.list_scenario_ids():
             scenario_repository.create_scenario(demo_scenario)
+
+    durable_runtime_repository = runtime_repository or SQLiteRuntimeSessionRepository(
+        runtime_database_path or DEFAULT_RUNTIME_DATABASE_PATH
+    )
+    runtime_service = RuntimeSessionService(
+        scenario_repository,
+        durable_runtime_repository,
+        wall_clock=wall_clock,
+        monotonic_clock=monotonic_clock,
+        session_id_factory=runtime_session_id_factory,
+        recover_on_startup=recover_runtime_sessions,
+    )
 
     application = FastAPI(
         title="联保智调业务 API",
@@ -180,6 +212,8 @@ def create_app(
     )
     application.state.scenario_repository = scenario_repository
     application.state.scenario_service = ScenarioService(scenario_repository)
+    application.state.runtime_repository = durable_runtime_repository
+    application.state.runtime_service = runtime_service
 
     @application.middleware("http")
     async def add_request_id(request: Request, call_next):

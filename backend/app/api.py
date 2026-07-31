@@ -37,6 +37,30 @@ from .repository import (
     ScenarioVersionNotFoundError,
     VersionConflictError,
 )
+from .runtime_models import (
+    CreateRuntimeSessionRequest,
+    ResetRuntimeSessionRequest,
+    RuntimeRevisionRequest,
+    RuntimeSessionListResponse,
+    RuntimeSessionSnapshot,
+    RuntimeStatus,
+    SetRuntimeSpeedRequest,
+)
+from .runtime_repository import (
+    RuntimePersistenceError,
+    RuntimeRevisionConflictError,
+    RuntimeSessionAlreadyExistsError,
+    RuntimeSessionNotFoundError,
+)
+from .runtime_services import (
+    RuntimeInvalidTransitionError,
+    RuntimePlanHasViolationsError,
+    RuntimePlanNotFoundError,
+    RuntimePlanScenarioMismatchError,
+    RuntimePlanVersionMismatchError,
+    RuntimeScenarioClassificationError,
+    RuntimeSessionService,
+)
 from .services import ScenarioNotReadyForPlanningError, ScenarioService
 
 
@@ -74,6 +98,10 @@ def get_demo() -> dict[str, Any]:
 
 def get_scenario_service(request: Request) -> ScenarioService:
     return request.app.state.scenario_service
+
+
+def get_runtime_service(request: Request) -> RuntimeSessionService:
+    return request.app.state.runtime_service
 
 
 def _raise_domain_error(error: Exception) -> Never:
@@ -240,7 +268,278 @@ def _raise_domain_error(error: Exception) -> Never:
                 )
             ],
         ) from error
+    if isinstance(error, RuntimeSessionNotFoundError):
+        raise ApiError(
+            404,
+            "runtime_session_not_found",
+            "未找到该运行会话，请从运行会话列表中重新选择",
+            [
+                ApiErrorDetail(
+                    location=["path", "session_id"],
+                    message="运行会话不存在",
+                    type="missing_runtime_session",
+                )
+            ],
+        ) from error
+    if isinstance(error, RuntimePlanNotFoundError):
+        raise ApiError(
+            404,
+            "runtime_plan_not_found",
+            "未找到用于创建运行会话的方案，请先生成并保存方案",
+            [
+                ApiErrorDetail(
+                    location=["body", "active_plan_id"],
+                    message="初始方案不存在",
+                    type="missing_runtime_plan",
+                )
+            ],
+        ) from error
+    if isinstance(error, RuntimePlanScenarioMismatchError):
+        raise ApiError(
+            400,
+            "runtime_plan_scenario_mismatch",
+            "初始方案不属于请求的仿真场景，请重新选择方案",
+            [
+                ApiErrorDetail(
+                    location=["body", "active_plan_id"],
+                    message="方案与场景不匹配",
+                    type="runtime_plan_scenario_mismatch",
+                )
+            ],
+        ) from error
+    if isinstance(error, RuntimePlanHasViolationsError):
+        raise ApiError(
+            400,
+            "runtime_plan_has_violations",
+            "初始方案存在硬约束冲突，不能用于运行仿真",
+            [
+                ApiErrorDetail(
+                    location=["body", "active_plan_id"],
+                    message="方案硬约束违规数必须为 0",
+                    type="runtime_plan_has_violations",
+                )
+            ],
+        ) from error
+    if isinstance(error, RuntimePlanVersionMismatchError):
+        raise ApiError(
+            409,
+            "runtime_plan_version_mismatch",
+            "初始方案与请求的场景版本不一致，请使用同一版本的方案",
+            [
+                ApiErrorDetail(
+                    location=["body", "active_plan_id"],
+                    message="方案版本与场景版本不一致",
+                    type="runtime_plan_version_mismatch",
+                )
+            ],
+        ) from error
+    if isinstance(error, RuntimeRevisionConflictError):
+        raise ApiError(
+            409,
+            "runtime_revision_conflict",
+            (
+                f"运行状态已更新到修订 {error.current_revision}；"
+                "请刷新当前会话后重试"
+            ),
+            [
+                ApiErrorDetail(
+                    location=["body", "expected_revision"],
+                    message=(
+                        f"提交修订 {error.expected_revision}，"
+                        f"当前修订 {error.current_revision}"
+                    ),
+                    type="stale_runtime_revision",
+                )
+            ],
+        ) from error
+    if isinstance(error, RuntimeInvalidTransitionError):
+        raise ApiError(
+            409,
+            "runtime_invalid_transition",
+            "当前运行状态不允许执行该操作，请刷新会话并查看建议操作",
+            [
+                ApiErrorDetail(
+                    location=["path", "session_id"],
+                    message=f"状态 {error.status.value} 不允许操作 {error.action}",
+                    type="runtime_invalid_transition",
+                )
+            ],
+        ) from error
+    if isinstance(error, RuntimeScenarioClassificationError):
+        raise ApiError(
+            400,
+            "runtime_scenario_not_supported",
+            "运行会话只接受合成数据或匿名化回放数据",
+            [
+                ApiErrorDetail(
+                    location=["body", "scenario_id"],
+                    message="场景数据分类不适用于教学仿真",
+                    type="runtime_scenario_not_supported",
+                )
+            ],
+        ) from error
+    if isinstance(error, (RuntimePersistenceError, RuntimeSessionAlreadyExistsError)):
+        raise ApiError(
+            500,
+            "runtime_persistence_error",
+            "运行状态暂时无法安全保存，请稍后重试并保留当前页面",
+        ) from error
     raise error
+
+
+@router.post(
+    "/runtime-sessions",
+    response_model=RuntimeSessionSnapshot,
+    status_code=status.HTTP_201_CREATED,
+    tags=["runtime"],
+    summary="创建独立的教学仿真运行会话",
+)
+def create_runtime_session(
+    payload: CreateRuntimeSessionRequest,
+    service: Annotated[RuntimeSessionService, Depends(get_runtime_service)],
+) -> RuntimeSessionSnapshot:
+    try:
+        return service.create_session(payload)
+    except (
+        ScenarioNotFoundError,
+        ScenarioVersionNotFoundError,
+        RuntimePlanNotFoundError,
+        RuntimePlanScenarioMismatchError,
+        RuntimePlanVersionMismatchError,
+        RuntimePlanHasViolationsError,
+        RuntimeScenarioClassificationError,
+        RuntimeSessionAlreadyExistsError,
+        RuntimePersistenceError,
+    ) as error:
+        _raise_domain_error(error)
+
+
+@router.get(
+    "/runtime-sessions",
+    response_model=RuntimeSessionListResponse,
+    tags=["runtime"],
+    summary="分页查找已持久化的运行会话",
+)
+def list_runtime_sessions(
+    service: Annotated[RuntimeSessionService, Depends(get_runtime_service)],
+    scenario_id: Annotated[str | None, Query(min_length=1)] = None,
+    runtime_status: Annotated[RuntimeStatus | None, Query(alias="status")] = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> RuntimeSessionListResponse:
+    try:
+        return service.list_sessions(
+            scenario_id=scenario_id,
+            status=runtime_status,
+            offset=offset,
+            limit=limit,
+        )
+    except RuntimePersistenceError as error:
+        _raise_domain_error(error)
+
+
+@router.get(
+    "/runtime-sessions/{session_id}",
+    response_model=RuntimeSessionSnapshot,
+    tags=["runtime"],
+    summary="查询权威运行快照",
+)
+def get_runtime_session(
+    session_id: str,
+    service: Annotated[RuntimeSessionService, Depends(get_runtime_service)],
+) -> RuntimeSessionSnapshot:
+    try:
+        return service.get_session(session_id)
+    except (RuntimeSessionNotFoundError, RuntimePersistenceError) as error:
+        _raise_domain_error(error)
+
+
+@router.post(
+    "/runtime-sessions/{session_id}/start",
+    response_model=RuntimeSessionSnapshot,
+    tags=["runtime"],
+    summary="开始或继续推进仿真时钟",
+)
+def start_runtime_session(
+    session_id: str,
+    payload: RuntimeRevisionRequest,
+    service: Annotated[RuntimeSessionService, Depends(get_runtime_service)],
+) -> RuntimeSessionSnapshot:
+    try:
+        return service.start_session(session_id, payload)
+    except (
+        RuntimeSessionNotFoundError,
+        RuntimeRevisionConflictError,
+        RuntimeInvalidTransitionError,
+        RuntimePersistenceError,
+    ) as error:
+        _raise_domain_error(error)
+
+
+@router.post(
+    "/runtime-sessions/{session_id}/pause",
+    response_model=RuntimeSessionSnapshot,
+    tags=["runtime"],
+    summary="暂停并固定当前仿真时间",
+)
+def pause_runtime_session(
+    session_id: str,
+    payload: RuntimeRevisionRequest,
+    service: Annotated[RuntimeSessionService, Depends(get_runtime_service)],
+) -> RuntimeSessionSnapshot:
+    try:
+        return service.pause_session(session_id, payload)
+    except (
+        RuntimeSessionNotFoundError,
+        RuntimeRevisionConflictError,
+        RuntimeInvalidTransitionError,
+        RuntimePersistenceError,
+    ) as error:
+        _raise_domain_error(error)
+
+
+@router.post(
+    "/runtime-sessions/{session_id}/speed",
+    response_model=RuntimeSessionSnapshot,
+    tags=["runtime"],
+    summary="切换仿真时间推进倍速",
+)
+def set_runtime_session_speed(
+    session_id: str,
+    payload: SetRuntimeSpeedRequest,
+    service: Annotated[RuntimeSessionService, Depends(get_runtime_service)],
+) -> RuntimeSessionSnapshot:
+    try:
+        return service.set_speed(session_id, payload)
+    except (
+        RuntimeSessionNotFoundError,
+        RuntimeRevisionConflictError,
+        RuntimeInvalidTransitionError,
+        RuntimePersistenceError,
+    ) as error:
+        _raise_domain_error(error)
+
+
+@router.post(
+    "/runtime-sessions/{session_id}/reset",
+    response_model=RuntimeSessionSnapshot,
+    tags=["runtime"],
+    summary="确认后重置到初始仿真状态",
+)
+def reset_runtime_session(
+    session_id: str,
+    payload: ResetRuntimeSessionRequest,
+    service: Annotated[RuntimeSessionService, Depends(get_runtime_service)],
+) -> RuntimeSessionSnapshot:
+    try:
+        return service.reset_session(session_id, payload)
+    except (
+        RuntimeSessionNotFoundError,
+        RuntimeRevisionConflictError,
+        RuntimeInvalidTransitionError,
+        RuntimePersistenceError,
+    ) as error:
+        _raise_domain_error(error)
 
 
 @router.post(

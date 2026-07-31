@@ -40,6 +40,7 @@ def test_openapi_document_contains_health_route() -> None:
         "events",
         "plans",
         "audit",
+        "runtime",
     }
     assert "/api/v1/health" in document["paths"]
     assert (
