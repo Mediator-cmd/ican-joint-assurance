@@ -206,7 +206,7 @@ def test_runtime_creation_rejects_plan_from_another_scenario_version(tmp_path) -
     assert mismatch.json()["error"]["code"] == "runtime_plan_version_mismatch"
 
 
-def test_runtime_openapi_exposes_m43_routes_without_stream(tmp_path) -> None:
+def test_runtime_openapi_exposes_m44_stream_route(tmp_path) -> None:
     app, _ = _build_app(tmp_path)
     with TestClient(app) as client:
         document = client.get("/api/v1/openapi.json").json()
@@ -222,7 +222,9 @@ def test_runtime_openapi_exposes_m43_routes_without_stream(tmp_path) -> None:
     }
     assert expected <= set(paths)
     assert "/api/v1/runtime-sessions/{session_id}/replan" in paths
-    assert "/api/v1/runtime-sessions/{session_id}/stream" not in paths
+    stream_path = "/api/v1/runtime-sessions/{session_id}/stream"
+    assert stream_path in paths
+    assert "text/event-stream" in paths[stream_path]["get"]["responses"]["200"]["content"]
     assert "/api/v1/runtime-sessions/{session_id}/candidate/accept" in paths
     assert "/api/v1/runtime-sessions/{session_id}/candidate/reject" in paths
     assert (
@@ -234,6 +236,31 @@ def test_runtime_openapi_exposes_m43_routes_without_stream(tmp_path) -> None:
     assert response_schema["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/RuntimeSessionSnapshot"
     }
+
+
+def test_runtime_stream_missing_session_uses_json_error(tmp_path) -> None:
+    app, _ = _build_app(tmp_path)
+    with TestClient(app) as client:
+        response = client.get("/api/v1/runtime-sessions/RUN-MISSING/stream")
+
+    assert response.status_code == 404
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json()["error"]["code"] == "runtime_session_not_found"
+
+
+def test_runtime_snapshot_polling_does_not_depend_on_stream_broker(tmp_path) -> None:
+    app, _ = _build_app(tmp_path, session_id="RUN-POLL-001")
+    with TestClient(app) as client:
+        plan_id = _create_plan(client)
+        created = _create_runtime(client, plan_id)
+        app.state.runtime_stream_broker = None
+        response = client.get(
+            f"/api/v1/runtime-sessions/{created['session_id']}"
+        )
+
+    assert response.status_code == 200
+    assert response.json()["session_id"] == created["session_id"]
+    assert response.json()["revision"] == created["revision"]
 
 
 def test_runtime_api_restart_recovers_and_rediscovers_session(tmp_path) -> None:

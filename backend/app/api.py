@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
+from datetime import datetime, timezone
 from typing import Annotated, Any, Never
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.responses import StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from .api_models import (
     ApplyEventsRequest,
@@ -65,6 +70,7 @@ from .runtime_services import (
     RuntimeSessionService,
 )
 from .runtime_planning import RuntimePlanningError
+from .runtime_stream import RuntimeStreamBroker, encode_sse_event
 from .services import ScenarioNotReadyForPlanningError, ScenarioService
 
 
@@ -106,6 +112,10 @@ def get_scenario_service(request: Request) -> ScenarioService:
 
 def get_runtime_service(request: Request) -> RuntimeSessionService:
     return request.app.state.runtime_service
+
+
+def get_runtime_stream_broker(request: Request) -> RuntimeStreamBroker:
+    return request.app.state.runtime_stream_broker
 
 
 def _raise_domain_error(error: Exception) -> Never:
@@ -479,6 +489,81 @@ def get_runtime_session(
         return service.get_session(session_id)
     except (RuntimeSessionNotFoundError, RuntimePersistenceError) as error:
         _raise_domain_error(error)
+
+
+@router.get(
+    "/runtime-sessions/{session_id}/stream",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "description": "类型化运行事件流",
+            "content": {"text/event-stream": {}},
+        }
+    },
+    tags=["runtime"],
+    summary="订阅可补发的权威运行事件流",
+)
+async def stream_runtime_session(
+    session_id: str,
+    request: Request,
+    service: Annotated[RuntimeSessionService, Depends(get_runtime_service)],
+    broker: Annotated[RuntimeStreamBroker, Depends(get_runtime_stream_broker)],
+) -> StreamingResponse:
+    try:
+        snapshot = await run_in_threadpool(service.get_session, session_id)
+        audits = await run_in_threadpool(
+            service.runtime_repository.list_audit_records,
+            session_id,
+        )
+    except (RuntimeSessionNotFoundError, RuntimePersistenceError) as error:
+        _raise_domain_error(error)
+
+    initial = broker.connect(
+        snapshot,
+        audits,
+        last_event_id=request.headers.get("last-event-id"),
+        emitted_at=datetime.now(timezone.utc),
+        monotonic_time=time.monotonic(),
+    )
+
+    async def event_source():
+        stream_id = initial.stream_id
+        cursor = initial.cursor_sequence
+        for event in initial.events:
+            yield encode_sse_event(event)
+
+        while not await request.is_disconnected():
+            await asyncio.sleep(min(1.0, broker.tick_interval_seconds))
+            try:
+                current = await run_in_threadpool(service.get_session, session_id)
+                current_audits = await run_in_threadpool(
+                    service.runtime_repository.list_audit_records,
+                    session_id,
+                )
+            except (RuntimeSessionNotFoundError, RuntimePersistenceError):
+                return
+            batch = broker.poll(
+                current,
+                current_audits,
+                stream_id=stream_id,
+                after_sequence=cursor,
+                emitted_at=datetime.now(timezone.utc),
+                monotonic_time=time.monotonic(),
+            )
+            stream_id = batch.stream_id
+            cursor = batch.cursor_sequence
+            for event in batch.events:
+                yield encode_sse_event(event)
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post(

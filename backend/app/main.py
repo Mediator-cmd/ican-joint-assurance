@@ -20,6 +20,7 @@ from .errors import ApiError
 from .repository import InMemoryScenarioRepository
 from .runtime_repository import SQLiteRuntimeSessionRepository
 from .runtime_services import RuntimeSessionService
+from .runtime_stream import RuntimeStreamBroker
 from .scenario_loader import load_scenario
 from .services import ScenarioService
 
@@ -38,7 +39,7 @@ OPENAPI_DESCRIPTION = f"""
 4. 在新版本生成 CP-SAT 系统优化建议；
 5. 比较两套已保存方案并查询审计记录。
 
-事件应用和计划创建受期望版本与重复提交检查保护；方案比较会校验两套方案均已保存、互不相同且属于请求场景。M4-3 运行会话、事件版本、冻结执行事实、当前方案和待确认候选保存在 SQLite；事件到时自动冻结仿真时间并生成经过独立硬约束复核的滚动候选，必须由用户明确采用或拒绝。场景与普通 M3 方案仍沿用进程内仓库，SSE 和前端实时控制将在后续单元接入。
+事件应用和计划创建受期望版本与重复提交检查保护；方案比较会校验两套方案均已保存、互不相同且属于请求场景。M4-4 运行会话、事件版本、冻结执行事实、当前方案和待确认候选保存在 SQLite；事件到时自动冻结仿真时间并生成经过独立硬约束复核的滚动候选，必须由用户明确采用或拒绝。运行变化可通过每会话共享的 SSE 流实时订阅，断线后按 `Last-Event-ID` 补发或回到完整快照。场景与普通 M3 方案仍沿用进程内仓库，五页前端实时控制将在后续单元接入。
 
 **安全边界：{SAFETY_NOTICE}**
 """.strip()
@@ -66,7 +67,7 @@ OPENAPI_TAGS = [
     },
     {
         "name": "runtime",
-        "description": "创建、找回并控制后端权威仿真会话，处理到时事件、滚动候选和人工确认。",
+        "description": "创建、找回并控制后端权威仿真会话，处理到时事件、滚动候选、人工确认和可恢复 SSE 推送。",
     },
 ]
 
@@ -182,6 +183,7 @@ def create_app(
     monotonic_clock: Callable[[], float] | None = None,
     runtime_session_id_factory: Callable[[], str] | None = None,
     recover_runtime_sessions: bool = True,
+    runtime_stream_broker: RuntimeStreamBroker | None = None,
 ) -> FastAPI:
     scenario_repository = repository or InMemoryScenarioRepository()
     if seed_demo:
@@ -200,6 +202,7 @@ def create_app(
         session_id_factory=runtime_session_id_factory,
         recover_on_startup=recover_runtime_sessions,
     )
+    stream_broker = runtime_stream_broker or RuntimeStreamBroker()
 
     application = FastAPI(
         title="联保智调业务 API",
@@ -214,6 +217,7 @@ def create_app(
     application.state.scenario_service = ScenarioService(scenario_repository)
     application.state.runtime_repository = durable_runtime_repository
     application.state.runtime_service = runtime_service
+    application.state.runtime_stream_broker = stream_broker
 
     @application.middleware("http")
     async def add_request_id(request: Request, call_next):

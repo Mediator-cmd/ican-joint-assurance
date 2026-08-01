@@ -133,10 +133,10 @@ M4 使用两个不能混用的单调编号：
 | `running` | 事件到达 | `replanning`，时钟冻结在事件时刻 |
 | `replanning` | 候选方案通过独立约束检查 | `awaiting_confirmation` |
 | `replanning` | 可恢复求解失败 | `paused`，保留当前方案并显示回退提示 |
-| `replanning` | 持久化或一致性故障 | `failed` |
+| `replanning` | 已成功持久化的一致性故障 | `failed` |
 | `running` | 无未来任务和事件 | `completed` |
 
-`failed` 只用于无法安全继续的会话级错误。普通无可行解不应让整个会话失败，而是回到暂停状态并提供人工协调清单。
+`failed` 只用于能够成功保存、但因运行事实不一致而无法安全继续的会话级错误。普通无可行解不应让整个会话失败，而是回到暂停状态并提供人工协调清单。SQLite 本身不可写时无法可靠地再保存 `failed`，此时必须回滚事务并返回 `runtime_persistence_error`，不得留下部分更新。
 
 ## 7. 任务、资源与事件状态
 

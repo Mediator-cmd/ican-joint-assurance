@@ -18,8 +18,8 @@
 
 ## 当前状态
 
-- 阶段：M4 实时运行与动态重规划（M4-3 已完成）。
-- 下一单元：M4-4 SSE 推送、消息缓冲、断线重连和轮询恢复。
+- 阶段：M4 实时运行与动态重规划（M4-4 已完成）。
+- 下一单元：M4-5 五页工作台实时运行改造。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
@@ -31,6 +31,7 @@
 - M4-1 实现审查：[docs/m4-01-review.md](docs/m4-01-review.md)
 - M4-2 实现审查：[docs/m4-02-review.md](docs/m4-02-review.md)
 - M4-3 实现审查：[docs/m4-03-review.md](docs/m4-03-review.md)
+- M4-4 实现审查：[docs/m4-04-review.md](docs/m4-04-review.md)
 
 ## 目录结构
 
@@ -72,7 +73,7 @@ scripts/                # 场景校验、数据生成和发布辅助脚本
 
 当前版本提供可运行的 React + FastAPI 本地演示。页面优先读取 `/api/v1/demo`，服务不可用时回退到静态演示 JSON；页面包含“扰动前 FIFO”“事件后 FIFO”和“CP-SAT 优化”三种方案视图，以及五个可切换工作页。
 
-当前前端仍是一次加载三套方案快照，尚未接入运行会话控制或推送状态变化。后端已经提供 SQLite 运行会话、权威仿真时钟、确定性状态投影、事件到时原子应用、执行事实冻结、滚动 CP-SAT 候选，以及手动重规划和候选采用/拒绝 API。M4-4 与 M4-5 将继续实现 SSE、断线轮询恢复和五页工作台联动。静态 JSON 仍只作为明确标识的离线只读降级。
+当前前端仍是一次加载三套方案快照，尚未接入运行会话控制或推送状态变化。后端已经提供 SQLite 运行会话、权威仿真时钟、确定性状态投影、事件到时原子应用、执行事实冻结、滚动 CP-SAT 候选、人工确认，以及带 256 条缓冲和 `Last-Event-ID` 恢复的 SSE 流。M4-5 将把这些能力接入五页工作台。静态 JSON 仍只作为明确标识的离线只读降级。
 
 ### Windows 一键启停
 
@@ -110,7 +111,7 @@ python -m venv .venv
 - 场景列表：`http://127.0.0.1:8000/api/v1/scenarios`，首次启动自动提供一个仿真示例。
 - 场景 API 支持结构化导入、可规划摘要、数据缺口提示、分页和当前/历史版本查询。
 - 事件与计划 API 支持版本化结构事件应用、FIFO/CP-SAT 计划创建、不可变计划查询，以及普通语言结果摘要和人工确认提示。
-- 运行 API 支持事件到时自动暂停、同刻事件批处理、滚动候选生成，以及使用 revision 和候选 ID 保护的采用/拒绝；当前仍需主动查询快照，SSE 尚未接入。
+- 运行 API 支持事件到时自动暂停、同刻事件批处理、滚动候选生成，以及使用 revision 和候选 ID 保护的采用/拒绝；`/stream` 提供共享 sequence、类型化消息、断线补发和完整快照回退，普通 GET 快照可作为短轮询入口。
 - Swagger 中的完整操作顺序、请求体、重复提交处理和 PowerShell 示例见 [docs/m3-openapi-guide.md](docs/m3-openapi-guide.md)。
 - M3 阶段能力、验证证据和已知边界见 [docs/m3-review.md](docs/m3-review.md)。
 
@@ -122,7 +123,7 @@ npm install
 npm run dev
 ```
 
-浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `118 passed`，前端应同时通过 `npm run typecheck` 和 `npm run build`。
+浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `129 passed`，前端应同时通过 `npm run typecheck` 和 `npm run build`。
 
 ## Git 工作流
 
