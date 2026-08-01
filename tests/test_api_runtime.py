@@ -70,11 +70,24 @@ def _create_runtime(client: TestClient, plan_id: str, *, version: int = 1) -> di
     return response.json()
 
 
+def _apply_first_event(client: TestClient) -> None:
+    response = client.post(
+        f"/api/v1/scenarios/{SCENARIO_ID}/events/apply",
+        json={
+            "expected_version": 1,
+            "event_ids": ["EVT-SIM102-DELAY"],
+            "events": [],
+        },
+    )
+    assert response.status_code == 200
+
+
 def test_runtime_api_controls_authoritative_clock_and_persists_boundaries(tmp_path) -> None:
     app, clock = _build_app(tmp_path)
     with TestClient(app) as client:
-        plan_id = _create_plan(client)
-        created = _create_runtime(client, plan_id)
+        _apply_first_event(client)
+        plan_id = _create_plan(client, version=2)
+        created = _create_runtime(client, plan_id, version=2)
         listed = client.get(
             "/api/v1/runtime-sessions",
             params={"scenario_id": SCENARIO_ID, "status": "ready"},
@@ -109,7 +122,7 @@ def test_runtime_api_controls_authoritative_clock_and_persists_boundaries(tmp_pa
     assert len(created["flights"]) == 2
     assert len(created["events"]) == 2
     assert {item["status"] for item in created["tasks"]} == {"pending", "unassigned"}
-    assert {item["status"] for item in created["events"]} == {"pending"}
+    assert {item["status"] for item in created["events"]} == {"pending", "resolved"}
     assert listed.status_code == 200
     assert listed.json()["total"] == 1
     assert listed.json()["safety_notice"] == SAFETY_NOTICE
@@ -132,8 +145,9 @@ def test_runtime_api_controls_authoritative_clock_and_persists_boundaries(tmp_pa
 def test_runtime_api_maps_revision_transition_missing_and_validation_errors(tmp_path) -> None:
     app, _ = _build_app(tmp_path)
     with TestClient(app) as client:
-        plan_id = _create_plan(client)
-        created = _create_runtime(client, plan_id)
+        _apply_first_event(client)
+        plan_id = _create_plan(client, version=2)
+        created = _create_runtime(client, plan_id, version=2)
         session_path = f"/api/v1/runtime-sessions/{created['session_id']}"
         assert client.post(f"{session_path}/start", json={"expected_revision": 1}).status_code == 200
 
@@ -192,7 +206,7 @@ def test_runtime_creation_rejects_plan_from_another_scenario_version(tmp_path) -
     assert mismatch.json()["error"]["code"] == "runtime_plan_version_mismatch"
 
 
-def test_runtime_openapi_exposes_only_m41_routes(tmp_path) -> None:
+def test_runtime_openapi_exposes_m43_routes_without_stream(tmp_path) -> None:
     app, _ = _build_app(tmp_path)
     with TestClient(app) as client:
         document = client.get("/api/v1/openapi.json").json()
@@ -207,9 +221,15 @@ def test_runtime_openapi_exposes_only_m41_routes(tmp_path) -> None:
         "/api/v1/runtime-sessions/{session_id}/reset",
     }
     assert expected <= set(paths)
-    assert "/api/v1/runtime-sessions/{session_id}/replan" not in paths
+    assert "/api/v1/runtime-sessions/{session_id}/replan" in paths
     assert "/api/v1/runtime-sessions/{session_id}/stream" not in paths
-    assert "/api/v1/runtime-sessions/{session_id}/candidate/accept" not in paths
+    assert "/api/v1/runtime-sessions/{session_id}/candidate/accept" in paths
+    assert "/api/v1/runtime-sessions/{session_id}/candidate/reject" in paths
+    assert (
+        paths["/api/v1/runtime-sessions/{session_id}/replan"]["post"]["responses"]
+        ["202"]["content"]["application/json"]["schema"]
+        == {"$ref": "#/components/schemas/RuntimeSessionSnapshot"}
+    )
     response_schema = paths["/api/v1/runtime-sessions"]["post"]["responses"]["201"]
     assert response_schema["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/RuntimeSessionSnapshot"
@@ -223,8 +243,9 @@ def test_runtime_api_restart_recovers_and_rediscovers_session(tmp_path) -> None:
     )
     first_app, _ = _build_app(tmp_path, session_id="RUN-RESTART-001", clock=clock)
     with TestClient(first_app) as client:
-        plan_id = _create_plan(client)
-        created = _create_runtime(client, plan_id)
+        _apply_first_event(client)
+        plan_id = _create_plan(client, version=2)
+        created = _create_runtime(client, plan_id, version=2)
         started = client.post(
             f"/api/v1/runtime-sessions/{created['session_id']}/start",
             json={"expected_revision": 1},
@@ -253,3 +274,67 @@ def test_runtime_api_restart_recovers_and_rediscovers_session(tmp_path) -> None:
     assert recovered.json()["status"] == "paused"
     assert recovered.json()["revision"] == 3
     assert recovered.json()["clock"]["simulation_time"] == created["clock"]["simulation_time"]
+
+
+def test_runtime_api_replan_candidate_errors_and_decisions(tmp_path) -> None:
+    app, _ = _build_app(tmp_path, session_id="RUN-API-M43")
+    with TestClient(app) as client:
+        plan_id = _create_plan(client)
+        created = _create_runtime(client, plan_id)
+        session_path = f"/api/v1/runtime-sessions/{created['session_id']}"
+        awaiting = client.post(
+            f"{session_path}/start",
+            json={"expected_revision": created["revision"]},
+        ).json()
+        candidate_id = awaiting["candidate_plan_id"]
+
+        mismatch = client.post(
+            f"{session_path}/candidate/accept",
+            json={
+                "expected_revision": awaiting["revision"],
+                "candidate_plan_id": "PLAN-WRONG-CANDIDATE",
+            },
+        )
+        stale = client.post(
+            f"{session_path}/candidate/reject",
+            json={
+                "expected_revision": awaiting["revision"] - 1,
+                "candidate_plan_id": candidate_id,
+            },
+        )
+        accepted = client.post(
+            f"{session_path}/candidate/accept",
+            json={
+                "expected_revision": awaiting["revision"],
+                "candidate_plan_id": candidate_id,
+                "reason": "确认教学演示方案",
+            },
+        )
+        manual = client.post(
+            f"{session_path}/replan",
+            json={
+                "expected_revision": accepted.json()["revision"],
+                "reason": "再次复核未来任务",
+            },
+        )
+        rejected = client.post(
+            f"{session_path}/candidate/reject",
+            json={
+                "expected_revision": manual.json()["revision"],
+                "candidate_plan_id": manual.json()["candidate_plan_id"],
+            },
+        )
+
+    assert mismatch.status_code == 409
+    assert mismatch.json()["error"]["code"] == "runtime_candidate_mismatch"
+    assert stale.status_code == 409
+    assert stale.json()["error"]["code"] == "runtime_revision_conflict"
+    assert accepted.status_code == 200
+    assert accepted.json()["status"] == "paused"
+    assert accepted.json()["active_plan_id"] == candidate_id
+    assert manual.status_code == 202
+    assert manual.json()["status"] == "awaiting_confirmation"
+    assert manual.json()["candidate_plan_id"] != candidate_id
+    assert rejected.status_code == 200
+    assert rejected.json()["status"] == "paused"
+    assert rejected.json()["active_plan_id"] == candidate_id

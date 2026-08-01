@@ -38,7 +38,9 @@ from .repository import (
     VersionConflictError,
 )
 from .runtime_models import (
+    CandidateDecisionRequest,
     CreateRuntimeSessionRequest,
+    ReplanRuntimeSessionRequest,
     ResetRuntimeSessionRequest,
     RuntimeRevisionRequest,
     RuntimeSessionListResponse,
@@ -53,6 +55,7 @@ from .runtime_repository import (
     RuntimeSessionNotFoundError,
 )
 from .runtime_services import (
+    RuntimeCandidateMismatchError,
     RuntimeInvalidTransitionError,
     RuntimePlanHasViolationsError,
     RuntimePlanNotFoundError,
@@ -61,6 +64,7 @@ from .runtime_services import (
     RuntimeScenarioClassificationError,
     RuntimeSessionService,
 )
+from .runtime_planning import RuntimePlanningError
 from .services import ScenarioNotReadyForPlanningError, ScenarioService
 
 
@@ -365,6 +369,22 @@ def _raise_domain_error(error: Exception) -> Never:
                 )
             ],
         ) from error
+    if isinstance(error, RuntimeCandidateMismatchError):
+        raise ApiError(
+            409,
+            "runtime_candidate_mismatch",
+            "待确认方案已经变化，请刷新会话后再操作",
+            [
+                ApiErrorDetail(
+                    location=["body", "candidate_plan_id"],
+                    message=(
+                        f"提交候选 {error.submitted_candidate_id}，"
+                        f"当前候选 {error.current_candidate_id or '无'}"
+                    ),
+                    type="stale_runtime_candidate",
+                )
+            ],
+        ) from error
     if isinstance(error, RuntimeScenarioClassificationError):
         raise ApiError(
             400,
@@ -378,7 +398,14 @@ def _raise_domain_error(error: Exception) -> Never:
                 )
             ],
         ) from error
-    if isinstance(error, (RuntimePersistenceError, RuntimeSessionAlreadyExistsError)):
+    if isinstance(
+        error,
+        (
+            RuntimePersistenceError,
+            RuntimeSessionAlreadyExistsError,
+            RuntimePlanningError,
+        ),
+    ):
         raise ApiError(
             500,
             "runtime_persistence_error",
@@ -538,6 +565,78 @@ def reset_runtime_session(
         RuntimeRevisionConflictError,
         RuntimeInvalidTransitionError,
         RuntimePersistenceError,
+    ) as error:
+        _raise_domain_error(error)
+
+
+@router.post(
+    "/runtime-sessions/{session_id}/replan",
+    response_model=RuntimeSessionSnapshot,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["runtime"],
+    summary="在冻结时刻重新计算未来保障任务",
+)
+def replan_runtime_session(
+    session_id: str,
+    payload: ReplanRuntimeSessionRequest,
+    service: Annotated[RuntimeSessionService, Depends(get_runtime_service)],
+) -> RuntimeSessionSnapshot:
+    try:
+        return service.replan_session(session_id, payload)
+    except (
+        RuntimeSessionNotFoundError,
+        RuntimeRevisionConflictError,
+        RuntimeInvalidTransitionError,
+        RuntimePersistenceError,
+        RuntimePlanningError,
+    ) as error:
+        _raise_domain_error(error)
+
+
+@router.post(
+    "/runtime-sessions/{session_id}/candidate/accept",
+    response_model=RuntimeSessionSnapshot,
+    tags=["runtime"],
+    summary="采用当前待确认的滚动候选方案",
+)
+def accept_runtime_candidate(
+    session_id: str,
+    payload: CandidateDecisionRequest,
+    service: Annotated[RuntimeSessionService, Depends(get_runtime_service)],
+) -> RuntimeSessionSnapshot:
+    try:
+        return service.accept_candidate(session_id, payload)
+    except (
+        RuntimeSessionNotFoundError,
+        RuntimeRevisionConflictError,
+        RuntimeInvalidTransitionError,
+        RuntimeCandidateMismatchError,
+        RuntimePersistenceError,
+        RuntimePlanningError,
+    ) as error:
+        _raise_domain_error(error)
+
+
+@router.post(
+    "/runtime-sessions/{session_id}/candidate/reject",
+    response_model=RuntimeSessionSnapshot,
+    tags=["runtime"],
+    summary="拒绝候选并保留当前执行方案",
+)
+def reject_runtime_candidate(
+    session_id: str,
+    payload: CandidateDecisionRequest,
+    service: Annotated[RuntimeSessionService, Depends(get_runtime_service)],
+) -> RuntimeSessionSnapshot:
+    try:
+        return service.reject_candidate(session_id, payload)
+    except (
+        RuntimeSessionNotFoundError,
+        RuntimeRevisionConflictError,
+        RuntimeInvalidTransitionError,
+        RuntimeCandidateMismatchError,
+        RuntimePersistenceError,
+        RuntimePlanningError,
     ) as error:
         _raise_domain_error(error)
 

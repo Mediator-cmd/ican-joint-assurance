@@ -10,13 +10,18 @@ from typing import Callable
 from uuid import uuid4
 
 from .audit_models import AuditAction
-from .models import DataClassification, Scenario
+from .constraints import validate_plan
+from .models import DataClassification, FlightEvent, Scenario
 from .planning_models import Plan
+from .optimizer import OptimizationError
 from .repository import InMemoryScenarioRepository, PlanNotFoundError, RepositoryError
 from .runtime_models import (
     CreateRuntimeSessionRequest,
+    CandidateDecisionRequest,
+    ReplanRuntimeSessionRequest,
     ResetRuntimeSessionRequest,
     RuntimeClockSnapshot,
+    RuntimeFailure,
     RuntimeGuidance,
     RuntimeRevisionRequest,
     RuntimeSessionListResponse,
@@ -26,12 +31,22 @@ from .runtime_models import (
     SetRuntimeSpeedRequest,
 )
 from .runtime_repository import (
+    RuntimePersistenceError,
     RuntimeRevisionConflictError,
     RuntimeSessionAlreadyExistsError,
     RuntimeSessionRecord,
     SQLiteRuntimeSessionRepository,
 )
 from .runtime_projection import RuntimeProjectionSource, project_runtime_state
+from .runtime_planning import (
+    RuntimePlanningError,
+    apply_runtime_event_batch,
+    build_rolling_candidate,
+    reset_runtime_source,
+    source_after_candidate_decision,
+    source_after_replan_failure,
+    source_with_candidate,
+)
 
 
 class RuntimeServiceError(Exception):
@@ -65,6 +80,16 @@ class RuntimeInvalidTransitionError(RuntimeServiceError):
         self.action = action
 
 
+class RuntimeCandidateMismatchError(RuntimeServiceError):
+    def __init__(self, submitted_candidate_id: str, current_candidate_id: str | None) -> None:
+        super().__init__(
+            f"submitted runtime candidate {submitted_candidate_id} does not match "
+            f"{current_candidate_id or 'none'}"
+        )
+        self.submitted_candidate_id = submitted_candidate_id
+        self.current_candidate_id = current_candidate_id
+
+
 @dataclass(frozen=True, slots=True)
 class _ClockAnchor:
     simulation_time: datetime
@@ -83,6 +108,7 @@ class RuntimeSessionService:
         wall_clock: Callable[[], datetime] | None = None,
         monotonic_clock: Callable[[], float] | None = None,
         session_id_factory: Callable[[], str] | None = None,
+        rolling_planner: Callable[..., Plan] | None = None,
         recover_on_startup: bool = True,
     ) -> None:
         self.scenario_repository = scenario_repository
@@ -92,6 +118,7 @@ class RuntimeSessionService:
         self._session_id_factory = session_id_factory or (
             lambda: f"RUN-{uuid4().hex[:16].upper()}"
         )
+        self._rolling_planner = rolling_planner or build_rolling_candidate
         self._anchors: dict[str, _ClockAnchor] = {}
         self._anchor_lock = RLock()
         if recover_on_startup:
@@ -170,7 +197,7 @@ class RuntimeSessionService:
         offset: int,
         limit: int,
     ) -> RuntimeSessionListResponse:
-        self._materialize_elapsed_window_ends()
+        self._materialize_running_boundaries()
         records, total = self.runtime_repository.list_sessions(
             scenario_id=scenario_id,
             status=status,
@@ -179,7 +206,7 @@ class RuntimeSessionService:
         )
         summaries: list[RuntimeSessionSummary] = []
         for record in records:
-            snapshot = self._build_snapshot(self._materialize_window_end(record))
+            snapshot = self._build_snapshot(self._materialize_runtime_boundary(record))
             summaries.append(
                 RuntimeSessionSummary(
                     session_id=snapshot.session_id,
@@ -201,7 +228,7 @@ class RuntimeSessionService:
             limit=limit,
         )
 
-    def _materialize_elapsed_window_ends(self) -> None:
+    def _materialize_running_boundaries(self) -> None:
         _, total = self.runtime_repository.list_sessions(
             status=RuntimeStatus.RUNNING,
             offset=0,
@@ -215,11 +242,11 @@ class RuntimeSessionService:
             limit=total,
         )
         for record in records:
-            self._materialize_window_end(record)
+            self._materialize_runtime_boundary(record)
 
     def get_session(self, session_id: str) -> RuntimeSessionSnapshot:
         record = self.runtime_repository.get_session(session_id)
-        return self._build_snapshot(self._materialize_window_end(record))
+        return self._build_snapshot(self._materialize_runtime_boundary(record))
 
     def start_session(
         self,
@@ -248,7 +275,7 @@ class RuntimeSessionService:
                 monotonic_time=monotonic_now,
                 revision=stored.revision,
             )
-        return self._build_snapshot(stored)
+        return self._build_snapshot(self._materialize_runtime_boundary(stored))
 
     def pause_session(
         self,
@@ -340,6 +367,8 @@ class RuntimeSessionService:
                 RuntimeStatus.FAILED,
             },
         )
+        source = record.projection_source
+        reset_source = reset_runtime_source(source) if source is not None else None
         updated = replace(
             record,
             current_scenario_version=record.initial_scenario_version,
@@ -350,6 +379,7 @@ class RuntimeSessionService:
             simulation_time=record.simulation_window_start,
             failure=None,
             updated_at=max(record.updated_at, self._now()),
+            projection_source=reset_source,
         )
         stored = self.runtime_repository.update_session(
             updated,
@@ -361,12 +391,112 @@ class RuntimeSessionService:
             self._anchors.pop(session_id, None)
         return self._build_snapshot(stored)
 
+    def replan_session(
+        self,
+        session_id: str,
+        request: ReplanRuntimeSessionRequest,
+    ) -> RuntimeSessionSnapshot:
+        record = self._load_for_control(session_id, request.expected_revision)
+        self._require_status(record, "replan", {RuntimeStatus.PAUSED})
+        if record.projection_source is None:
+            raise RuntimePlanningError("runtime projection facts are unavailable")
+        replanning = replace(
+            record,
+            status=RuntimeStatus.REPLANNING,
+            revision=record.revision + 1,
+            candidate_plan_id=None,
+            failure=None,
+            updated_at=max(record.updated_at, self._now()),
+        )
+        stored = self.runtime_repository.update_session(
+            replanning,
+            expected_revision=record.revision,
+            action="replan_started",
+            summary=(
+                f"已按人工请求启动滚动重规划：{request.reason}"
+                if request.reason
+                else "已按人工请求启动滚动重规划"
+            ),
+        )
+        return self._build_snapshot(self._finish_replan(stored))
+
+    def accept_candidate(
+        self,
+        session_id: str,
+        request: CandidateDecisionRequest,
+    ) -> RuntimeSessionSnapshot:
+        return self._decide_candidate(session_id, request, accept=True)
+
+    def reject_candidate(
+        self,
+        session_id: str,
+        request: CandidateDecisionRequest,
+    ) -> RuntimeSessionSnapshot:
+        return self._decide_candidate(session_id, request, accept=False)
+
+    def _decide_candidate(
+        self,
+        session_id: str,
+        request: CandidateDecisionRequest,
+        *,
+        accept: bool,
+    ) -> RuntimeSessionSnapshot:
+        record = self._load_for_control(session_id, request.expected_revision)
+        self._require_status(
+            record,
+            "candidate_accept" if accept else "candidate_reject",
+            {RuntimeStatus.AWAITING_CONFIRMATION},
+        )
+        if record.candidate_plan_id != request.candidate_plan_id:
+            raise RuntimeCandidateMismatchError(
+                request.candidate_plan_id,
+                record.candidate_plan_id,
+            )
+        source = record.projection_source
+        if (
+            source is None
+            or source.candidate_plan is None
+            or source.candidate_plan.plan_id != request.candidate_plan_id
+        ):
+            raise RuntimeCandidateMismatchError(
+                request.candidate_plan_id,
+                source.candidate_plan.plan_id
+                if source is not None and source.candidate_plan is not None
+                else None,
+            )
+        decided_source = source_after_candidate_decision(source, accept=accept)
+        now = self._now()
+        updated = replace(
+            record,
+            active_plan_id=(
+                request.candidate_plan_id if accept else record.active_plan_id
+            ),
+            candidate_plan_id=None,
+            status=RuntimeStatus.PAUSED,
+            revision=record.revision + 1,
+            failure=None,
+            updated_at=max(record.updated_at, now),
+            projection_source=decided_source,
+        )
+        reason_suffix = f"：{request.reason}" if request.reason else ""
+        stored = self.runtime_repository.update_session(
+            updated,
+            expected_revision=record.revision,
+            action="candidate_accepted" if accept else "candidate_rejected",
+            summary=(
+                f"已采用候选方案 {request.candidate_plan_id}{reason_suffix}"
+                if accept
+                else f"已保留当前方案并拒绝候选 {request.candidate_plan_id}{reason_suffix}"
+            ),
+        )
+        return self._build_snapshot(stored)
+
     def _load_for_control(
         self,
         session_id: str,
         expected_revision: int,
     ) -> RuntimeSessionRecord:
-        record = self._materialize_window_end(
+        record = self._materialize_runtime_boundary(
             self.runtime_repository.get_session(session_id)
         )
         if record.revision != expected_revision:
@@ -382,18 +512,193 @@ class RuntimeSessionService:
         if record.status not in allowed:
             raise RuntimeInvalidTransitionError(record.status, action)
 
-    def _materialize_window_end(
+    def _materialize_runtime_boundary(
         self,
         record: RuntimeSessionRecord,
     ) -> RuntimeSessionRecord:
         if record.status is not RuntimeStatus.RUNNING:
             return record
-        if self._current_simulation_time(record) < record.simulation_window_end:
+        record = self._hydrate_projection_source(record)
+        target_time = self._current_simulation_time(record)
+        source = record.projection_source
+        if source is not None:
+            pending_events = sorted(
+                (
+                    event
+                    for event in source.event_catalog
+                    if event.event_id not in source.applied_event_versions
+                    and event.occurred_at <= target_time
+                ),
+                key=lambda item: (item.occurred_at, item.event_id),
+            )
+            if pending_events:
+                boundary = pending_events[0].occurred_at
+                batch = [
+                    event for event in pending_events if event.occurred_at == boundary
+                ]
+                try:
+                    return self._apply_event_boundary(record, boundary, batch)
+                except RuntimeRevisionConflictError:
+                    return self.runtime_repository.get_session(record.session_id)
+        if target_time < record.simulation_window_end:
             return record
         try:
             return self._complete_at_window_end(record, self._now())
         except RuntimeRevisionConflictError:
             return self.runtime_repository.get_session(record.session_id)
+
+    def _apply_event_boundary(
+        self,
+        record: RuntimeSessionRecord,
+        boundary: datetime,
+        events: list[FlightEvent],
+    ) -> RuntimeSessionRecord:
+        source = record.projection_source
+        if source is None:
+            raise RuntimePlanningError("runtime projection facts are unavailable")
+        projection = project_runtime_state(source, boundary, RuntimeStatus.RUNNING)
+        frozen_task_ids = set(source.frozen_task_ids)
+        frozen_task_ids.update(
+            task.task_id
+            for task in projection.tasks
+            if task.is_locked and task.assignment_id is not None
+        )
+        try:
+            event_source = apply_runtime_event_batch(
+                source,
+                list(events),
+                frozen_task_ids,
+            )
+        except (RuntimePlanningError, ValueError):
+            failed_codes = dict(source.failed_event_codes)
+            failed_codes.update(
+                {event.event_id: "event_application_failed" for event in events}
+            )
+            failed_source_data = source.model_dump(mode="python")
+            failed_source_data["failed_event_codes"] = failed_codes
+            failed_source = RuntimeProjectionSource.model_validate(failed_source_data)
+            failed = replace(
+                record,
+                status=RuntimeStatus.FAILED,
+                revision=record.revision + 1,
+                simulation_time=boundary,
+                candidate_plan_id=None,
+                failure=RuntimeFailure(
+                    code="event_application_failed",
+                    message="事件与当前运行事实不一致，已冻结会话等待复核",
+                    recoverable=False,
+                ),
+                updated_at=max(record.updated_at, self._now()),
+                projection_source=failed_source,
+            )
+            stored = self.runtime_repository.update_session(
+                failed,
+                expected_revision=record.revision,
+                action="event_application_failed",
+                summary="事件批次未写入场景，会话已安全冻结",
+            )
+            with self._anchor_lock:
+                self._anchors.pop(record.session_id, None)
+            return stored
+
+        replanning = replace(
+            record,
+            current_scenario_version=event_source.scenario.version,
+            candidate_plan_id=None,
+            status=RuntimeStatus.REPLANNING,
+            revision=record.revision + 1,
+            simulation_time=boundary,
+            failure=None,
+            updated_at=max(record.updated_at, self._now()),
+            projection_source=event_source,
+        )
+        stored = self.runtime_repository.update_session(
+            replanning,
+            expected_revision=record.revision,
+            action="event_batch_applied",
+            summary=(
+                f"事件批次已应用到场景版本 {event_source.scenario.version}："
+                + "、".join(event.event_id for event in events)
+            ),
+        )
+        with self._anchor_lock:
+            self._anchors.pop(record.session_id, None)
+        return self._finish_replan(stored)
+
+    def _finish_replan(self, record: RuntimeSessionRecord) -> RuntimeSessionRecord:
+        source = record.projection_source
+        if source is None:
+            raise RuntimePlanningError("runtime projection facts are unavailable")
+        try:
+            candidate = self._rolling_planner(
+                source.scenario,
+                source.plan,
+                record.simulation_time,
+                set(source.frozen_task_ids),
+                record.session_id,
+                record.revision,
+                5.0,
+            )
+            independent_violations = validate_plan(
+                source.scenario,
+                candidate.assignments,
+                candidate.unassigned_tasks,
+            )
+            if candidate.violations or independent_violations:
+                raise RuntimePlanningError("runtime candidate contains hard violations")
+            candidate_source = source_with_candidate(source, candidate)
+        except (OptimizationError, RuntimePlanningError):
+            failed_source = source_after_replan_failure(source, "replan_failed")
+            paused = replace(
+                record,
+                status=RuntimeStatus.PAUSED,
+                revision=record.revision + 1,
+                candidate_plan_id=None,
+                failure=None,
+                updated_at=max(record.updated_at, self._now()),
+                projection_source=failed_source,
+            )
+            return self.runtime_repository.update_session(
+                paused,
+                expected_revision=record.revision,
+                action="replan_failed",
+                summary="滚动重规划未生成可安全采用的候选，已保留当前方案",
+            )
+        except ValueError:
+            failed = replace(
+                record,
+                status=RuntimeStatus.FAILED,
+                revision=record.revision + 1,
+                candidate_plan_id=None,
+                failure=RuntimeFailure(
+                    code="runtime_state_inconsistent",
+                    message="运行状态一致性复核失败，已冻结会话等待检查",
+                    recoverable=False,
+                ),
+                updated_at=max(record.updated_at, self._now()),
+            )
+            return self.runtime_repository.update_session(
+                failed,
+                expected_revision=record.revision,
+                action="runtime_state_inconsistent",
+                summary="候选方案状态不一致，会话已安全冻结",
+            )
+
+        awaiting = replace(
+            record,
+            candidate_plan_id=candidate.plan_id,
+            status=RuntimeStatus.AWAITING_CONFIRMATION,
+            revision=record.revision + 1,
+            failure=None,
+            updated_at=max(record.updated_at, self._now()),
+            projection_source=candidate_source,
+        )
+        return self.runtime_repository.update_session(
+            awaiting,
+            expected_revision=record.revision,
+            action="candidate_created",
+            summary=f"滚动候选方案 {candidate.plan_id} 已通过独立约束复核",
+        )
 
     def _complete_at_window_end(
         self,
@@ -443,6 +748,7 @@ class RuntimeSessionService:
 
     def _build_snapshot(self, record: RuntimeSessionRecord) -> RuntimeSessionSnapshot:
         record = self._hydrate_projection_source(record)
+        self._validate_projection_record(record)
         simulation_time = self._current_simulation_time(record)
         projection = (
             project_runtime_state(
@@ -488,6 +794,28 @@ class RuntimeSessionService:
             created_at=record.created_at,
             updated_at=record.updated_at,
         )
+
+    @staticmethod
+    def _validate_projection_record(record: RuntimeSessionRecord) -> None:
+        source = record.projection_source
+        if source is None:
+            return
+        candidate_plan_id = (
+            source.candidate_plan.plan_id if source.candidate_plan is not None else None
+        )
+        if (
+            source.scenario.scenario_id != record.scenario_id
+            or source.initial_scenario is None
+            or source.initial_scenario.version != record.initial_scenario_version
+            or source.initial_plan is None
+            or source.initial_plan.plan_id != record.initial_plan_id
+            or source.scenario.version != record.current_scenario_version
+            or source.plan.plan_id != record.active_plan_id
+            or candidate_plan_id != record.candidate_plan_id
+        ):
+            raise RuntimePersistenceError(
+                "runtime session columns do not match persisted projection facts"
+            )
 
     def _build_projection_source(
         self,
@@ -551,6 +879,21 @@ class RuntimeSessionService:
                 recommended_action="继续观察运行变化，必要时暂停复核",
             )
         if record.status is RuntimeStatus.PAUSED:
+            source = record.projection_source
+            unresolved_events = (
+                set(source.applied_event_versions)
+                - set(source.resolved_event_ids)
+                - set(source.failed_event_codes)
+                if source is not None
+                else set()
+            )
+            if unresolved_events:
+                return RuntimeGuidance(
+                    headline="重规划需要重新启动",
+                    detail="事件已经生效，但候选计算在服务恢复前未完成，当前方案仍被保留。",
+                    action_required=True,
+                    recommended_action="复核当前状态后点击重新计算",
+                )
             return RuntimeGuidance(
                 headline="运行已暂停",
                 detail="仿真时间已固定，继续运行前可先复核当前状态。",

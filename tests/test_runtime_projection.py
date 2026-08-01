@@ -233,8 +233,9 @@ def test_projection_reads_do_not_change_revision_or_control_audit(tmp_path) -> N
     assert first.resources == second.resources
     assert first.flights == second.flights
     assert first.events == second.events
-    assert first.revision == second.revision == stored.revision == 2
-    assert len(repository.list_audit_records(created.session_id)) == 2
+    assert first.revision == second.revision == stored.revision == 4
+    assert first.status is RuntimeStatus.AWAITING_CONFIRMATION
+    assert len(repository.list_audit_records(created.session_id)) == 4
 
 
 def test_session_source_captures_applied_event_version_from_audit(tmp_path) -> None:

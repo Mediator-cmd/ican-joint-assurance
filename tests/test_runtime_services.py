@@ -46,6 +46,7 @@ class FakeClock:
 def _build_service(tmp_path, *, clock: FakeClock | None = None):
     scenario_repository = InMemoryScenarioRepository()
     scenario = load_scenario(DEMO_SCENARIO_PATH)
+    scenario.events = []
     scenario_repository.create_scenario(scenario)
     plan = ScenarioService(scenario_repository).create_plan(
         scenario.scenario_id,

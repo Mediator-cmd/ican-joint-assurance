@@ -30,12 +30,20 @@ from .runtime_models import (
 
 
 class RuntimeProjectionSource(ModelBase):
-    """Immutable inputs required to rebuild one runtime session after restart."""
+    """Durable facts required to rebuild one runtime session after restart."""
 
     scenario: Scenario
     plan: Plan
     event_catalog: list[FlightEvent] = Field(default_factory=list)
     applied_event_versions: dict[str, int] = Field(default_factory=dict)
+    initial_scenario: Scenario | None = None
+    initial_plan: Plan | None = None
+    initial_applied_event_versions: dict[str, int] | None = None
+    candidate_plan: Plan | None = None
+    frozen_task_ids: list[str] = Field(default_factory=list)
+    event_candidate_plan_ids: dict[str, str] = Field(default_factory=dict)
+    resolved_event_ids: list[str] = Field(default_factory=list)
+    failed_event_codes: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("event_catalog")
     @classmethod
@@ -45,30 +53,89 @@ class RuntimeProjectionSource(ModelBase):
             raise ValueError("runtime event catalog must contain unique IDs")
         return events
 
+    @field_validator("frozen_task_ids", "resolved_event_ids")
+    @classmethod
+    def validate_unique_ids(cls, values: list[str], info) -> list[str]:
+        if len(values) != len(set(values)):
+            raise ValueError(f"{info.field_name} must contain unique IDs")
+        return values
+
     @model_validator(mode="after")
     def validate_source_consistency(self) -> RuntimeProjectionSource:
+        if self.initial_scenario is None:
+            object.__setattr__(self, "initial_scenario", self.scenario.model_copy(deep=True))
+        if self.initial_plan is None:
+            object.__setattr__(self, "initial_plan", self.plan.model_copy(deep=True))
+        initial_scenario = self.initial_scenario
+        initial_plan = self.initial_plan
+        assert initial_scenario is not None
+        assert initial_plan is not None
+        if self.initial_applied_event_versions is None:
+            initial_event_ids = {event.event_id for event in initial_scenario.events}
+            object.__setattr__(
+                self,
+                "initial_applied_event_versions",
+                {
+                    event_id: version
+                    for event_id, version in self.applied_event_versions.items()
+                    if event_id in initial_event_ids
+                },
+            )
+
         if self.plan.scenario_id != self.scenario.scenario_id:
             raise ValueError("runtime projection plan must belong to the scenario")
-        if self.plan.scenario_version != self.scenario.version:
-            raise ValueError("runtime projection plan and scenario versions must match")
+        if self.plan.scenario_version > self.scenario.version:
+            raise ValueError("active runtime plan cannot be newer than the scenario")
         if self.plan.violations:
             raise ValueError("runtime projection plan cannot contain hard violations")
+        if initial_plan.scenario_id != initial_scenario.scenario_id:
+            raise ValueError("initial runtime plan must belong to the initial scenario")
+        if initial_plan.scenario_version != initial_scenario.version:
+            raise ValueError("initial runtime plan and scenario versions must match")
+        if initial_plan.violations:
+            raise ValueError("initial runtime plan cannot contain hard violations")
+        if initial_scenario.scenario_id != self.scenario.scenario_id:
+            raise ValueError("initial and current runtime scenarios must match")
+        if initial_scenario.version > self.scenario.version:
+            raise ValueError("initial runtime scenario cannot be newer than current scenario")
+        if self.candidate_plan is not None:
+            if self.candidate_plan.scenario_id != self.scenario.scenario_id:
+                raise ValueError("runtime candidate plan must belong to the scenario")
+            if self.candidate_plan.scenario_version != self.scenario.version:
+                raise ValueError("runtime candidate plan must match the current scenario version")
+            if self.candidate_plan.violations:
+                raise ValueError("runtime candidate plan cannot contain hard violations")
 
         task_ids = {task.task_id for task in self.scenario.tasks}
+        initial_task_ids = {task.task_id for task in initial_scenario.tasks}
+        if initial_task_ids != task_ids:
+            raise ValueError("runtime event revisions cannot add or remove tasks")
         resource_by_id = {resource.resource_id: resource for resource in self.scenario.resources}
-        assigned_task_ids = [assignment.task_id for assignment in self.plan.assignments]
-        unassigned_task_ids = [item.task_id for item in self.plan.unassigned_tasks]
-        covered_task_ids = [*assigned_task_ids, *unassigned_task_ids]
-        if len(covered_task_ids) != len(set(covered_task_ids)):
-            raise ValueError("runtime projection plan must cover each task at most once")
-        if set(covered_task_ids) != task_ids:
-            raise ValueError("runtime projection plan must cover every scenario task")
-        for assignment in self.plan.assignments:
-            resource = resource_by_id.get(assignment.resource_id)
-            if resource is None:
-                raise ValueError("runtime projection assignment references an unknown resource")
-            if resource.resource_type is not assignment.resource_type:
-                raise ValueError("runtime projection assignment resource type does not match")
+        for label, checked_plan in (
+            ("active", self.plan),
+            ("candidate", self.candidate_plan),
+        ):
+            if checked_plan is None:
+                continue
+            assigned_task_ids = [assignment.task_id for assignment in checked_plan.assignments]
+            unassigned_task_ids = [item.task_id for item in checked_plan.unassigned_tasks]
+            covered_task_ids = [*assigned_task_ids, *unassigned_task_ids]
+            if len(covered_task_ids) != len(set(covered_task_ids)):
+                raise ValueError(f"runtime {label} plan must cover each task at most once")
+            if set(covered_task_ids) != task_ids:
+                raise ValueError(f"runtime {label} plan must cover every scenario task")
+            for assignment in checked_plan.assignments:
+                resource = resource_by_id.get(assignment.resource_id)
+                if resource is None:
+                    raise ValueError(f"runtime {label} plan references an unknown resource")
+                if resource.resource_type is not assignment.resource_type:
+                    raise ValueError(f"runtime {label} plan resource type does not match")
+
+        if not set(self.frozen_task_ids) <= task_ids:
+            raise ValueError("frozen runtime tasks must exist in the scenario")
+        active_assigned_ids = {assignment.task_id for assignment in self.plan.assignments}
+        if not set(self.frozen_task_ids) <= active_assigned_ids:
+            raise ValueError("frozen runtime tasks require active assignments")
 
         flight_ids = {flight.flight_id for flight in self.scenario.flights}
         catalog_by_id = {event.event_id: event for event in self.event_catalog}
@@ -86,6 +153,36 @@ class RuntimeProjectionSource(ModelBase):
             for version in self.applied_event_versions.values()
         ):
             raise ValueError("applied event versions must not exceed the scenario version")
+        initial_versions = self.initial_applied_event_versions or {}
+        initial_applied_ids = {event.event_id for event in initial_scenario.events}
+        if set(initial_versions) != initial_applied_ids:
+            raise ValueError("initial applied event evidence must match the initial scenario")
+        if any(
+            version < 1 or version > initial_scenario.version
+            for version in initial_versions.values()
+        ):
+            raise ValueError("initial event versions must not exceed the initial scenario version")
+        if not initial_applied_ids <= set(self.resolved_event_ids):
+            object.__setattr__(
+                self,
+                "resolved_event_ids",
+                sorted({*self.resolved_event_ids, *initial_applied_ids}),
+            )
+        applied_ids = set(self.applied_event_versions)
+        if not set(self.event_candidate_plan_ids) <= applied_ids:
+            raise ValueError("event candidate evidence requires an applied event")
+        if any(not plan_id for plan_id in self.event_candidate_plan_ids.values()):
+            raise ValueError("event candidate plan IDs must be non-empty")
+        if not set(self.resolved_event_ids) <= applied_ids:
+            raise ValueError("resolved runtime events must already be applied")
+        catalog_ids = set(catalog_by_id)
+        if not set(self.failed_event_codes) <= catalog_ids:
+            raise ValueError("failed runtime events must exist in the event catalog")
+        if any(
+            not code or any(character not in "abcdefghijklmnopqrstuvwxyz0123456789_" for character in code)
+            for code in self.failed_event_codes.values()
+        ):
+            raise ValueError("runtime event failure codes must use lowercase snake case")
         return self
 
 
@@ -110,14 +207,34 @@ def project_runtime_state(
     assignments_by_task = {
         assignment.task_id: assignment for assignment in source.plan.assignments
     }
+    unresolved_event_ids = (
+        set(source.applied_event_versions)
+        - set(source.resolved_event_ids)
+        - set(source.failed_event_codes)
+    )
+    unresolved_events_by_flight: dict[str, list[str]] = {}
+    for event in source.event_catalog:
+        if event.event_id in unresolved_event_ids:
+            unresolved_events_by_flight.setdefault(event.flight_id, []).append(event.event_id)
     tasks = [
         _project_task(
             task_id=task.task_id,
-            origin_zone_id=task.origin_zone_id,
-            destination_zone_id=task.destination_zone_id,
+            origin_zone_id=(
+                assignments_by_task[task.task_id].origin_zone_id
+                if task.task_id in assignments_by_task
+                else task.origin_zone_id
+            ),
+            destination_zone_id=(
+                assignments_by_task[task.task_id].destination_zone_id
+                if task.task_id in assignments_by_task
+                else task.destination_zone_id
+            ),
             assignment=assignments_by_task.get(task.task_id),
             simulation_time=simulation_time,
             runtime_status=runtime_status,
+            affected_by_event_ids=sorted(
+                unresolved_events_by_flight.get(task.flight_id, [])
+            ),
         )
         for task in source.scenario.tasks
     ]
@@ -169,6 +286,9 @@ def project_runtime_state(
         _project_event(
             event,
             applied_version=source.applied_event_versions.get(event.event_id),
+            candidate_plan_id=source.event_candidate_plan_ids.get(event.event_id),
+            is_resolved=event.event_id in source.resolved_event_ids,
+            failure_code=source.failed_event_codes.get(event.event_id),
             simulation_time=simulation_time,
             runtime_status=runtime_status,
         )
@@ -195,12 +315,14 @@ def _project_task(
     assignment: Assignment | None,
     simulation_time: datetime,
     runtime_status: RuntimeStatus,
+    affected_by_event_ids: list[str],
 ) -> TaskRuntimeProjection:
     if assignment is None:
         return TaskRuntimeProjection(
             task_id=task_id,
             status=TaskRuntimeStatus.UNASSIGNED,
             current_zone_id=origin_zone_id,
+            affected_by_event_ids=affected_by_event_ids,
         )
     if runtime_status is RuntimeStatus.READY:
         status = TaskRuntimeStatus.PENDING
@@ -226,6 +348,8 @@ def _project_task(
         status = TaskRuntimeStatus.PENDING
         next_transition_at = assignment.travel_started_at
         current_zone_id = origin_zone_id
+    if status is TaskRuntimeStatus.PENDING and affected_by_event_ids:
+        status = TaskRuntimeStatus.AFFECTED
     return TaskRuntimeProjection(
         task_id=task_id,
         status=status,
@@ -233,6 +357,7 @@ def _project_task(
         resource_id=assignment.resource_id,
         current_zone_id=current_zone_id,
         next_transition_at=next_transition_at,
+        affected_by_event_ids=affected_by_event_ids,
     )
 
 
@@ -369,16 +494,44 @@ def _project_event(
     event: FlightEvent,
     *,
     applied_version: int | None,
+    candidate_plan_id: str | None,
+    is_resolved: bool,
+    failure_code: str | None,
     simulation_time: datetime,
     runtime_status: RuntimeStatus,
 ) -> EventRuntimeProjection:
-    if applied_version is not None:
+    if failure_code is not None:
         return EventRuntimeProjection(
             event_id=event.event_id,
-            status=RuntimeEventStatus.RESOLVED,
+            status=RuntimeEventStatus.FAILED,
+            occurred_at=event.occurred_at,
+            applied_at=event.occurred_at if applied_version is not None else None,
+            scenario_version_after=applied_version,
+            failure_code=failure_code,
+        )
+    if applied_version is not None:
+        if is_resolved:
+            status = RuntimeEventStatus.RESOLVED
+        elif runtime_status is RuntimeStatus.REPLANNING:
+            status = RuntimeEventStatus.REPLANNING
+        elif runtime_status is RuntimeStatus.AWAITING_CONFIRMATION:
+            status = RuntimeEventStatus.AWAITING_CONFIRMATION
+        else:
+            status = RuntimeEventStatus.APPLIED
+        return EventRuntimeProjection(
+            event_id=event.event_id,
+            status=status,
             occurred_at=event.occurred_at,
             applied_at=event.occurred_at,
             scenario_version_after=applied_version,
+            candidate_plan_id=(
+                candidate_plan_id
+                if status in {
+                    RuntimeEventStatus.AWAITING_CONFIRMATION,
+                    RuntimeEventStatus.RESOLVED,
+                }
+                else None
+            ),
         )
     status = (
         RuntimeEventStatus.TRIGGERED
