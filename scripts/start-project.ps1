@@ -43,6 +43,33 @@ function Get-PropertyValue {
     return $null
 }
 
+function Get-ServiceExecutablePath {
+    param([string]$ServiceName)
+
+    if ($ServiceName -eq "backend" -and (Test-Path -LiteralPath $PythonPath)) {
+        return [System.IO.Path]::GetFullPath($PythonPath)
+    }
+    if ($ServiceName -eq "frontend") {
+        $nodeExecutable = Get-Command node.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($nodeExecutable -and $nodeExecutable.Source) {
+            return [System.IO.Path]::GetFullPath($nodeExecutable.Source)
+        }
+    }
+    return $null
+}
+
+function Get-ExpectedExecutablePath {
+    param([object]$Service)
+
+    $recordedPath = [string](Get-PropertyValue -InputObject $Service -Name "executablePath")
+    if ($recordedPath -and [System.IO.Path]::GetExtension($recordedPath) -ieq ".exe") {
+        return [System.IO.Path]::GetFullPath($recordedPath)
+    }
+
+    $serviceName = [string](Get-PropertyValue -InputObject $Service -Name "name")
+    return Get-ServiceExecutablePath -ServiceName $serviceName
+}
+
 function Test-PortAvailable {
     param([int]$Port)
 
@@ -121,6 +148,7 @@ function New-ServiceRecord {
     param(
         [string]$Name,
         [System.Diagnostics.Process]$Process,
+        [string]$ExecutablePath,
         [int]$Port,
         [string]$Url,
         [string]$HealthUrl,
@@ -130,8 +158,11 @@ function New-ServiceRecord {
     )
 
     $Process.Refresh()
-    $executablePath = $null
-    try { $executablePath = $Process.Path } catch { }
+    $normalizedExecutablePath = if ($ExecutablePath) {
+        [System.IO.Path]::GetFullPath($ExecutablePath)
+    } else {
+        $null
+    }
 
     return [pscustomobject][ordered]@{
         name = $Name
@@ -141,7 +172,7 @@ function New-ServiceRecord {
         healthUrl = $HealthUrl
         processName = $Process.ProcessName
         processStartTimeUtc = $Process.StartTime.ToUniversalTime().ToString("o")
-        executablePath = $executablePath
+        executablePath = $normalizedExecutablePath
         workingDirectory = $WorkingDirectory
         stdoutLog = $StdoutLog
         stderrLog = $StderrLog
@@ -201,7 +232,7 @@ function Get-ServiceIdentityState {
             return [pscustomobject]@{ status = "mismatch"; name = $serviceName; process = $process }
         }
 
-        $expectedPath = [string](Get-PropertyValue -InputObject $Service -Name "executablePath")
+        $expectedPath = Get-ExpectedExecutablePath -Service $Service
         if ($expectedPath) {
             $actualPath = $null
             try { $actualPath = $process.Path } catch { }
@@ -416,6 +447,7 @@ try {
     $backendRecord = New-ServiceRecord `
         -Name "backend" `
         -Process $backendProcess `
+        -ExecutablePath $PythonPath `
         -Port $backendPort `
         -Url $backendUrl `
         -HealthUrl $backendHealthUrl `
@@ -455,6 +487,7 @@ try {
     $frontendRecord = New-ServiceRecord `
         -Name "frontend" `
         -Process $frontendProcess `
+        -ExecutablePath $nodeCommand.Source `
         -Port $frontendPort `
         -Url $frontendUrl `
         -HealthUrl $frontendUrl `

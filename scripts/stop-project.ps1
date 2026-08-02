@@ -4,6 +4,7 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $RuntimeRoot = Join-Path $ProjectRoot ".runtime"
 $StateFile = Join-Path $RuntimeRoot "server-state.json"
+$PythonPath = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
 
 function Get-PropertyValue {
     param(
@@ -19,6 +20,33 @@ function Get-PropertyValue {
         return $property.Value
     }
     return $null
+}
+
+function Get-ServiceExecutablePath {
+    param([string]$ServiceName)
+
+    if ($ServiceName -eq "backend" -and (Test-Path -LiteralPath $PythonPath)) {
+        return [System.IO.Path]::GetFullPath($PythonPath)
+    }
+    if ($ServiceName -eq "frontend") {
+        $nodeExecutable = Get-Command node.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($nodeExecutable -and $nodeExecutable.Source) {
+            return [System.IO.Path]::GetFullPath($nodeExecutable.Source)
+        }
+    }
+    return $null
+}
+
+function Get-ExpectedExecutablePath {
+    param([object]$Service)
+
+    $recordedPath = [string](Get-PropertyValue -InputObject $Service -Name "executablePath")
+    if ($recordedPath -and [System.IO.Path]::GetExtension($recordedPath) -ieq ".exe") {
+        return [System.IO.Path]::GetFullPath($recordedPath)
+    }
+
+    $serviceName = [string](Get-PropertyValue -InputObject $Service -Name "name")
+    return Get-ServiceExecutablePath -ServiceName $serviceName
 }
 
 function Get-RecordedServices {
@@ -72,7 +100,7 @@ function Get-ServiceIdentityState {
             return [pscustomobject]@{ status = "mismatch"; name = $serviceName; process = $process; service = $Service }
         }
 
-        $expectedPath = [string](Get-PropertyValue -InputObject $Service -Name "executablePath")
+        $expectedPath = Get-ExpectedExecutablePath -Service $Service
         if ($expectedPath) {
             $actualPath = $null
             try { $actualPath = $process.Path } catch { }

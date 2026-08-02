@@ -18,7 +18,7 @@
 
 ## 当前状态
 
-- 阶段：M4 实时运行与动态重规划（M4-5B 方案依据完整展示修正已完成）。
+- 阶段：M4 实时运行与动态重规划（M4-5C Windows 一键启停修正已完成）。
 - 下一单元：M4-6 端到端、性能、长时间、故障与三轮连续演示验收。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
@@ -37,6 +37,7 @@
 - M4-5A 修正计划：[docs/m4-05a-plan.md](docs/m4-05a-plan.md)
 - M4-5A 修正审查：[docs/m4-05a-review.md](docs/m4-05a-review.md)
 - M4-5B 展示修正审查：[docs/m4-05b-review.md](docs/m4-05b-review.md)
+- M4-5C 一键启停修正审查：[docs/m4-05c-review.md](docs/m4-05c-review.md)
 
 ## 目录结构
 
@@ -88,6 +89,7 @@ scripts/                # 场景校验、数据生成和发布辅助脚本
 - 双击项目根目录的 `停止联保智调.cmd`：按“前端 → 后端”顺序只停止由状态文件记录的本项目服务，不会结束其他 Node/Python 进程，也不会关闭 Edge。
 - 后端默认从 `8000-8020` 选择端口，前端默认从 `4173-4199` 选择端口；端口占用时自动换用范围内空闲端口，实际 URL 以 `.runtime/server-state.json` 为准。
 - 运行状态和本地日志保存在忽略提交的 `.runtime/` 目录。启动脚本已运行时再次双击会复用已通过健康检查的服务组，只打开现有页面，不创建第二组进程。
+- 状态文件保存明确的 Python/Node 可执行路径；旧版误记为系统 DLL 时，只允许按项目 Python 和当前 Node 可信路径兼容校验，其他进程身份不匹配仍会拒绝操作。
 - 启动失败会回收本次已创建的服务；停止前会校验项目路径、服务名、PID、进程名和启动时间，状态异常时保留文件并停止操作。
 
 首次安装后端依赖：
