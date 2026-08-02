@@ -19,9 +19,10 @@ import {
   HardDrive,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { loadDemoPayload } from "./api";
+import RuntimeWorkspace from "./RuntimeWorkspace";
 import { resolveSelectedId } from "./selection";
 
 import type {
@@ -392,6 +393,16 @@ export default function App() {
   const [selectedResourceId, setSelectedResourceId] = useState("WC-01");
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const [runtimeUnavailable, setRuntimeUnavailable] = useState(false);
+
+  const reloadDemo = useCallback(() => {
+    setRuntimeUnavailable(false);
+    setReloadToken((value) => value + 1);
+  }, []);
+
+  const useOfflineFallback = useCallback(() => {
+    setRuntimeUnavailable(true);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -503,9 +514,19 @@ export default function App() {
   }, [payload, selectedEvent]);
 
   if (error) {
-    return <ErrorState message={`演示数据加载失败：${error}`} retry={() => setReloadToken((value) => value + 1)} />;
+    return <ErrorState message={`演示数据加载失败：${error}`} retry={reloadDemo} />;
   }
   if (!payload || !current || !dataSource) return <LoadingState />;
+
+  if (dataSource === "api" && !runtimeUnavailable) {
+    return (
+      <RuntimeWorkspace
+        payload={payload}
+        onReload={reloadDemo}
+        onInitialUnavailable={useOfflineFallback}
+      />
+    );
+  }
 
   const metrics = current.plan.metrics;
   const changedRuleMetrics = payload.views.after_events_fifo.plan.metrics;
@@ -548,12 +569,14 @@ export default function App() {
   const algorithmLabel = current.plan.algorithm.startsWith("cp_sat")
     ? "约束优化（CP-SAT）"
     : "顺序规则（FIFO）";
-  const isApiSource = dataSource === "api";
+  const isApiSource = dataSource === "api" && !runtimeUnavailable;
   const SourceIcon = isApiSource ? Server : HardDrive;
-  const sourceLabel = isApiSource ? "服务数据" : "本地演示数据";
+  const sourceLabel = isApiSource ? "服务数据" : "离线只读";
   const sourceDetail = isApiSource
     ? "当前数据由本地业务服务提供"
-    : "业务服务暂未连接，当前使用内置演示数据";
+    : runtimeUnavailable
+      ? "运行服务暂不可用，当前为离线演示，时间不会推进"
+      : "业务服务暂未连接，当前使用内置演示数据，时间不会推进";
 
   const decision = isOptimized
     ? {
@@ -630,7 +653,7 @@ export default function App() {
         <div className={`sidebar-status${isApiSource ? "" : " is-fallback"}`}>
           <span className="eyebrow">当前运行状态</span>
           <strong>{viewInfo[activeView].label}</strong>
-          <span><i /> {isApiSource ? "数据服务连接正常" : "当前使用本地演示数据"}</span>
+          <span><i /> {isApiSource ? "数据服务连接正常" : "离线演示 · 时间不会推进"}</span>
           <small>合成教学场景 · V{current.scenario.version}</small>
         </div>
       </aside>
@@ -653,7 +676,7 @@ export default function App() {
               {sourceLabel}
             </span>
             <span className="data-chip"><ShieldCheck size={15} />合成数据</span>
-            <button className="icon-button" title="重新载入演示数据" onClick={() => setReloadToken((value) => value + 1)}>
+            <button className="icon-button" title="重新连接运行服务" onClick={reloadDemo}>
               <RefreshCw size={18} />
               <span className="sr-only">重新载入演示数据</span>
             </button>
@@ -670,8 +693,12 @@ export default function App() {
           </div>
           <div className="scenario-window">
             <Clock3 size={16} />
-            <span>仿真窗口</span>
-            <strong>{formatTime(current.scenario.window_start)}—{formatTime(current.scenario.window_end)}</strong>
+            <span>{isApiSource ? "仿真窗口" : "离线演示"}</span>
+            <strong>
+              {isApiSource
+                ? `${formatTime(current.scenario.window_start)}—${formatTime(current.scenario.window_end)}`
+                : "时间不会推进"}
+            </strong>
           </div>
           <PlanSwitch activeView={activeView} onChange={setActiveView} />
         </section>
