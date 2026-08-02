@@ -9,7 +9,8 @@ from typing import Literal
 from pydantic import Field, computed_field, field_validator, model_validator
 
 from .demo_export import SAFETY_NOTICE
-from .models import FlightStatus, ModelBase
+from .models import FlightEventType, FlightStatus, ModelBase
+from .planning_models import Plan
 
 
 SESSION_ID_PATTERN = r"^RUN-[A-Z0-9-]+$"
@@ -275,6 +276,10 @@ class FlightRuntimeProjection(ModelBase):
 
 class EventRuntimeProjection(ModelBase):
     event_id: str = Field(min_length=1)
+    event_type: FlightEventType
+    flight_id: str = Field(min_length=1)
+    detail: str = Field(min_length=1, max_length=240)
+    note: str | None = Field(default=None, max_length=240)
     status: RuntimeEventStatus
     occurred_at: datetime
     applied_at: datetime | None = None
@@ -341,6 +346,8 @@ class RuntimeSessionSnapshot(ModelBase):
     initial_plan_id: str = Field(min_length=1)
     active_plan_id: str = Field(min_length=1)
     candidate_plan_id: str | None = Field(default=None, min_length=1)
+    active_plan_detail: Plan | None = None
+    candidate_plan_detail: Plan | None = None
     status: RuntimeStatus
     revision: int = Field(ge=1)
     clock: RuntimeClockSnapshot
@@ -375,6 +382,16 @@ class RuntimeSessionSnapshot(ModelBase):
                 raise ValueError("awaiting confirmation requires candidate_plan_id")
         elif self.candidate_plan_id is not None:
             raise ValueError("candidate_plan_id is only valid while awaiting confirmation")
+        if (
+            self.active_plan_detail is not None
+            and self.active_plan_detail.plan_id != self.active_plan_id
+        ):
+            raise ValueError("active plan detail must match active_plan_id")
+        if self.candidate_plan_detail is not None:
+            if self.candidate_plan_id is None:
+                raise ValueError("candidate plan detail requires candidate_plan_id")
+            if self.candidate_plan_detail.plan_id != self.candidate_plan_id:
+                raise ValueError("candidate plan detail must match candidate_plan_id")
         if self.status is RuntimeStatus.FAILED:
             if self.failure is None:
                 raise ValueError("failed session requires failure details")

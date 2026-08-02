@@ -355,6 +355,12 @@ async function ensureOptimizedPlan(
   }
 }
 
+function hasExactIds(actual: string[], expected: string[]): boolean {
+  if (actual.length !== expected.length) return false;
+  const expectedIds = new Set(expected);
+  return expectedIds.size === expected.length && actual.every((id) => expectedIds.has(id));
+}
+
 export async function findOrCreateRuntimeSession(
   payload: DemoPayload,
   options: RuntimeApiOptions = {},
@@ -366,11 +372,15 @@ export async function findOrCreateRuntimeSession(
     options,
   );
   const sessions = await listRuntimeSessions(scenario.scenario_id, options);
+  const expectedTaskIds = scenario.tasks.map((task) => task.task_id);
+  const expectedEventIds = payload.events.map((event) => event.event_id);
   for (const item of sessions.items) {
     const snapshot = await getRuntimeSession(item.session_id, options);
     if (
       snapshot.initial_scenario_version === scenario.version
       && snapshot.initial_plan_id === initialPlanId
+      && hasExactIds(snapshot.tasks.map((task) => task.task_id), expectedTaskIds)
+      && hasExactIds(snapshot.events.map((event) => event.event_id), expectedEventIds)
     ) {
       return snapshot;
     }

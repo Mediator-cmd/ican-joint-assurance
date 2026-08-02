@@ -20,7 +20,9 @@ def test_demo_payload_contains_fifo_and_optimized_views() -> None:
     assert payload["views"]["baseline"]["plan"]["violations"] == []
     assert payload["views"]["after_events_fifo"]["plan"]["violations"] == []
     assert payload["views"]["optimized"]["plan"]["violations"] == []
-    assert payload["views"]["baseline"]["plan"]["metrics"]["critical_task_completion_rate_pct"] == 50
+    assert payload["views"]["baseline"]["plan"]["metrics"]["assigned_tasks"] == 9
+    assert payload["views"]["baseline"]["plan"]["metrics"]["critical_task_completion_rate_pct"] == 75
+    assert payload["views"]["optimized"]["plan"]["metrics"]["assigned_tasks"] == 10
     assert payload["views"]["optimized"]["plan"]["metrics"]["critical_task_completion_rate_pct"] == 100
-    assert len(payload["events"]) == 2
-    assert len(payload["changes"]) == 6
+    assert len(payload["events"]) == 6
+    assert len(payload["changes"]) == 18

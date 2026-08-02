@@ -28,6 +28,7 @@ const runtimeDemoPayload = {
       scenario: {
         scenario_id: "SCN-DEMO",
         version: 1,
+        tasks: [],
       },
       plan: {},
     },
@@ -176,6 +177,53 @@ describe("findOrCreateRuntimeSession", () => {
     expect(fetcher.mock.calls[1]?.[1]?.method).toBe("POST");
     expect(fetcher.mock.calls[3]?.[1]?.method).toBe("POST");
     expect(fetcher.mock.calls[3]?.[1]?.body).toContain('"active_plan_id":"PLAN-DEMO-V1-CP-SAT"');
+  });
+
+  it("does not reuse an older session whose task or event catalog is stale", async () => {
+    const expandedPayload = {
+      ...runtimeDemoPayload,
+      events: [{ event_id: "EVT-NEW" }],
+      views: {
+        ...runtimeDemoPayload.views,
+        baseline: {
+          ...runtimeDemoPayload.views.baseline,
+          scenario: {
+            scenario_id: "SCN-DEMO",
+            version: 1,
+            tasks: [{ task_id: "TASK-NEW" }],
+          },
+        },
+      },
+    } as unknown as DemoPayload;
+    const expandedSnapshot = {
+      ...runtimeSnapshot,
+      session_id: "RUN-NEW",
+      tasks: [{ task_id: "TASK-NEW" }],
+      events: [{ event_id: "EVT-NEW" }],
+    } as RuntimeSessionSnapshot;
+    const fetcher = vi
+      .fn<Fetcher>()
+      .mockResolvedValueOnce(jsonResponse({
+        items: [{ plan_id: "PLAN-DEMO-V1-CP-SAT" }],
+        total: 1,
+        storage_scope: "process_memory",
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        items: [{ session_id: "RUN-OLD" }],
+        total: 1,
+        offset: 0,
+        limit: 100,
+        storage_scope: "sqlite",
+        safety_notice: "safe",
+      }))
+      .mockResolvedValueOnce(jsonResponse({ ...runtimeSnapshot, session_id: "RUN-OLD" }))
+      .mockResolvedValueOnce(jsonResponse(expandedSnapshot, 201));
+
+    const result = await findOrCreateRuntimeSession(expandedPayload, { fetcher });
+
+    expect(result.session_id).toBe("RUN-NEW");
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(fetcher.mock.calls[3]?.[1]?.method).toBe("POST");
   });
 });
 

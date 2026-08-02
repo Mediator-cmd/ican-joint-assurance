@@ -31,11 +31,11 @@ def test_default_app_opens_with_a_ready_to_explore_demo_scenario() -> None:
     assert summary["scenario_id"] == "SCN-TERMINAL-DISTURBANCE-01"
     assert summary["data_classification"] == "synthetic"
     assert summary["operational"] == {
-        "flight_count": 2,
-        "task_count": 5,
-        "resource_count": 4,
+        "flight_count": 3,
+        "task_count": 10,
+        "resource_count": 5,
         "zone_count": 3,
-        "pending_event_count": 2,
+        "pending_event_count": 6,
         "applied_event_count": 0,
         "ready_for_planning": True,
         "warnings": [],
@@ -56,6 +56,10 @@ def test_scenario_detail_explains_version_events_storage_and_safety() -> None:
     assert record["pending_event_ids"] == [
         "EVT-SIM102-DELAY",
         "EVT-SIM218-GATE",
+        "EVT-SIM330-GATE",
+        "EVT-SIM218-DELAY",
+        "EVT-SIM330-DELAY",
+        "EVT-SIM218-GATE-RETURN",
     ]
     assert record["applied_event_ids"] == []
     assert record["storage_scope"] == "process_memory"
@@ -71,7 +75,7 @@ def test_import_returns_validated_record_and_creates_one_audit() -> None:
     record = response.json()
     assert record["summary"]["operational"]["ready_for_planning"] is True
     assert record["scenario"]["events"] == []
-    assert len(record["pending_event_ids"]) == 2
+    assert len(record["pending_event_ids"]) == 6
     repository = app.state.scenario_repository
     assert len(repository.list_audit_records(record["summary"]["scenario_id"])) == 1
 

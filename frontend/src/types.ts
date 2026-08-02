@@ -242,6 +242,10 @@ export interface FlightRuntimeProjection {
 
 export interface EventRuntimeProjection {
   event_id: string;
+  event_type: "delay" | "gate_change";
+  flight_id: string;
+  detail: string;
+  note: string | null;
   status: RuntimeEventStatus;
   occurred_at: string;
   applied_at: string | null;
@@ -272,6 +276,8 @@ export interface RuntimeSessionSnapshot {
   initial_plan_id: string;
   active_plan_id: string;
   candidate_plan_id: string | null;
+  active_plan_detail: Plan | null;
+  candidate_plan_detail: Plan | null;
   status: RuntimeStatus;
   status_label: string;
   revision: number;

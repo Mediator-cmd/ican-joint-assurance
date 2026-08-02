@@ -72,8 +72,8 @@ def test_full_workflow_compares_saved_plans_without_mutating_state() -> None:
     assert comparison["candidate_plan_id"] == candidate_plan_id
     assert comparison["baseline_metrics"]["scenario_version"] == 1
     assert comparison["candidate_metrics"]["scenario_version"] == 2
-    assert comparison["baseline_metrics"]["assigned_tasks"] == 4
-    assert comparison["candidate_metrics"]["assigned_tasks"] == 5
+    assert comparison["baseline_metrics"]["assigned_tasks"] == 9
+    assert comparison["candidate_metrics"]["assigned_tasks"] == 10
     assert comparison["baseline_metrics"]["violation_count"] == 0
     assert comparison["candidate_metrics"]["violation_count"] == 0
     assert comparison["requires_human_confirmation"] is True
@@ -102,11 +102,11 @@ def test_comparison_returns_candidate_minus_baseline_deltas() -> None:
         "assigned_tasks": 1,
         "unassigned_tasks": -1,
         "total_tasks": 0,
-        "task_completion_rate_pct": 20.0,
-        "critical_task_completion_rate_pct": 50.0,
-        "average_wait_minutes": 6.35,
+        "task_completion_rate_pct": 10.0,
+        "critical_task_completion_rate_pct": 25.0,
+        "average_wait_minutes": 3.36,
         "max_wait_minutes": 20,
-        "overall_resource_utilization_pct": 5.83,
+        "overall_resource_utilization_pct": 1.53,
         "violation_count": 0,
     }
 
@@ -201,11 +201,11 @@ def test_demo_endpoint_is_exactly_compatible_with_static_payload() -> None:
     assert response.json()["project"]["safety_notice"] == SAFETY_NOTICE
     views = response.json()["views"]
     assert set(views) == {"baseline", "after_events_fifo", "optimized"}
-    assert views["after_events_fifo"]["plan"]["metrics"]["assigned_tasks"] == 4
-    assert views["optimized"]["plan"]["metrics"]["assigned_tasks"] == 5
+    assert views["after_events_fifo"]["plan"]["metrics"]["assigned_tasks"] == 9
+    assert views["optimized"]["plan"]["metrics"]["assigned_tasks"] == 10
     assert (
         views["after_events_fifo"]["plan"]["metrics"]["critical_task_completion_rate_pct"]
-        == 50
+        == 75
     )
     assert views["optimized"]["plan"]["metrics"]["critical_task_completion_rate_pct"] == 100
     assert all(not view["plan"]["violations"] for view in views.values())

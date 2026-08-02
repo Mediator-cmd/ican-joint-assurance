@@ -117,10 +117,16 @@ def test_runtime_api_controls_authoritative_clock_and_persists_boundaries(tmp_pa
     assert created["status"] == "ready"
     assert created["storage_scope"] == "sqlite"
     assert created["safety_notice"] == SAFETY_NOTICE
-    assert len(created["tasks"]) == 5
-    assert len(created["resources"]) == 4
-    assert len(created["flights"]) == 2
-    assert len(created["events"]) == 2
+    assert len(created["tasks"]) == 10
+    assert len(created["resources"]) == 5
+    assert len(created["flights"]) == 3
+    assert len(created["events"]) == 6
+    assert created["active_plan_detail"]["plan_id"] == created["active_plan_id"]
+    assert created["candidate_plan_detail"] is None
+    first_event = next(item for item in created["events"] if item["event_id"] == "EVT-SIM102-DELAY")
+    assert first_event["event_type"] == "delay"
+    assert first_event["flight_id"] == "FL-SIM102"
+    assert first_event["detail"] == "SIM102 预计离港时间顺延 25 分钟"
     assert {item["status"] for item in created["tasks"]} == {"pending", "unassigned"}
     assert {item["status"] for item in created["events"]} == {"pending", "resolved"}
     assert listed.status_code == 200

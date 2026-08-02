@@ -57,7 +57,7 @@ def test_full_fifo_event_optimization_workflow_is_queryable_and_understandable()
     fifo_record = fifo_response.json()
     assert fifo_record["guidance"]["display_name"] == "原规则方案"
     assert fifo_record["plan"]["scenario_version"] == 1
-    assert fifo_record["plan"]["metrics"]["assigned_tasks"] == 4
+    assert fifo_record["plan"]["metrics"]["assigned_tasks"] == 9
     assert fifo_record["plan"]["violations"] == []
 
     assert events_response.status_code == 200
@@ -70,10 +70,10 @@ def test_full_fifo_event_optimization_workflow_is_queryable_and_understandable()
     assert optimized_response.status_code == 201
     optimized_record = optimized_response.json()
     assert optimized_record["guidance"]["display_name"] == "系统优化建议"
-    assert "全部 5 项任务已安排" in optimized_record["guidance"]["result_summary"]
+    assert "全部 10 项任务已安排" in optimized_record["guidance"]["result_summary"]
     assert optimized_record["guidance"]["requires_human_confirmation"] is True
     assert optimized_record["plan"]["scenario_version"] == 2
-    assert optimized_record["plan"]["metrics"]["assigned_tasks"] == 5
+    assert optimized_record["plan"]["metrics"]["assigned_tasks"] == 10
     assert optimized_record["plan"]["metrics"]["critical_task_completion_rate_pct"] == 100
     assert optimized_record["plan"]["violations"] == []
     assert "仅供教学仿真" in optimized_record["safety_notice"]
@@ -127,7 +127,14 @@ def test_new_structured_event_is_applied_and_original_catalog_remains_pending() 
     assert response.status_code == 200
     record = response.json()
     assert record["applied_event_ids"] == [new_event["event_id"]]
-    assert record["pending_event_ids"] == ["EVT-SIM102-DELAY", "EVT-SIM218-GATE"]
+    assert record["pending_event_ids"] == [
+        "EVT-SIM102-DELAY",
+        "EVT-SIM218-GATE",
+        "EVT-SIM330-GATE",
+        "EVT-SIM218-DELAY",
+        "EVT-SIM330-DELAY",
+        "EVT-SIM218-GATE-RETURN",
+    ]
     departure = datetime.fromisoformat(_flight(record, "FL-SIM102")["scheduled_departure"])
     assert departure.hour == 8 and departure.minute == 40
 

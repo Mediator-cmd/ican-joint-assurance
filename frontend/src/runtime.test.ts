@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  compareRuntimePlans,
   reduceRuntimeStreamEvent,
   runtimeStatusCounts,
   shouldReplaceRuntimeSnapshot,
 } from "./runtime";
-import type { RuntimeSessionSnapshot, RuntimeStreamEvent } from "./types";
+import type { Assignment, Plan, RuntimeSessionSnapshot, RuntimeStreamEvent } from "./types";
 
 const snapshot = {
   session_id: "RUN-DEMO",
@@ -119,5 +120,68 @@ describe("shouldReplaceRuntimeSnapshot", () => {
 
     expect(shouldReplaceRuntimeSnapshot(snapshot, staleClock)).toBe(false);
     expect(shouldReplaceRuntimeSnapshot(snapshot, reset)).toBe(true);
+  });
+});
+
+function assignment(
+  taskId: string,
+  resourceId: string,
+  start: string,
+  destination = "GATE-E01",
+): Assignment {
+  const end = new Date(Date.parse(start) + 8 * 60_000).toISOString();
+  return {
+    assignment_id: `ASG-${taskId}-${resourceId}`,
+    task_id: taskId,
+    resource_id: resourceId,
+    resource_type: "wheelchair",
+    resource_start_zone_id: "TRANSFER-DESK",
+    origin_zone_id: "TRANSFER-DESK",
+    destination_zone_id: destination,
+    travel_started_at: start,
+    travel_ended_at: start,
+    service_started_at: start,
+    service_ended_at: end,
+    reposition_minutes: 0,
+    service_minutes: 8,
+    wait_minutes: 0,
+  };
+}
+
+describe("compareRuntimePlans", () => {
+  it("reports assignment, resource, schedule and route changes from plan facts", () => {
+    const unchanged = assignment("TASK-003", "WC-01", "2026-08-01T08:30:00+08:00");
+    const active = {
+      assignments: [
+        assignment("TASK-001", "WC-01", "2026-08-01T08:00:00+08:00"),
+        unchanged,
+      ],
+      unassigned_tasks: [{ task_id: "TASK-002", reason: "time_window", detail: "时间不足" }],
+    } as unknown as Plan;
+    const candidate = {
+      assignments: [
+        {
+          ...assignment("TASK-001", "WC-02", "2026-08-01T08:10:00+08:00", "GATE-W03"),
+          wait_minutes: 10,
+        },
+        assignment("TASK-002", "WC-01", "2026-08-01T08:20:00+08:00"),
+        unchanged,
+      ],
+      unassigned_tasks: [],
+    } as unknown as Plan;
+
+    const comparison = compareRuntimePlans(active, candidate);
+
+    expect(comparison.unchangedTaskIds).toEqual(["TASK-003"]);
+    expect(comparison.changes).toEqual([
+      expect.objectContaining({
+        taskId: "TASK-001",
+        changedFields: ["resource", "schedule", "route", "wait"],
+      }),
+      expect.objectContaining({
+        taskId: "TASK-002",
+        changedFields: ["assignment", "coordination"],
+      }),
+    ]);
   });
 });

@@ -31,10 +31,10 @@ def test_fifo_plan_is_safe_partial_and_deterministic() -> None:
     assert first == second
     assert first.status is PlanStatus.PARTIAL
     assert first.violations == []
-    assert len(first.assignments) == 4
+    assert len(first.assignments) == 9
     assert [item.task_id for item in first.unassigned_tasks] == ["TASK-005"]
-    assert first.metrics.task_completion_rate_pct == 80
-    assert first.metrics.critical_task_completion_rate_pct == 50
+    assert first.metrics.task_completion_rate_pct == 90
+    assert first.metrics.critical_task_completion_rate_pct == 75
 
 
 def test_fifo_resource_selection_is_stable() -> None:
@@ -48,6 +48,11 @@ def test_fifo_resource_selection_is_stable() -> None:
         "TASK-002": "AGENT-01",
         "TASK-003": "BUS-01",
         "TASK-004": "WC-01",
+        "TASK-006": "AGENT-02",
+        "TASK-007": "BUS-01",
+        "TASK-008": "WC-01",
+        "TASK-009": "AGENT-01",
+        "TASK-010": "WC-02",
     }
 
 
@@ -71,9 +76,12 @@ def test_events_create_new_version_without_mutating_baseline() -> None:
     assert baseline_flights["FL-SIM102"].scheduled_departure.hour == 8
     assert updated_flights["FL-SIM102"].scheduled_departure.hour == 9
     assert baseline_flights["FL-SIM218"].gate_id == "GATE-W03"
-    assert updated_flights["FL-SIM218"].gate_id == "GATE-E01"
+    assert updated_flights["FL-SIM218"].gate_id == "GATE-W03"
+    assert updated_flights["FL-SIM218"].scheduled_departure.minute == 5
+    assert updated_flights["FL-SIM330"].gate_id == "GATE-W03"
     assert baseline_tasks["TASK-002"].destination_zone_id == "GATE-W03"
-    assert updated_tasks["TASK-002"].destination_zone_id == "GATE-E01"
+    assert updated_tasks["TASK-002"].destination_zone_id == "GATE-W03"
+    assert updated_tasks["TASK-006"].destination_zone_id == "GATE-W03"
     assert updated_tasks["TASK-001"].deadline_at == baseline_tasks["TASK-001"].deadline_at + timedelta(minutes=25)
 
 
@@ -99,6 +107,8 @@ def test_resource_shortage_is_explicitly_unassigned() -> None:
         "TASK-001",
         "TASK-004",
         "TASK-005",
+        "TASK-008",
+        "TASK-010",
     }
     assert {item.reason for item in plan.unassigned_tasks} == {
         UnassignedReason.NO_COMPATIBLE_RESOURCE

@@ -86,6 +86,20 @@ def _snapshot(**updates) -> RuntimeSessionSnapshot:
     return RuntimeSessionSnapshot.model_validate(payload)
 
 
+def _event_projection(**updates) -> EventRuntimeProjection:
+    payload = {
+        "event_id": "EVT-SIM102-DELAY",
+        "event_type": "delay",
+        "flight_id": "FL-SIM102",
+        "detail": "SIM102 预计离港时间顺延 25 分钟",
+        "note": "前序航班保障延误",
+        "status": RuntimeEventStatus.PENDING,
+        "occurred_at": BASE_TIME,
+    }
+    payload.update(updates)
+    return EventRuntimeProjection.model_validate(payload)
+
+
 def test_runtime_requests_freeze_revision_and_speed_contract() -> None:
     created = CreateRuntimeSessionRequest(
         scenario_id="SCN-TERMINAL-DISTURBANCE-01",
@@ -220,10 +234,8 @@ def test_resource_projection_distinguishes_stationary_and_moving_positions() -> 
 
 
 def test_event_projection_requires_evidence_for_terminal_states() -> None:
-    event = EventRuntimeProjection(
-        event_id="EVT-SIM102-DELAY",
+    event = _event_projection(
         status="awaiting_confirmation",
-        occurred_at=BASE_TIME,
         applied_at=BASE_TIME,
         scenario_version_after=2,
         candidate_plan_id="PLAN-CANDIDATE",
@@ -232,31 +244,23 @@ def test_event_projection_requires_evidence_for_terminal_states() -> None:
     assert event.status_label == "方案待确认"
 
     with pytest.raises(ValidationError):
-        EventRuntimeProjection(
-            event_id="EVT-SIM102-DELAY",
+        _event_projection(
             status=RuntimeEventStatus.AWAITING_CONFIRMATION,
-            occurred_at=BASE_TIME,
             applied_at=BASE_TIME,
             scenario_version_after=2,
         )
     with pytest.raises(ValidationError):
-        EventRuntimeProjection(
-            event_id="EVT-SIM102-DELAY",
+        _event_projection(
             status=RuntimeEventStatus.FAILED,
-            occurred_at=BASE_TIME,
         )
     with pytest.raises(ValidationError):
-        EventRuntimeProjection(
-            event_id="EVT-SIM102-DELAY",
+        _event_projection(
             status=RuntimeEventStatus.PENDING,
-            occurred_at=BASE_TIME,
             candidate_plan_id="PLAN-CANDIDATE",
         )
     with pytest.raises(ValidationError):
-        EventRuntimeProjection(
-            event_id="EVT-SIM102-DELAY",
+        _event_projection(
             status=RuntimeEventStatus.PENDING,
-            occurred_at=BASE_TIME,
             failure_code="unexpected_failure",
         )
 
@@ -379,6 +383,8 @@ def test_runtime_snapshot_schema_contains_frontend_contract_fields() -> None:
         "current_scenario_version",
         "active_plan_id",
         "candidate_plan_id",
+        "active_plan_detail",
+        "candidate_plan_detail",
         "status",
         "revision",
         "clock",

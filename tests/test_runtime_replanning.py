@@ -127,6 +127,10 @@ def test_event_boundary_freezes_execution_and_creates_candidate(tmp_path) -> Non
     assert [event.status.value for event in awaiting.events] == [
         "awaiting_confirmation",
         "pending",
+        "pending",
+        "pending",
+        "pending",
+        "pending",
     ]
     assert [audit.action for audit in repository.list_audit_records(created.session_id)] == [
         "session_created",
@@ -134,6 +138,61 @@ def test_event_boundary_freezes_execution_and_creates_candidate(tmp_path) -> Non
         "event_batch_applied",
         "candidate_created",
     ]
+
+
+def test_finite_event_sequence_creates_six_unique_candidates_then_completes(tmp_path) -> None:
+    service, repository, clock, scenario, initial_plan = _service(
+        tmp_path,
+        session_id="RUN-M45A-SEQUENCE",
+    )
+    created = _create(service, scenario, initial_plan)
+    event_minutes = [0, 4, 16, 28, 40, 52]
+    candidate_ids: list[str] = []
+
+    awaiting = service.start_session(
+        created.session_id,
+        RuntimeRevisionRequest(expected_revision=created.revision),
+    )
+    for index, minute in enumerate(event_minutes):
+        assert awaiting.status is RuntimeStatus.AWAITING_CONFIRMATION
+        assert awaiting.clock.simulation_time == _at(8, minute)
+        assert awaiting.current_scenario_version == index + 2
+        assert awaiting.candidate_plan_id is not None
+        assert awaiting.candidate_plan_detail is not None
+        assert awaiting.candidate_plan_detail.violations == []
+        candidate_ids.append(awaiting.candidate_plan_id)
+
+        accepted = service.accept_candidate(
+            created.session_id,
+            CandidateDecisionRequest(
+                expected_revision=awaiting.revision,
+                candidate_plan_id=awaiting.candidate_plan_id,
+            ),
+        )
+        if index == len(event_minutes) - 1:
+            break
+        running = service.start_session(
+            created.session_id,
+            RuntimeRevisionRequest(expected_revision=accepted.revision),
+        )
+        next_minute = event_minutes[index + 1]
+        clock.advance((next_minute - minute) * 60 / 15)
+        awaiting = service.get_session(running.session_id)
+
+    assert len(set(candidate_ids)) == len(event_minutes)
+    running = service.start_session(
+        created.session_id,
+        RuntimeRevisionRequest(expected_revision=accepted.revision),
+    )
+    clock.advance((90 - event_minutes[-1]) * 60 / 15)
+    completed = service.get_session(running.session_id)
+    source = repository.get_session(created.session_id).projection_source
+
+    assert completed.status is RuntimeStatus.COMPLETED
+    assert completed.clock.simulation_time == _at(9, 30)
+    assert source is not None
+    assert len(source.applied_event_versions) == 6
+    assert set(source.resolved_event_ids) == set(source.applied_event_versions)
 
 
 def test_accept_then_reset_restores_initial_runtime_facts(tmp_path) -> None:
@@ -223,7 +282,7 @@ def test_reject_keeps_older_active_plan_with_newer_event_scenario(tmp_path) -> N
     assert source.scenario.version == 3
     assert source.plan.scenario_version == 2
     assert source.candidate_plan is None
-    assert {event.status.value for event in rejected.events} == {"resolved"}
+    assert {event.status.value for event in rejected.events} == {"resolved", "pending"}
 
 
 def test_same_time_events_share_one_scenario_version_and_replan(tmp_path) -> None:

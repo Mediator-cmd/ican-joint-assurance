@@ -52,12 +52,16 @@ def test_create_scenario_separates_pending_events_from_immutable_baseline() -> N
     created.name = "返回值修改"
 
     baseline = repository.get_baseline("SCN-TERMINAL-DISTURBANCE-01")
-    assert baseline.name == "东区登机口扰动演示场景"
+    assert baseline.name == "航站楼连续扰动教学场景"
     assert baseline.events == []
     assert repository.get_scenario(baseline.scenario_id).events == []
     assert repository.get_pending_event_ids(baseline.scenario_id) == (
         "EVT-SIM102-DELAY",
         "EVT-SIM218-GATE",
+        "EVT-SIM330-GATE",
+        "EVT-SIM218-DELAY",
+        "EVT-SIM330-DELAY",
+        "EVT-SIM218-GATE-RETURN",
     )
     assert repository.get_applied_event_ids(baseline.scenario_id) == ()
 
@@ -91,7 +95,7 @@ def test_event_revision_preserves_history_and_updates_event_state() -> None:
 
     original = repository.get_scenario(baseline.scenario_id, version=1)
     current = repository.get_scenario(baseline.scenario_id)
-    assert current.name == "东区登机口扰动演示场景"
+    assert current.name == "航站楼连续扰动教学场景"
     assert original.version == 1
     assert current.version == 2
     assert original.flights[0].scheduled_departure.hour == 8
@@ -100,6 +104,10 @@ def test_event_revision_preserves_history_and_updates_event_state() -> None:
     assert repository.get_applied_event_ids(baseline.scenario_id) == (event_id,)
     assert repository.get_pending_event_ids(baseline.scenario_id) == (
         "EVT-SIM218-GATE",
+        "EVT-SIM330-GATE",
+        "EVT-SIM218-DELAY",
+        "EVT-SIM330-DELAY",
+        "EVT-SIM218-GATE-RETURN",
     )
 
 
@@ -134,6 +142,10 @@ def test_new_structured_event_is_registered_and_applied_atomically() -> None:
     assert repository.get_pending_event_ids(baseline.scenario_id) == (
         "EVT-SIM102-DELAY",
         "EVT-SIM218-GATE",
+        "EVT-SIM330-GATE",
+        "EVT-SIM218-DELAY",
+        "EVT-SIM330-DELAY",
+        "EVT-SIM218-GATE-RETURN",
     )
 
 
@@ -277,7 +289,7 @@ def test_saved_plans_are_immutable_queryable_and_audited() -> None:
 
     fetched = repository.get_plan("PLAN-TERMINAL-DISTURBANCE-01-V1-FIFO")
     listed = repository.list_plans(scenario.scenario_id, scenario_version=1)
-    assert fetched.metrics.assigned_tasks == 4
+    assert fetched.metrics.assigned_tasks == 9
     assert len(listed) == 1
     assert listed[0] == fetched
     assert [record.action for record in repository.list_audit_records(scenario.scenario_id)] == [

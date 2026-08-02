@@ -21,12 +21,13 @@ def test_demo_scenario_loads_with_cross_references() -> None:
     assert scenario.scenario_id == "SCN-TERMINAL-DISTURBANCE-01"
     assert scenario.data_classification.value == "synthetic"
     assert len(scenario.zones) == 3
-    assert len(scenario.flights) == 2
-    assert len(scenario.events) == 2
-    assert len(scenario.tasks) == 5
-    assert len(scenario.resources) == 4
-    assert {flight.display_code for flight in scenario.flights} == {"SIM102", "SIM218"}
-    assert {task.flight_id for task in scenario.tasks} == {"FL-SIM102", "FL-SIM218"}
+    assert len(scenario.flights) == 3
+    assert len(scenario.events) == 6
+    assert len(scenario.tasks) == 10
+    assert len(scenario.resources) == 5
+    assert {flight.display_code for flight in scenario.flights} == {"SIM102", "SIM218", "SIM330"}
+    assert {task.flight_id for task in scenario.tasks} == {"FL-SIM102", "FL-SIM218", "FL-SIM330"}
+    assert [event.occurred_at.minute for event in scenario.events] == [0, 4, 16, 28, 40, 52]
 
 
 def test_scenario_rejects_unknown_task_flight() -> None:

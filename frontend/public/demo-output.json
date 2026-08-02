@@ -8,9 +8,23 @@
       "field": "scheduled_departure"
     },
     {
-      "after": "GATE-E01",
-      "before": "GATE-W03",
+      "after": "2026-08-01T09:05:00+08:00",
+      "before": "2026-08-01T08:50:00+08:00",
       "entity_id": "FL-SIM218",
+      "entity_type": "flight",
+      "field": "scheduled_departure"
+    },
+    {
+      "after": "2026-08-01T09:25:00+08:00",
+      "before": "2026-08-01T09:15:00+08:00",
+      "entity_id": "FL-SIM330",
+      "entity_type": "flight",
+      "field": "scheduled_departure"
+    },
+    {
+      "after": "GATE-W03",
+      "before": "GATE-E01",
+      "entity_id": "FL-SIM330",
       "entity_type": "flight",
       "field": "gate_id"
     },
@@ -22,11 +36,11 @@
       "field": "deadline_at"
     },
     {
-      "after": "GATE-E01",
-      "before": "GATE-W03",
+      "after": "2026-08-01T08:42:00+08:00",
+      "before": "2026-08-01T08:27:00+08:00",
       "entity_id": "TASK-002",
       "entity_type": "task",
-      "field": "destination_zone_id"
+      "field": "deadline_at"
     },
     {
       "after": "2026-08-01T08:47:00+08:00",
@@ -36,9 +50,79 @@
       "field": "deadline_at"
     },
     {
-      "after": "GATE-E01",
-      "before": "GATE-W03",
+      "after": "2026-08-01T08:43:00+08:00",
+      "before": "2026-08-01T08:28:00+08:00",
       "entity_id": "TASK-004",
+      "entity_type": "task",
+      "field": "deadline_at"
+    },
+    {
+      "after": "2026-08-01T08:33:00+08:00",
+      "before": "2026-08-01T08:18:00+08:00",
+      "entity_id": "TASK-005",
+      "entity_type": "task",
+      "field": "deadline_at"
+    },
+    {
+      "after": "GATE-W03",
+      "before": "GATE-E01",
+      "entity_id": "TASK-005",
+      "entity_type": "task",
+      "field": "destination_zone_id"
+    },
+    {
+      "after": "2026-08-01T09:00:00+08:00",
+      "before": "2026-08-01T08:50:00+08:00",
+      "entity_id": "TASK-006",
+      "entity_type": "task",
+      "field": "deadline_at"
+    },
+    {
+      "after": "GATE-W03",
+      "before": "GATE-E01",
+      "entity_id": "TASK-006",
+      "entity_type": "task",
+      "field": "destination_zone_id"
+    },
+    {
+      "after": "2026-08-01T09:03:00+08:00",
+      "before": "2026-08-01T08:48:00+08:00",
+      "entity_id": "TASK-007",
+      "entity_type": "task",
+      "field": "deadline_at"
+    },
+    {
+      "after": "2026-08-01T09:10:00+08:00",
+      "before": "2026-08-01T09:00:00+08:00",
+      "entity_id": "TASK-008",
+      "entity_type": "task",
+      "field": "deadline_at"
+    },
+    {
+      "after": "GATE-W03",
+      "before": "GATE-E01",
+      "entity_id": "TASK-008",
+      "entity_type": "task",
+      "field": "destination_zone_id"
+    },
+    {
+      "after": "2026-08-01T09:17:00+08:00",
+      "before": "2026-08-01T09:02:00+08:00",
+      "entity_id": "TASK-009",
+      "entity_type": "task",
+      "field": "deadline_at"
+    },
+    {
+      "after": "2026-08-01T09:18:00+08:00",
+      "before": "2026-08-01T09:08:00+08:00",
+      "entity_id": "TASK-010",
+      "entity_type": "task",
+      "field": "deadline_at"
+    },
+    {
+      "after": "GATE-W03",
+      "before": "GATE-E01",
+      "entity_id": "TASK-010",
       "entity_type": "task",
       "field": "destination_zone_id"
     }
@@ -58,6 +142,38 @@
       "event_type": "gate_change",
       "note": "西区登机口临时关闭",
       "occurred_at": "2026-08-01T08:04:00+08:00",
+      "title": "登机口变更"
+    },
+    {
+      "detail": "SIM330 由 GATE-E01 调整至 GATE-W03",
+      "event_id": "EVT-SIM330-GATE",
+      "event_type": "gate_change",
+      "note": "东区廊桥临时检修",
+      "occurred_at": "2026-08-01T08:16:00+08:00",
+      "title": "登机口变更"
+    },
+    {
+      "detail": "SIM218 延误 15 分钟",
+      "event_id": "EVT-SIM218-DELAY",
+      "event_type": "delay",
+      "note": "机组衔接时间延长",
+      "occurred_at": "2026-08-01T08:28:00+08:00",
+      "title": "航班延误"
+    },
+    {
+      "detail": "SIM330 延误 10 分钟",
+      "event_id": "EVT-SIM330-DELAY",
+      "event_type": "delay",
+      "note": "行李装载复核延长",
+      "occurred_at": "2026-08-01T08:40:00+08:00",
+      "title": "航班延误"
+    },
+    {
+      "detail": "SIM218 由 GATE-E01 调整至 GATE-W03",
+      "event_id": "EVT-SIM218-GATE-RETURN",
+      "event_type": "gate_change",
+      "note": "西区登机口恢复使用",
+      "occurred_at": "2026-08-01T08:52:00+08:00",
       "title": "登机口变更"
     }
   ],
@@ -91,7 +207,7 @@
           },
           {
             "assignment_id": "ASG-002",
-            "destination_zone_id": "GATE-E01",
+            "destination_zone_id": "GATE-W03",
             "origin_zone_id": "TRANSFER-DESK",
             "reposition_minutes": 0,
             "resource_id": "AGENT-01",
@@ -123,7 +239,7 @@
           },
           {
             "assignment_id": "ASG-004",
-            "destination_zone_id": "GATE-E01",
+            "destination_zone_id": "GATE-W03",
             "origin_zone_id": "TRANSFER-DESK",
             "reposition_minutes": 8,
             "resource_id": "WC-01",
@@ -136,47 +252,134 @@
             "travel_ended_at": "2026-08-01T08:16:00+08:00",
             "travel_started_at": "2026-08-01T08:08:00+08:00",
             "wait_minutes": 13
+          },
+          {
+            "assignment_id": "ASG-006",
+            "destination_zone_id": "GATE-W03",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 0,
+            "resource_id": "AGENT-02",
+            "resource_start_zone_id": "TRANSFER-DESK",
+            "resource_type": "service_agent",
+            "service_ended_at": "2026-08-01T08:28:00+08:00",
+            "service_minutes": 10,
+            "service_started_at": "2026-08-01T08:18:00+08:00",
+            "task_id": "TASK-006",
+            "travel_ended_at": "2026-08-01T08:18:00+08:00",
+            "travel_started_at": "2026-08-01T08:18:00+08:00",
+            "wait_minutes": 0
+          },
+          {
+            "assignment_id": "ASG-007",
+            "destination_zone_id": "GATE-W03",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 8,
+            "resource_id": "BUS-01",
+            "resource_start_zone_id": "GATE-E01",
+            "resource_type": "shuttle_bus",
+            "service_ended_at": "2026-08-01T08:39:00+08:00",
+            "service_minutes": 9,
+            "service_started_at": "2026-08-01T08:30:00+08:00",
+            "task_id": "TASK-007",
+            "travel_ended_at": "2026-08-01T08:22:00+08:00",
+            "travel_started_at": "2026-08-01T08:14:00+08:00",
+            "wait_minutes": 0
+          },
+          {
+            "assignment_id": "ASG-008",
+            "destination_zone_id": "GATE-W03",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 12,
+            "resource_id": "WC-01",
+            "resource_start_zone_id": "GATE-W03",
+            "resource_type": "wheelchair",
+            "service_ended_at": "2026-08-01T08:50:00+08:00",
+            "service_minutes": 8,
+            "service_started_at": "2026-08-01T08:42:00+08:00",
+            "task_id": "TASK-008",
+            "travel_ended_at": "2026-08-01T08:35:00+08:00",
+            "travel_started_at": "2026-08-01T08:23:00+08:00",
+            "wait_minutes": 0
+          },
+          {
+            "assignment_id": "ASG-009",
+            "destination_zone_id": "GATE-W03",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 12,
+            "resource_id": "AGENT-01",
+            "resource_start_zone_id": "GATE-W03",
+            "resource_type": "service_agent",
+            "service_ended_at": "2026-08-01T09:01:00+08:00",
+            "service_minutes": 7,
+            "service_started_at": "2026-08-01T08:54:00+08:00",
+            "task_id": "TASK-009",
+            "travel_ended_at": "2026-08-01T08:22:00+08:00",
+            "travel_started_at": "2026-08-01T08:10:00+08:00",
+            "wait_minutes": 0
+          },
+          {
+            "assignment_id": "ASG-010",
+            "destination_zone_id": "GATE-W03",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 0,
+            "resource_id": "WC-02",
+            "resource_start_zone_id": "TRANSFER-DESK",
+            "resource_type": "wheelchair",
+            "service_ended_at": "2026-08-01T09:01:00+08:00",
+            "service_minutes": 6,
+            "service_started_at": "2026-08-01T08:55:00+08:00",
+            "task_id": "TASK-010",
+            "travel_ended_at": "2026-08-01T08:40:00+08:00",
+            "travel_started_at": "2026-08-01T08:40:00+08:00",
+            "wait_minutes": 0
           }
         ],
         "generated_at": "2026-08-01T08:00:00+08:00",
         "metrics": {
-          "assigned_tasks": 4,
-          "average_wait_minutes": 3.25,
-          "critical_task_completion_rate_pct": 50.0,
+          "assigned_tasks": 9,
+          "average_wait_minutes": 1.44,
+          "critical_task_completion_rate_pct": 75.0,
           "max_wait_minutes": 13,
-          "overall_resource_utilization_pct": 18.75,
+          "overall_resource_utilization_pct": 29.85,
           "resource_metrics": [
             {
-              "available_minutes": 60,
-              "busy_minutes": 10,
+              "available_minutes": 90,
+              "busy_minutes": 29,
               "resource_id": "AGENT-01",
               "resource_type": "service_agent",
-              "utilization_pct": 16.67
+              "utilization_pct": 32.22
             },
             {
-              "available_minutes": 60,
-              "busy_minutes": 0,
+              "available_minutes": 72,
+              "busy_minutes": 10,
               "resource_id": "AGENT-02",
               "resource_type": "service_agent",
-              "utilization_pct": 0.0
+              "utilization_pct": 13.89
             },
             {
-              "available_minutes": 60,
-              "busy_minutes": 12,
+              "available_minutes": 90,
+              "busy_minutes": 29,
               "resource_id": "BUS-01",
               "resource_type": "shuttle_bus",
-              "utilization_pct": 20.0
+              "utilization_pct": 32.22
             },
             {
-              "available_minutes": 60,
-              "busy_minutes": 23,
+              "available_minutes": 90,
+              "busy_minutes": 43,
               "resource_id": "WC-01",
               "resource_type": "wheelchair",
-              "utilization_pct": 38.33
+              "utilization_pct": 47.78
+            },
+            {
+              "available_minutes": 50,
+              "busy_minutes": 6,
+              "resource_id": "WC-02",
+              "resource_type": "wheelchair",
+              "utilization_pct": 12.0
             }
           ],
-          "task_completion_rate_pct": 80.0,
-          "total_tasks": 5,
+          "task_completion_rate_pct": 90.0,
+          "total_tasks": 10,
           "unassigned_tasks": 1
         },
         "plan_id": "PLAN-TERMINAL-DISTURBANCE-01-V2-FIFO",
@@ -214,6 +417,46 @@
             "note": "西区登机口临时关闭",
             "occurred_at": "2026-08-01T08:04:00+08:00",
             "previous_gate_id": "GATE-W03"
+          },
+          {
+            "delay_minutes": null,
+            "event_id": "EVT-SIM330-GATE",
+            "event_type": "gate_change",
+            "flight_id": "FL-SIM330",
+            "new_gate_id": "GATE-W03",
+            "note": "东区廊桥临时检修",
+            "occurred_at": "2026-08-01T08:16:00+08:00",
+            "previous_gate_id": "GATE-E01"
+          },
+          {
+            "delay_minutes": 15,
+            "event_id": "EVT-SIM218-DELAY",
+            "event_type": "delay",
+            "flight_id": "FL-SIM218",
+            "new_gate_id": null,
+            "note": "机组衔接时间延长",
+            "occurred_at": "2026-08-01T08:28:00+08:00",
+            "previous_gate_id": null
+          },
+          {
+            "delay_minutes": 10,
+            "event_id": "EVT-SIM330-DELAY",
+            "event_type": "delay",
+            "flight_id": "FL-SIM330",
+            "new_gate_id": null,
+            "note": "行李装载复核延长",
+            "occurred_at": "2026-08-01T08:40:00+08:00",
+            "previous_gate_id": null
+          },
+          {
+            "delay_minutes": null,
+            "event_id": "EVT-SIM218-GATE-RETURN",
+            "event_type": "gate_change",
+            "flight_id": "FL-SIM218",
+            "new_gate_id": "GATE-W03",
+            "note": "西区登机口恢复使用",
+            "occurred_at": "2026-08-01T08:52:00+08:00",
+            "previous_gate_id": "GATE-E01"
           }
         ],
         "flights": [
@@ -226,19 +469,27 @@
             "status": "delayed"
           },
           {
-            "boarding_starts_at": "2026-08-01T08:20:00+08:00",
+            "boarding_starts_at": "2026-08-01T08:35:00+08:00",
             "display_code": "SIM218",
             "flight_id": "FL-SIM218",
-            "gate_id": "GATE-E01",
-            "scheduled_departure": "2026-08-01T08:50:00+08:00",
-            "status": "scheduled"
+            "gate_id": "GATE-W03",
+            "scheduled_departure": "2026-08-01T09:05:00+08:00",
+            "status": "delayed"
+          },
+          {
+            "boarding_starts_at": "2026-08-01T08:55:00+08:00",
+            "display_code": "SIM330",
+            "flight_id": "FL-SIM330",
+            "gate_id": "GATE-W03",
+            "scheduled_departure": "2026-08-01T09:25:00+08:00",
+            "status": "delayed"
           }
         ],
-        "name": "东区登机口扰动演示场景",
+        "name": "航站楼连续扰动教学场景",
         "resources": [
           {
             "available_from": "2026-08-01T08:00:00+08:00",
-            "available_to": "2026-08-01T09:00:00+08:00",
+            "available_to": "2026-08-01T09:30:00+08:00",
             "capacity": 8,
             "current_zone_id": "TRANSFER-DESK",
             "home_zone_id": "TRANSFER-DESK",
@@ -248,7 +499,7 @@
           },
           {
             "available_from": "2026-08-01T08:00:00+08:00",
-            "available_to": "2026-08-01T09:00:00+08:00",
+            "available_to": "2026-08-01T09:30:00+08:00",
             "capacity": 1,
             "current_zone_id": "TRANSFER-DESK",
             "home_zone_id": "TRANSFER-DESK",
@@ -257,8 +508,18 @@
             "status": "available"
           },
           {
+            "available_from": "2026-08-01T08:40:00+08:00",
+            "available_to": "2026-08-01T09:30:00+08:00",
+            "capacity": 1,
+            "current_zone_id": "TRANSFER-DESK",
+            "home_zone_id": "TRANSFER-DESK",
+            "resource_id": "WC-02",
+            "resource_type": "wheelchair",
+            "status": "available"
+          },
+          {
             "available_from": "2026-08-01T08:00:00+08:00",
-            "available_to": "2026-08-01T09:00:00+08:00",
+            "available_to": "2026-08-01T09:30:00+08:00",
             "capacity": 1,
             "current_zone_id": "TRANSFER-DESK",
             "home_zone_id": "TRANSFER-DESK",
@@ -267,8 +528,8 @@
             "status": "available"
           },
           {
-            "available_from": "2026-08-01T08:00:00+08:00",
-            "available_to": "2026-08-01T09:00:00+08:00",
+            "available_from": "2026-08-01T08:18:00+08:00",
+            "available_to": "2026-08-01T09:30:00+08:00",
             "capacity": 1,
             "current_zone_id": "TRANSFER-DESK",
             "home_zone_id": "TRANSFER-DESK",
@@ -296,8 +557,8 @@
             "task_type": "wheelchair_transfer"
           },
           {
-            "deadline_at": "2026-08-01T08:27:00+08:00",
-            "destination_zone_id": "GATE-E01",
+            "deadline_at": "2026-08-01T08:42:00+08:00",
+            "destination_zone_id": "GATE-W03",
             "duration_minutes": 10,
             "flight_id": "FL-SIM218",
             "locked": false,
@@ -326,8 +587,8 @@
             "task_type": "shuttle_transfer"
           },
           {
-            "deadline_at": "2026-08-01T08:28:00+08:00",
-            "destination_zone_id": "GATE-E01",
+            "deadline_at": "2026-08-01T08:43:00+08:00",
+            "destination_zone_id": "GATE-W03",
             "duration_minutes": 7,
             "flight_id": "FL-SIM218",
             "locked": false,
@@ -341,8 +602,8 @@
             "task_type": "wheelchair_transfer"
           },
           {
-            "deadline_at": "2026-08-01T08:18:00+08:00",
-            "destination_zone_id": "GATE-E01",
+            "deadline_at": "2026-08-01T08:33:00+08:00",
+            "destination_zone_id": "GATE-W03",
             "duration_minutes": 6,
             "flight_id": "FL-SIM218",
             "locked": false,
@@ -354,10 +615,85 @@
             "required_resource_type": "wheelchair",
             "task_id": "TASK-005",
             "task_type": "boarding_assistance"
+          },
+          {
+            "deadline_at": "2026-08-01T09:00:00+08:00",
+            "destination_zone_id": "GATE-W03",
+            "duration_minutes": 10,
+            "flight_id": "FL-SIM330",
+            "locked": false,
+            "origin_zone_id": "TRANSFER-DESK",
+            "party_size": 1,
+            "passenger_group": "general_assistance",
+            "priority": 3,
+            "release_at": "2026-08-01T08:18:00+08:00",
+            "required_resource_type": "service_agent",
+            "task_id": "TASK-006",
+            "task_type": "escort"
+          },
+          {
+            "deadline_at": "2026-08-01T09:03:00+08:00",
+            "destination_zone_id": "GATE-W03",
+            "duration_minutes": 9,
+            "flight_id": "FL-SIM218",
+            "locked": false,
+            "origin_zone_id": "TRANSFER-DESK",
+            "party_size": 4,
+            "passenger_group": "urgent_connection",
+            "priority": 1,
+            "release_at": "2026-08-01T08:30:00+08:00",
+            "required_resource_type": "shuttle_bus",
+            "task_id": "TASK-007",
+            "task_type": "shuttle_transfer"
+          },
+          {
+            "deadline_at": "2026-08-01T09:10:00+08:00",
+            "destination_zone_id": "GATE-W03",
+            "duration_minutes": 8,
+            "flight_id": "FL-SIM330",
+            "locked": false,
+            "origin_zone_id": "TRANSFER-DESK",
+            "party_size": 1,
+            "passenger_group": "special_assistance",
+            "priority": 2,
+            "release_at": "2026-08-01T08:42:00+08:00",
+            "required_resource_type": "wheelchair",
+            "task_id": "TASK-008",
+            "task_type": "wheelchair_transfer"
+          },
+          {
+            "deadline_at": "2026-08-01T09:17:00+08:00",
+            "destination_zone_id": "GATE-W03",
+            "duration_minutes": 7,
+            "flight_id": "FL-SIM218",
+            "locked": false,
+            "origin_zone_id": "TRANSFER-DESK",
+            "party_size": 1,
+            "passenger_group": "urgent_connection",
+            "priority": 1,
+            "release_at": "2026-08-01T08:54:00+08:00",
+            "required_resource_type": "service_agent",
+            "task_id": "TASK-009",
+            "task_type": "escort"
+          },
+          {
+            "deadline_at": "2026-08-01T09:18:00+08:00",
+            "destination_zone_id": "GATE-W03",
+            "duration_minutes": 6,
+            "flight_id": "FL-SIM330",
+            "locked": false,
+            "origin_zone_id": "TRANSFER-DESK",
+            "party_size": 1,
+            "passenger_group": "special_assistance",
+            "priority": 2,
+            "release_at": "2026-08-01T08:55:00+08:00",
+            "required_resource_type": "wheelchair",
+            "task_id": "TASK-010",
+            "task_type": "boarding_assistance"
           }
         ],
         "version": 2,
-        "window_end": "2026-08-01T09:00:00+08:00",
+        "window_end": "2026-08-01T09:30:00+08:00",
         "window_start": "2026-08-01T08:00:00+08:00",
         "zones": [
           {
@@ -453,47 +789,134 @@
             "travel_ended_at": "2026-08-01T08:16:00+08:00",
             "travel_started_at": "2026-08-01T08:08:00+08:00",
             "wait_minutes": 13
+          },
+          {
+            "assignment_id": "ASG-006",
+            "destination_zone_id": "GATE-E01",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 0,
+            "resource_id": "AGENT-02",
+            "resource_start_zone_id": "TRANSFER-DESK",
+            "resource_type": "service_agent",
+            "service_ended_at": "2026-08-01T08:28:00+08:00",
+            "service_minutes": 10,
+            "service_started_at": "2026-08-01T08:18:00+08:00",
+            "task_id": "TASK-006",
+            "travel_ended_at": "2026-08-01T08:18:00+08:00",
+            "travel_started_at": "2026-08-01T08:18:00+08:00",
+            "wait_minutes": 0
+          },
+          {
+            "assignment_id": "ASG-007",
+            "destination_zone_id": "GATE-W03",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 8,
+            "resource_id": "BUS-01",
+            "resource_start_zone_id": "GATE-E01",
+            "resource_type": "shuttle_bus",
+            "service_ended_at": "2026-08-01T08:39:00+08:00",
+            "service_minutes": 9,
+            "service_started_at": "2026-08-01T08:30:00+08:00",
+            "task_id": "TASK-007",
+            "travel_ended_at": "2026-08-01T08:22:00+08:00",
+            "travel_started_at": "2026-08-01T08:14:00+08:00",
+            "wait_minutes": 0
+          },
+          {
+            "assignment_id": "ASG-008",
+            "destination_zone_id": "GATE-E01",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 12,
+            "resource_id": "WC-01",
+            "resource_start_zone_id": "GATE-W03",
+            "resource_type": "wheelchair",
+            "service_ended_at": "2026-08-01T08:50:00+08:00",
+            "service_minutes": 8,
+            "service_started_at": "2026-08-01T08:42:00+08:00",
+            "task_id": "TASK-008",
+            "travel_ended_at": "2026-08-01T08:35:00+08:00",
+            "travel_started_at": "2026-08-01T08:23:00+08:00",
+            "wait_minutes": 0
+          },
+          {
+            "assignment_id": "ASG-009",
+            "destination_zone_id": "GATE-W03",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 12,
+            "resource_id": "AGENT-01",
+            "resource_start_zone_id": "GATE-W03",
+            "resource_type": "service_agent",
+            "service_ended_at": "2026-08-01T09:01:00+08:00",
+            "service_minutes": 7,
+            "service_started_at": "2026-08-01T08:54:00+08:00",
+            "task_id": "TASK-009",
+            "travel_ended_at": "2026-08-01T08:22:00+08:00",
+            "travel_started_at": "2026-08-01T08:10:00+08:00",
+            "wait_minutes": 0
+          },
+          {
+            "assignment_id": "ASG-010",
+            "destination_zone_id": "GATE-E01",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 0,
+            "resource_id": "WC-02",
+            "resource_start_zone_id": "TRANSFER-DESK",
+            "resource_type": "wheelchair",
+            "service_ended_at": "2026-08-01T09:01:00+08:00",
+            "service_minutes": 6,
+            "service_started_at": "2026-08-01T08:55:00+08:00",
+            "task_id": "TASK-010",
+            "travel_ended_at": "2026-08-01T08:40:00+08:00",
+            "travel_started_at": "2026-08-01T08:40:00+08:00",
+            "wait_minutes": 0
           }
         ],
         "generated_at": "2026-08-01T08:00:00+08:00",
         "metrics": {
-          "assigned_tasks": 4,
-          "average_wait_minutes": 3.25,
-          "critical_task_completion_rate_pct": 50.0,
+          "assigned_tasks": 9,
+          "average_wait_minutes": 1.44,
+          "critical_task_completion_rate_pct": 75.0,
           "max_wait_minutes": 13,
-          "overall_resource_utilization_pct": 18.75,
+          "overall_resource_utilization_pct": 29.85,
           "resource_metrics": [
             {
-              "available_minutes": 60,
-              "busy_minutes": 10,
+              "available_minutes": 90,
+              "busy_minutes": 29,
               "resource_id": "AGENT-01",
               "resource_type": "service_agent",
-              "utilization_pct": 16.67
+              "utilization_pct": 32.22
             },
             {
-              "available_minutes": 60,
-              "busy_minutes": 0,
+              "available_minutes": 72,
+              "busy_minutes": 10,
               "resource_id": "AGENT-02",
               "resource_type": "service_agent",
-              "utilization_pct": 0.0
+              "utilization_pct": 13.89
             },
             {
-              "available_minutes": 60,
-              "busy_minutes": 12,
+              "available_minutes": 90,
+              "busy_minutes": 29,
               "resource_id": "BUS-01",
               "resource_type": "shuttle_bus",
-              "utilization_pct": 20.0
+              "utilization_pct": 32.22
             },
             {
-              "available_minutes": 60,
-              "busy_minutes": 23,
+              "available_minutes": 90,
+              "busy_minutes": 43,
               "resource_id": "WC-01",
               "resource_type": "wheelchair",
-              "utilization_pct": 38.33
+              "utilization_pct": 47.78
+            },
+            {
+              "available_minutes": 50,
+              "busy_minutes": 6,
+              "resource_id": "WC-02",
+              "resource_type": "wheelchair",
+              "utilization_pct": 12.0
             }
           ],
-          "task_completion_rate_pct": 80.0,
-          "total_tasks": 5,
+          "task_completion_rate_pct": 90.0,
+          "total_tasks": 10,
           "unassigned_tasks": 1
         },
         "plan_id": "PLAN-TERMINAL-DISTURBANCE-01-V1-FIFO",
@@ -531,6 +954,46 @@
             "note": "西区登机口临时关闭",
             "occurred_at": "2026-08-01T08:04:00+08:00",
             "previous_gate_id": "GATE-W03"
+          },
+          {
+            "delay_minutes": null,
+            "event_id": "EVT-SIM330-GATE",
+            "event_type": "gate_change",
+            "flight_id": "FL-SIM330",
+            "new_gate_id": "GATE-W03",
+            "note": "东区廊桥临时检修",
+            "occurred_at": "2026-08-01T08:16:00+08:00",
+            "previous_gate_id": "GATE-E01"
+          },
+          {
+            "delay_minutes": 15,
+            "event_id": "EVT-SIM218-DELAY",
+            "event_type": "delay",
+            "flight_id": "FL-SIM218",
+            "new_gate_id": null,
+            "note": "机组衔接时间延长",
+            "occurred_at": "2026-08-01T08:28:00+08:00",
+            "previous_gate_id": null
+          },
+          {
+            "delay_minutes": 10,
+            "event_id": "EVT-SIM330-DELAY",
+            "event_type": "delay",
+            "flight_id": "FL-SIM330",
+            "new_gate_id": null,
+            "note": "行李装载复核延长",
+            "occurred_at": "2026-08-01T08:40:00+08:00",
+            "previous_gate_id": null
+          },
+          {
+            "delay_minutes": null,
+            "event_id": "EVT-SIM218-GATE-RETURN",
+            "event_type": "gate_change",
+            "flight_id": "FL-SIM218",
+            "new_gate_id": "GATE-W03",
+            "note": "西区登机口恢复使用",
+            "occurred_at": "2026-08-01T08:52:00+08:00",
+            "previous_gate_id": "GATE-E01"
           }
         ],
         "flights": [
@@ -549,13 +1012,21 @@
             "gate_id": "GATE-W03",
             "scheduled_departure": "2026-08-01T08:50:00+08:00",
             "status": "scheduled"
+          },
+          {
+            "boarding_starts_at": "2026-08-01T08:45:00+08:00",
+            "display_code": "SIM330",
+            "flight_id": "FL-SIM330",
+            "gate_id": "GATE-E01",
+            "scheduled_departure": "2026-08-01T09:15:00+08:00",
+            "status": "scheduled"
           }
         ],
-        "name": "东区登机口扰动演示场景",
+        "name": "航站楼连续扰动教学场景",
         "resources": [
           {
             "available_from": "2026-08-01T08:00:00+08:00",
-            "available_to": "2026-08-01T09:00:00+08:00",
+            "available_to": "2026-08-01T09:30:00+08:00",
             "capacity": 8,
             "current_zone_id": "TRANSFER-DESK",
             "home_zone_id": "TRANSFER-DESK",
@@ -565,7 +1036,7 @@
           },
           {
             "available_from": "2026-08-01T08:00:00+08:00",
-            "available_to": "2026-08-01T09:00:00+08:00",
+            "available_to": "2026-08-01T09:30:00+08:00",
             "capacity": 1,
             "current_zone_id": "TRANSFER-DESK",
             "home_zone_id": "TRANSFER-DESK",
@@ -574,8 +1045,18 @@
             "status": "available"
           },
           {
+            "available_from": "2026-08-01T08:40:00+08:00",
+            "available_to": "2026-08-01T09:30:00+08:00",
+            "capacity": 1,
+            "current_zone_id": "TRANSFER-DESK",
+            "home_zone_id": "TRANSFER-DESK",
+            "resource_id": "WC-02",
+            "resource_type": "wheelchair",
+            "status": "available"
+          },
+          {
             "available_from": "2026-08-01T08:00:00+08:00",
-            "available_to": "2026-08-01T09:00:00+08:00",
+            "available_to": "2026-08-01T09:30:00+08:00",
             "capacity": 1,
             "current_zone_id": "TRANSFER-DESK",
             "home_zone_id": "TRANSFER-DESK",
@@ -584,8 +1065,8 @@
             "status": "available"
           },
           {
-            "available_from": "2026-08-01T08:00:00+08:00",
-            "available_to": "2026-08-01T09:00:00+08:00",
+            "available_from": "2026-08-01T08:18:00+08:00",
+            "available_to": "2026-08-01T09:30:00+08:00",
             "capacity": 1,
             "current_zone_id": "TRANSFER-DESK",
             "home_zone_id": "TRANSFER-DESK",
@@ -671,10 +1152,85 @@
             "required_resource_type": "wheelchair",
             "task_id": "TASK-005",
             "task_type": "boarding_assistance"
+          },
+          {
+            "deadline_at": "2026-08-01T08:50:00+08:00",
+            "destination_zone_id": "GATE-E01",
+            "duration_minutes": 10,
+            "flight_id": "FL-SIM330",
+            "locked": false,
+            "origin_zone_id": "TRANSFER-DESK",
+            "party_size": 1,
+            "passenger_group": "general_assistance",
+            "priority": 3,
+            "release_at": "2026-08-01T08:18:00+08:00",
+            "required_resource_type": "service_agent",
+            "task_id": "TASK-006",
+            "task_type": "escort"
+          },
+          {
+            "deadline_at": "2026-08-01T08:48:00+08:00",
+            "destination_zone_id": "GATE-W03",
+            "duration_minutes": 9,
+            "flight_id": "FL-SIM218",
+            "locked": false,
+            "origin_zone_id": "TRANSFER-DESK",
+            "party_size": 4,
+            "passenger_group": "urgent_connection",
+            "priority": 1,
+            "release_at": "2026-08-01T08:30:00+08:00",
+            "required_resource_type": "shuttle_bus",
+            "task_id": "TASK-007",
+            "task_type": "shuttle_transfer"
+          },
+          {
+            "deadline_at": "2026-08-01T09:00:00+08:00",
+            "destination_zone_id": "GATE-E01",
+            "duration_minutes": 8,
+            "flight_id": "FL-SIM330",
+            "locked": false,
+            "origin_zone_id": "TRANSFER-DESK",
+            "party_size": 1,
+            "passenger_group": "special_assistance",
+            "priority": 2,
+            "release_at": "2026-08-01T08:42:00+08:00",
+            "required_resource_type": "wheelchair",
+            "task_id": "TASK-008",
+            "task_type": "wheelchair_transfer"
+          },
+          {
+            "deadline_at": "2026-08-01T09:02:00+08:00",
+            "destination_zone_id": "GATE-W03",
+            "duration_minutes": 7,
+            "flight_id": "FL-SIM218",
+            "locked": false,
+            "origin_zone_id": "TRANSFER-DESK",
+            "party_size": 1,
+            "passenger_group": "urgent_connection",
+            "priority": 1,
+            "release_at": "2026-08-01T08:54:00+08:00",
+            "required_resource_type": "service_agent",
+            "task_id": "TASK-009",
+            "task_type": "escort"
+          },
+          {
+            "deadline_at": "2026-08-01T09:08:00+08:00",
+            "destination_zone_id": "GATE-E01",
+            "duration_minutes": 6,
+            "flight_id": "FL-SIM330",
+            "locked": false,
+            "origin_zone_id": "TRANSFER-DESK",
+            "party_size": 1,
+            "passenger_group": "special_assistance",
+            "priority": 2,
+            "release_at": "2026-08-01T08:55:00+08:00",
+            "required_resource_type": "wheelchair",
+            "task_id": "TASK-010",
+            "task_type": "boarding_assistance"
           }
         ],
         "version": 1,
-        "window_end": "2026-08-01T09:00:00+08:00",
+        "window_end": "2026-08-01T09:30:00+08:00",
         "window_start": "2026-08-01T08:00:00+08:00",
         "zones": [
           {
@@ -708,8 +1264,24 @@
         "algorithm": "cp_sat_priority_v1",
         "assignments": [
           {
-            "assignment_id": "ASG-002",
+            "assignment_id": "ASG-001",
             "destination_zone_id": "GATE-E01",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 0,
+            "resource_id": "WC-01",
+            "resource_start_zone_id": "TRANSFER-DESK",
+            "resource_type": "wheelchair",
+            "service_ended_at": "2026-08-01T08:08:00+08:00",
+            "service_minutes": 8,
+            "service_started_at": "2026-08-01T08:00:00+08:00",
+            "task_id": "TASK-001",
+            "travel_ended_at": "2026-08-01T08:00:00+08:00",
+            "travel_started_at": "2026-08-01T08:00:00+08:00",
+            "wait_minutes": 0
+          },
+          {
+            "assignment_id": "ASG-002",
+            "destination_zone_id": "GATE-W03",
             "origin_zone_id": "TRANSFER-DESK",
             "reposition_minutes": 0,
             "resource_id": "AGENT-01",
@@ -741,92 +1313,163 @@
           },
           {
             "assignment_id": "ASG-005",
-            "destination_zone_id": "GATE-E01",
+            "destination_zone_id": "GATE-W03",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 8,
+            "resource_id": "WC-01",
+            "resource_start_zone_id": "GATE-E01",
+            "resource_type": "wheelchair",
+            "service_ended_at": "2026-08-01T08:22:00+08:00",
+            "service_minutes": 6,
+            "service_started_at": "2026-08-01T08:16:00+08:00",
+            "task_id": "TASK-005",
+            "travel_ended_at": "2026-08-01T08:16:00+08:00",
+            "travel_started_at": "2026-08-01T08:08:00+08:00",
+            "wait_minutes": 12
+          },
+          {
+            "assignment_id": "ASG-006",
+            "destination_zone_id": "GATE-W03",
             "origin_zone_id": "TRANSFER-DESK",
             "reposition_minutes": 0,
-            "resource_id": "WC-01",
+            "resource_id": "AGENT-02",
             "resource_start_zone_id": "TRANSFER-DESK",
-            "resource_type": "wheelchair",
-            "service_ended_at": "2026-08-01T08:10:00+08:00",
-            "service_minutes": 6,
-            "service_started_at": "2026-08-01T08:04:00+08:00",
-            "task_id": "TASK-005",
-            "travel_ended_at": "2026-08-01T08:00:00+08:00",
-            "travel_started_at": "2026-08-01T08:00:00+08:00",
+            "resource_type": "service_agent",
+            "service_ended_at": "2026-08-01T08:28:00+08:00",
+            "service_minutes": 10,
+            "service_started_at": "2026-08-01T08:18:00+08:00",
+            "task_id": "TASK-006",
+            "travel_ended_at": "2026-08-01T08:18:00+08:00",
+            "travel_started_at": "2026-08-01T08:18:00+08:00",
+            "wait_minutes": 0
+          },
+          {
+            "assignment_id": "ASG-007",
+            "destination_zone_id": "GATE-W03",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 8,
+            "resource_id": "BUS-01",
+            "resource_start_zone_id": "GATE-E01",
+            "resource_type": "shuttle_bus",
+            "service_ended_at": "2026-08-01T08:39:00+08:00",
+            "service_minutes": 9,
+            "service_started_at": "2026-08-01T08:30:00+08:00",
+            "task_id": "TASK-007",
+            "travel_ended_at": "2026-08-01T08:22:00+08:00",
+            "travel_started_at": "2026-08-01T08:14:00+08:00",
             "wait_minutes": 0
           },
           {
             "assignment_id": "ASG-004",
-            "destination_zone_id": "GATE-E01",
+            "destination_zone_id": "GATE-W03",
             "origin_zone_id": "TRANSFER-DESK",
-            "reposition_minutes": 8,
+            "reposition_minutes": 12,
             "resource_id": "WC-01",
-            "resource_start_zone_id": "GATE-E01",
-            "resource_type": "wheelchair",
-            "service_ended_at": "2026-08-01T08:25:00+08:00",
-            "service_minutes": 7,
-            "service_started_at": "2026-08-01T08:18:00+08:00",
-            "task_id": "TASK-004",
-            "travel_ended_at": "2026-08-01T08:18:00+08:00",
-            "travel_started_at": "2026-08-01T08:10:00+08:00",
-            "wait_minutes": 15
-          },
-          {
-            "assignment_id": "ASG-001",
-            "destination_zone_id": "GATE-E01",
-            "origin_zone_id": "TRANSFER-DESK",
-            "reposition_minutes": 8,
-            "resource_id": "WC-01",
-            "resource_start_zone_id": "GATE-E01",
+            "resource_start_zone_id": "GATE-W03",
             "resource_type": "wheelchair",
             "service_ended_at": "2026-08-01T08:41:00+08:00",
+            "service_minutes": 7,
+            "service_started_at": "2026-08-01T08:34:00+08:00",
+            "task_id": "TASK-004",
+            "travel_ended_at": "2026-08-01T08:34:00+08:00",
+            "travel_started_at": "2026-08-01T08:22:00+08:00",
+            "wait_minutes": 31
+          },
+          {
+            "assignment_id": "ASG-008",
+            "destination_zone_id": "GATE-W03",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 0,
+            "resource_id": "WC-02",
+            "resource_start_zone_id": "TRANSFER-DESK",
+            "resource_type": "wheelchair",
+            "service_ended_at": "2026-08-01T08:50:00+08:00",
             "service_minutes": 8,
-            "service_started_at": "2026-08-01T08:33:00+08:00",
-            "task_id": "TASK-001",
-            "travel_ended_at": "2026-08-01T08:33:00+08:00",
-            "travel_started_at": "2026-08-01T08:25:00+08:00",
-            "wait_minutes": 33
+            "service_started_at": "2026-08-01T08:42:00+08:00",
+            "task_id": "TASK-008",
+            "travel_ended_at": "2026-08-01T08:40:00+08:00",
+            "travel_started_at": "2026-08-01T08:40:00+08:00",
+            "wait_minutes": 0
+          },
+          {
+            "assignment_id": "ASG-009",
+            "destination_zone_id": "GATE-W03",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 12,
+            "resource_id": "AGENT-01",
+            "resource_start_zone_id": "GATE-W03",
+            "resource_type": "service_agent",
+            "service_ended_at": "2026-08-01T09:01:00+08:00",
+            "service_minutes": 7,
+            "service_started_at": "2026-08-01T08:54:00+08:00",
+            "task_id": "TASK-009",
+            "travel_ended_at": "2026-08-01T08:22:00+08:00",
+            "travel_started_at": "2026-08-01T08:10:00+08:00",
+            "wait_minutes": 0
+          },
+          {
+            "assignment_id": "ASG-010",
+            "destination_zone_id": "GATE-W03",
+            "origin_zone_id": "TRANSFER-DESK",
+            "reposition_minutes": 12,
+            "resource_id": "WC-01",
+            "resource_start_zone_id": "GATE-W03",
+            "resource_type": "wheelchair",
+            "service_ended_at": "2026-08-01T09:01:00+08:00",
+            "service_minutes": 6,
+            "service_started_at": "2026-08-01T08:55:00+08:00",
+            "task_id": "TASK-010",
+            "travel_ended_at": "2026-08-01T08:53:00+08:00",
+            "travel_started_at": "2026-08-01T08:41:00+08:00",
+            "wait_minutes": 0
           }
         ],
         "generated_at": "2026-08-01T08:00:00+08:00",
         "metrics": {
-          "assigned_tasks": 5,
-          "average_wait_minutes": 9.6,
+          "assigned_tasks": 10,
+          "average_wait_minutes": 4.3,
           "critical_task_completion_rate_pct": 100.0,
-          "max_wait_minutes": 33,
-          "overall_resource_utilization_pct": 24.58,
+          "max_wait_minutes": 31,
+          "overall_resource_utilization_pct": 34.44,
           "resource_metrics": [
             {
-              "available_minutes": 60,
-              "busy_minutes": 10,
+              "available_minutes": 90,
+              "busy_minutes": 29,
               "resource_id": "AGENT-01",
               "resource_type": "service_agent",
-              "utilization_pct": 16.67
+              "utilization_pct": 32.22
             },
             {
-              "available_minutes": 60,
-              "busy_minutes": 0,
+              "available_minutes": 72,
+              "busy_minutes": 10,
               "resource_id": "AGENT-02",
               "resource_type": "service_agent",
-              "utilization_pct": 0.0
+              "utilization_pct": 13.89
             },
             {
-              "available_minutes": 60,
-              "busy_minutes": 12,
+              "available_minutes": 90,
+              "busy_minutes": 29,
               "resource_id": "BUS-01",
               "resource_type": "shuttle_bus",
-              "utilization_pct": 20.0
+              "utilization_pct": 32.22
             },
             {
-              "available_minutes": 60,
-              "busy_minutes": 37,
+              "available_minutes": 90,
+              "busy_minutes": 59,
               "resource_id": "WC-01",
               "resource_type": "wheelchair",
-              "utilization_pct": 61.67
+              "utilization_pct": 65.56
+            },
+            {
+              "available_minutes": 50,
+              "busy_minutes": 8,
+              "resource_id": "WC-02",
+              "resource_type": "wheelchair",
+              "utilization_pct": 16.0
             }
           ],
           "task_completion_rate_pct": 100.0,
-          "total_tasks": 5,
+          "total_tasks": 10,
           "unassigned_tasks": 0
         },
         "plan_id": "PLAN-TERMINAL-DISTURBANCE-01-V2-CP-SAT",
@@ -858,6 +1501,46 @@
             "note": "西区登机口临时关闭",
             "occurred_at": "2026-08-01T08:04:00+08:00",
             "previous_gate_id": "GATE-W03"
+          },
+          {
+            "delay_minutes": null,
+            "event_id": "EVT-SIM330-GATE",
+            "event_type": "gate_change",
+            "flight_id": "FL-SIM330",
+            "new_gate_id": "GATE-W03",
+            "note": "东区廊桥临时检修",
+            "occurred_at": "2026-08-01T08:16:00+08:00",
+            "previous_gate_id": "GATE-E01"
+          },
+          {
+            "delay_minutes": 15,
+            "event_id": "EVT-SIM218-DELAY",
+            "event_type": "delay",
+            "flight_id": "FL-SIM218",
+            "new_gate_id": null,
+            "note": "机组衔接时间延长",
+            "occurred_at": "2026-08-01T08:28:00+08:00",
+            "previous_gate_id": null
+          },
+          {
+            "delay_minutes": 10,
+            "event_id": "EVT-SIM330-DELAY",
+            "event_type": "delay",
+            "flight_id": "FL-SIM330",
+            "new_gate_id": null,
+            "note": "行李装载复核延长",
+            "occurred_at": "2026-08-01T08:40:00+08:00",
+            "previous_gate_id": null
+          },
+          {
+            "delay_minutes": null,
+            "event_id": "EVT-SIM218-GATE-RETURN",
+            "event_type": "gate_change",
+            "flight_id": "FL-SIM218",
+            "new_gate_id": "GATE-W03",
+            "note": "西区登机口恢复使用",
+            "occurred_at": "2026-08-01T08:52:00+08:00",
+            "previous_gate_id": "GATE-E01"
           }
         ],
         "flights": [
@@ -870,19 +1553,27 @@
             "status": "delayed"
           },
           {
-            "boarding_starts_at": "2026-08-01T08:20:00+08:00",
+            "boarding_starts_at": "2026-08-01T08:35:00+08:00",
             "display_code": "SIM218",
             "flight_id": "FL-SIM218",
-            "gate_id": "GATE-E01",
-            "scheduled_departure": "2026-08-01T08:50:00+08:00",
-            "status": "scheduled"
+            "gate_id": "GATE-W03",
+            "scheduled_departure": "2026-08-01T09:05:00+08:00",
+            "status": "delayed"
+          },
+          {
+            "boarding_starts_at": "2026-08-01T08:55:00+08:00",
+            "display_code": "SIM330",
+            "flight_id": "FL-SIM330",
+            "gate_id": "GATE-W03",
+            "scheduled_departure": "2026-08-01T09:25:00+08:00",
+            "status": "delayed"
           }
         ],
-        "name": "东区登机口扰动演示场景",
+        "name": "航站楼连续扰动教学场景",
         "resources": [
           {
             "available_from": "2026-08-01T08:00:00+08:00",
-            "available_to": "2026-08-01T09:00:00+08:00",
+            "available_to": "2026-08-01T09:30:00+08:00",
             "capacity": 8,
             "current_zone_id": "TRANSFER-DESK",
             "home_zone_id": "TRANSFER-DESK",
@@ -892,7 +1583,7 @@
           },
           {
             "available_from": "2026-08-01T08:00:00+08:00",
-            "available_to": "2026-08-01T09:00:00+08:00",
+            "available_to": "2026-08-01T09:30:00+08:00",
             "capacity": 1,
             "current_zone_id": "TRANSFER-DESK",
             "home_zone_id": "TRANSFER-DESK",
@@ -901,8 +1592,18 @@
             "status": "available"
           },
           {
+            "available_from": "2026-08-01T08:40:00+08:00",
+            "available_to": "2026-08-01T09:30:00+08:00",
+            "capacity": 1,
+            "current_zone_id": "TRANSFER-DESK",
+            "home_zone_id": "TRANSFER-DESK",
+            "resource_id": "WC-02",
+            "resource_type": "wheelchair",
+            "status": "available"
+          },
+          {
             "available_from": "2026-08-01T08:00:00+08:00",
-            "available_to": "2026-08-01T09:00:00+08:00",
+            "available_to": "2026-08-01T09:30:00+08:00",
             "capacity": 1,
             "current_zone_id": "TRANSFER-DESK",
             "home_zone_id": "TRANSFER-DESK",
@@ -911,8 +1612,8 @@
             "status": "available"
           },
           {
-            "available_from": "2026-08-01T08:00:00+08:00",
-            "available_to": "2026-08-01T09:00:00+08:00",
+            "available_from": "2026-08-01T08:18:00+08:00",
+            "available_to": "2026-08-01T09:30:00+08:00",
             "capacity": 1,
             "current_zone_id": "TRANSFER-DESK",
             "home_zone_id": "TRANSFER-DESK",
@@ -940,8 +1641,8 @@
             "task_type": "wheelchair_transfer"
           },
           {
-            "deadline_at": "2026-08-01T08:27:00+08:00",
-            "destination_zone_id": "GATE-E01",
+            "deadline_at": "2026-08-01T08:42:00+08:00",
+            "destination_zone_id": "GATE-W03",
             "duration_minutes": 10,
             "flight_id": "FL-SIM218",
             "locked": false,
@@ -970,8 +1671,8 @@
             "task_type": "shuttle_transfer"
           },
           {
-            "deadline_at": "2026-08-01T08:28:00+08:00",
-            "destination_zone_id": "GATE-E01",
+            "deadline_at": "2026-08-01T08:43:00+08:00",
+            "destination_zone_id": "GATE-W03",
             "duration_minutes": 7,
             "flight_id": "FL-SIM218",
             "locked": false,
@@ -985,8 +1686,8 @@
             "task_type": "wheelchair_transfer"
           },
           {
-            "deadline_at": "2026-08-01T08:18:00+08:00",
-            "destination_zone_id": "GATE-E01",
+            "deadline_at": "2026-08-01T08:33:00+08:00",
+            "destination_zone_id": "GATE-W03",
             "duration_minutes": 6,
             "flight_id": "FL-SIM218",
             "locked": false,
@@ -998,10 +1699,85 @@
             "required_resource_type": "wheelchair",
             "task_id": "TASK-005",
             "task_type": "boarding_assistance"
+          },
+          {
+            "deadline_at": "2026-08-01T09:00:00+08:00",
+            "destination_zone_id": "GATE-W03",
+            "duration_minutes": 10,
+            "flight_id": "FL-SIM330",
+            "locked": false,
+            "origin_zone_id": "TRANSFER-DESK",
+            "party_size": 1,
+            "passenger_group": "general_assistance",
+            "priority": 3,
+            "release_at": "2026-08-01T08:18:00+08:00",
+            "required_resource_type": "service_agent",
+            "task_id": "TASK-006",
+            "task_type": "escort"
+          },
+          {
+            "deadline_at": "2026-08-01T09:03:00+08:00",
+            "destination_zone_id": "GATE-W03",
+            "duration_minutes": 9,
+            "flight_id": "FL-SIM218",
+            "locked": false,
+            "origin_zone_id": "TRANSFER-DESK",
+            "party_size": 4,
+            "passenger_group": "urgent_connection",
+            "priority": 1,
+            "release_at": "2026-08-01T08:30:00+08:00",
+            "required_resource_type": "shuttle_bus",
+            "task_id": "TASK-007",
+            "task_type": "shuttle_transfer"
+          },
+          {
+            "deadline_at": "2026-08-01T09:10:00+08:00",
+            "destination_zone_id": "GATE-W03",
+            "duration_minutes": 8,
+            "flight_id": "FL-SIM330",
+            "locked": false,
+            "origin_zone_id": "TRANSFER-DESK",
+            "party_size": 1,
+            "passenger_group": "special_assistance",
+            "priority": 2,
+            "release_at": "2026-08-01T08:42:00+08:00",
+            "required_resource_type": "wheelchair",
+            "task_id": "TASK-008",
+            "task_type": "wheelchair_transfer"
+          },
+          {
+            "deadline_at": "2026-08-01T09:17:00+08:00",
+            "destination_zone_id": "GATE-W03",
+            "duration_minutes": 7,
+            "flight_id": "FL-SIM218",
+            "locked": false,
+            "origin_zone_id": "TRANSFER-DESK",
+            "party_size": 1,
+            "passenger_group": "urgent_connection",
+            "priority": 1,
+            "release_at": "2026-08-01T08:54:00+08:00",
+            "required_resource_type": "service_agent",
+            "task_id": "TASK-009",
+            "task_type": "escort"
+          },
+          {
+            "deadline_at": "2026-08-01T09:18:00+08:00",
+            "destination_zone_id": "GATE-W03",
+            "duration_minutes": 6,
+            "flight_id": "FL-SIM330",
+            "locked": false,
+            "origin_zone_id": "TRANSFER-DESK",
+            "party_size": 1,
+            "passenger_group": "special_assistance",
+            "priority": 2,
+            "release_at": "2026-08-01T08:55:00+08:00",
+            "required_resource_type": "wheelchair",
+            "task_id": "TASK-010",
+            "task_type": "boarding_assistance"
           }
         ],
         "version": 2,
-        "window_end": "2026-08-01T09:00:00+08:00",
+        "window_end": "2026-08-01T09:30:00+08:00",
         "window_start": "2026-08-01T08:00:00+08:00",
         "zones": [
           {

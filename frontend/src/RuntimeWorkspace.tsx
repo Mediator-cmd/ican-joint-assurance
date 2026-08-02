@@ -22,8 +22,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { resolveSelectedId } from "./selection";
 import { runtimeStatusCounts } from "./runtime";
+import RuntimePlanDetails from "./RuntimePlanDetails";
 import type {
-  DemoEvent,
   DemoPayload,
   EventRuntimeProjection,
   ResourceRuntimeProjection,
@@ -130,7 +130,7 @@ function formatTime(value: string | null): string {
   }).format(new Date(value));
 }
 
-function eventTypeLabel(event: DemoEvent | undefined): string {
+function eventTypeLabel(event: EventRuntimeProjection | undefined): string {
   if (!event) return "运行扰动";
   return event.event_type === "delay" ? "航班延误" : "登机口调整";
 }
@@ -263,11 +263,6 @@ export default function RuntimeWorkspace({
     () => new Map(scenario.flights.map((flight) => [flight.flight_id, flight])),
     [scenario.flights],
   );
-  const eventMeta = useMemo(
-    () => new Map(payload.events.map((event) => [event.event_id, event])),
-    [payload.events],
-  );
-
   const visibleTasks = useMemo(() => {
     if (!snapshot) return [];
     return snapshot.tasks.filter((task) => {
@@ -315,8 +310,13 @@ export default function RuntimeWorkspace({
   const selectedResourceMeta = selectedResource ? resourceMeta.get(selectedResource.resource_id) : undefined;
   const selectedEvent = snapshot.events.find((event) => event.event_id === selectedEventId)
     ?? snapshot.events[0];
-  const selectedEventMeta = selectedEvent ? eventMeta.get(selectedEvent.event_id) : undefined;
   const affectedTasks = snapshot.tasks.filter((task) => task.affected_by_event_ids.length > 0);
+  const candidateEventDetails = snapshot.candidate_plan_id
+    ? snapshot.events
+      .filter((event) => event.candidate_plan_id === snapshot.candidate_plan_id)
+      .map((event) => event.detail)
+    : [];
+  const frozenTaskCount = snapshot.tasks.filter((task) => task.is_locked).length;
   const currentPage = pageInfo[activePage];
   const connection = connectionInfo[runtime.connectionStatus];
   const controlsDisabled = runtime.connectionStatus === "offline_readonly" || runtime.controlBusy !== null;
@@ -590,11 +590,10 @@ export default function RuntimeWorkspace({
                   <div className="section-heading"><div><p className="eyebrow">处理时间流</p><h2>{snapshot.events.length} 项运行扰动</h2></div><span className="section-note">事件只应用一次</span></div>
                   <div className="event-selector runtime-event-selector">
                     {snapshot.events.map((event, index) => {
-                      const meta = eventMeta.get(event.event_id);
                       return (
                         <button key={event.event_id} className={selectedEvent?.event_id === event.event_id ? "active" : undefined} onClick={() => setSelectedEventId(event.event_id)}>
                           <span className="event-index">{String(index + 1).padStart(2, "0")}</span>
-                          <div><strong>{eventTypeLabel(meta)}</strong><span>{formatTime(event.occurred_at)} · {meta?.detail ?? event.event_id}</span></div>
+                          <div><strong>{eventTypeLabel(event)}</strong><span>{formatTime(event.occurred_at)} · {event.detail}</span></div>
                           <span className={`runtime-state ${eventTone(event.status)}`}>{event.status_label}</span>
                         </button>
                       );
@@ -605,12 +604,12 @@ export default function RuntimeWorkspace({
                 <section className="workspace-section event-analysis">
                   {selectedEvent ? (
                     <>
-                      <div className="event-hero"><div className="event-symbol"><Plane size={23} /></div><div><span>{eventTypeLabel(selectedEventMeta)}</span><h2>{selectedEventMeta?.detail ?? selectedEvent.event_id}</h2><p>{selectedEventMeta?.note ?? "结构化运行事件"}</p></div></div>
+                      <div className="event-hero"><div className="event-symbol"><Plane size={23} /></div><div><span>{eventTypeLabel(selectedEvent)}</span><h2>{selectedEvent.detail}</h2><p>{selectedEvent.note ?? "结构化运行事件"}</p></div></div>
                       <div className="impact-summary">
                         <article><span>发生时间</span><strong>{formatTime(selectedEvent.occurred_at)}</strong></article>
                         <article><span>处理状态</span><strong>{selectedEvent.status_label}</strong></article>
                         <article><span>应用版本</span><strong>{selectedEvent.scenario_version_after ? `V${selectedEvent.scenario_version_after}` : "待应用"}</strong></article>
-                        <article><span>关联候选</span><strong>{selectedEvent.candidate_plan_id ? "待确认" : "无"}</strong></article>
+                        <article><span>关联候选</span><strong>{selectedEvent.candidate_plan_id ? (selectedEvent.status === "resolved" ? "已完成人工确认" : "待确认") : "无"}</strong></article>
                       </div>
                       <div className="event-interpretation"><h3>处理依据</h3><p>{selectedEvent.applied_at ? `事件已于仿真时间 ${formatTime(selectedEvent.applied_at)} 原子应用；执行中的任务继续受冻结保护。` : "事件尚未到达发生边界，后端不会提前应用或触发规划。"}</p></div>
                     </>
@@ -714,6 +713,17 @@ export default function RuntimeWorkspace({
                       <button className="runtime-command" disabled={controlsDisabled} onClick={() => void runtime.rejectCandidate()}><ShieldCheck size={18} />保留当前方案</button>
                     </div>
                   )}
+                </section>
+
+                <section className="workspace-section runtime-plan-detail-panel">
+                  <div className="section-heading"><div><p className="eyebrow">方案任务书</p><h2>当前安排与候选响应内容</h2></div><span className="section-note">全部来自后端计划事实</span></div>
+                  <RuntimePlanDetails
+                    activePlan={snapshot.active_plan_detail}
+                    candidatePlan={snapshot.candidate_plan_detail}
+                    scenario={scenario}
+                    eventDetails={candidateEventDetails}
+                    frozenTaskCount={frozenTaskCount}
+                  />
                 </section>
 
                 <section className="workspace-section affected-task-panel">

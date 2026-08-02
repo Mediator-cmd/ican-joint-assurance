@@ -1,8 +1,32 @@
 import type {
+  Assignment,
+  Plan,
   RuntimeSessionSnapshot,
   RuntimeStreamEvent,
   RuntimeStreamEventType,
 } from "./types";
+
+export type RuntimePlanChangeField =
+  | "assignment"
+  | "resource"
+  | "schedule"
+  | "route"
+  | "wait"
+  | "coordination";
+
+export interface RuntimePlanTaskDelta {
+  taskId: string;
+  changedFields: RuntimePlanChangeField[];
+  activeAssignment: Assignment | null;
+  candidateAssignment: Assignment | null;
+  activeUnassigned: Plan["unassigned_tasks"][number] | null;
+  candidateUnassigned: Plan["unassigned_tasks"][number] | null;
+}
+
+export interface RuntimePlanComparison {
+  changes: RuntimePlanTaskDelta[];
+  unchangedTaskIds: string[];
+}
 
 export const RUNTIME_STREAM_EVENT_TYPES: readonly RuntimeStreamEventType[] = [
   "runtime.snapshot",
@@ -90,4 +114,60 @@ export function runtimeStatusCounts(snapshot: RuntimeSessionSnapshot) {
     counts[task.status] = (counts[task.status] ?? 0) + 1;
     return counts;
   }, {});
+}
+
+export function compareRuntimePlans(active: Plan, candidate: Plan): RuntimePlanComparison {
+  const activeAssignments = new Map(active.assignments.map((item) => [item.task_id, item]));
+  const candidateAssignments = new Map(candidate.assignments.map((item) => [item.task_id, item]));
+  const activeUnassigned = new Map(active.unassigned_tasks.map((item) => [item.task_id, item]));
+  const candidateUnassigned = new Map(candidate.unassigned_tasks.map((item) => [item.task_id, item]));
+  const taskIds = new Set([
+    ...activeAssignments.keys(),
+    ...candidateAssignments.keys(),
+    ...activeUnassigned.keys(),
+    ...candidateUnassigned.keys(),
+  ]);
+  const changes: RuntimePlanTaskDelta[] = [];
+  const unchangedTaskIds: string[] = [];
+
+  [...taskIds].sort().forEach((taskId) => {
+    const before = activeAssignments.get(taskId) ?? null;
+    const after = candidateAssignments.get(taskId) ?? null;
+    const beforeUnassigned = activeUnassigned.get(taskId) ?? null;
+    const afterUnassigned = candidateUnassigned.get(taskId) ?? null;
+    const changedFields: RuntimePlanChangeField[] = [];
+
+    if ((before === null) !== (after === null)) changedFields.push("assignment");
+    if (before && after) {
+      if (before.resource_id !== after.resource_id) changedFields.push("resource");
+      if (
+        before.service_started_at !== after.service_started_at
+        || before.service_ended_at !== after.service_ended_at
+      ) changedFields.push("schedule");
+      if (
+        before.origin_zone_id !== after.origin_zone_id
+        || before.destination_zone_id !== after.destination_zone_id
+      ) changedFields.push("route");
+      if (before.wait_minutes !== after.wait_minutes) changedFields.push("wait");
+    }
+    if (
+      beforeUnassigned?.reason !== afterUnassigned?.reason
+      || beforeUnassigned?.detail !== afterUnassigned?.detail
+    ) changedFields.push("coordination");
+
+    if (changedFields.length === 0) {
+      unchangedTaskIds.push(taskId);
+      return;
+    }
+    changes.push({
+      taskId,
+      changedFields,
+      activeAssignment: before,
+      candidateAssignment: after,
+      activeUnassigned: beforeUnassigned,
+      candidateUnassigned: afterUnassigned,
+    });
+  });
+
+  return { changes, unchangedTaskIds };
 }

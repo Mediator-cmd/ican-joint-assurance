@@ -500,11 +500,19 @@ def _project_event(
     simulation_time: datetime,
     runtime_status: RuntimeStatus,
 ) -> EventRuntimeProjection:
+    detail = _event_detail(event)
+    event_facts = {
+        "event_id": event.event_id,
+        "event_type": event.event_type,
+        "flight_id": event.flight_id,
+        "detail": detail,
+        "note": event.note,
+        "occurred_at": event.occurred_at,
+    }
     if failure_code is not None:
         return EventRuntimeProjection(
-            event_id=event.event_id,
+            **event_facts,
             status=RuntimeEventStatus.FAILED,
-            occurred_at=event.occurred_at,
             applied_at=event.occurred_at if applied_version is not None else None,
             scenario_version_after=applied_version,
             failure_code=failure_code,
@@ -519,9 +527,8 @@ def _project_event(
         else:
             status = RuntimeEventStatus.APPLIED
         return EventRuntimeProjection(
-            event_id=event.event_id,
+            **event_facts,
             status=status,
-            occurred_at=event.occurred_at,
             applied_at=event.occurred_at,
             scenario_version_after=applied_version,
             candidate_plan_id=(
@@ -539,9 +546,18 @@ def _project_event(
         else RuntimeEventStatus.PENDING
     )
     return EventRuntimeProjection(
-        event_id=event.event_id,
+        **event_facts,
         status=status,
-        occurred_at=event.occurred_at,
+    )
+
+
+def _event_detail(event: FlightEvent) -> str:
+    flight_code = event.flight_id.removeprefix("FL-")
+    if event.event_type.value == "delay":
+        return f"{flight_code} 预计离港时间顺延 {event.delay_minutes or 0} 分钟"
+    return (
+        f"{flight_code} 保障地点由 {event.previous_gate_id} "
+        f"调整至 {event.new_gate_id}"
     )
 
 

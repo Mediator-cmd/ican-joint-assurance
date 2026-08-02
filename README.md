@@ -18,7 +18,7 @@
 
 ## 当前状态
 
-- 阶段：M4 实时运行与动态重规划（M4-5 已完成）。
+- 阶段：M4 实时运行与动态重规划（M4-5A 修正已完成）。
 - 下一单元：M4-6 端到端、性能、长时间、故障与三轮连续演示验收。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
@@ -34,6 +34,8 @@
 - M4-4 实现审查：[docs/m4-04-review.md](docs/m4-04-review.md)
 - M4-5 实施计划：[docs/m4-05-plan.md](docs/m4-05-plan.md)
 - M4-5 实现审查：[docs/m4-05-review.md](docs/m4-05-review.md)
+- M4-5A 修正计划：[docs/m4-05a-plan.md](docs/m4-05a-plan.md)
+- M4-5A 修正审查：[docs/m4-05a-review.md](docs/m4-05a-review.md)
 
 ## 目录结构
 
@@ -74,6 +76,8 @@ scripts/                # 场景校验、数据生成和发布辅助脚本
 ## 当前运行说明
 
 当前版本提供可运行的 React + FastAPI 本地演示。正常在线时，五个工作页共享同一个 SQLite 运行会话和权威 `RuntimeSessionSnapshot`，通过 SSE 自动接收仿真时钟、任务、资源、航班、事件和候选方案变化；页面提供开始、暂停、`1x/5x/15x`、重置、手动重规划以及候选采用/保留操作。
+
+当前合成场景包含 08:00 至 08:52 的 6 条固定、一次性扰动以及 10 项匿名保障任务。每条事件到时由后端原子应用并生成独立滚动候选，场景在 09:30 正常完成，不循环播放、不随机制造业务变化。方案页直接展示后端当前/候选计划的任务、资源、服务时段、路线、指标、人工协调原因和真实差异。
 
 前端不自行推进时钟、推导业务状态或运行规划器。SSE 连续失败后，每 2 秒读取一次 REST 权威快照，流恢复后停止轮询；所有修改命令携带当前 revision，冲突时只刷新最新状态，不自动重放旧命令。只有运行 API 不可用时才显示原有三套静态快照，并明确标为“离线只读，时间不会推进”，所有运行控制禁用。
 
@@ -125,7 +129,7 @@ npm install
 npm run dev
 ```
 
-浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `129 passed`，前端回归基线为 `17 passed`，并应同时通过 `npm run typecheck` 和 `npm run build`。
+浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `130 passed`，前端回归基线为 `19 passed`，并应同时通过 `npm run typecheck` 和 `npm run build`。
 
 ## Git 工作流
 

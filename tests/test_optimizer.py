@@ -17,8 +17,8 @@ def test_optimizer_protects_critical_task_under_resource_conflict() -> None:
     fifo = build_fifo_plan(scenario)
     optimized = build_optimized_plan(scenario)
 
-    assert fifo.metrics.assigned_tasks == optimized.metrics.assigned_tasks == 4
-    assert fifo.metrics.critical_task_completion_rate_pct == 50
+    assert fifo.metrics.assigned_tasks == optimized.metrics.assigned_tasks == 9
+    assert fifo.metrics.critical_task_completion_rate_pct == 75
     assert optimized.metrics.critical_task_completion_rate_pct == 100
     assert optimized.status is PlanStatus.PARTIAL
     assert optimized.violations == []
@@ -35,8 +35,7 @@ def test_event_updated_optimizer_completes_every_task_deterministically() -> Non
 
     assert first == second
     assert first.status is PlanStatus.EXECUTABLE
-    assert first.metrics.assigned_tasks == 5
+    assert first.metrics.assigned_tasks == 10
     assert first.metrics.unassigned_tasks == 0
     assert first.metrics.critical_task_completion_rate_pct == 100
     assert first.violations == []
-

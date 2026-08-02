@@ -250,6 +250,9 @@ def test_event_batch_and_candidate_audits_publish_typed_messages() -> None:
     broker = _broker()
     initial_event = EventRuntimeProjection(
         event_id="EVT-001",
+        event_type="delay",
+        flight_id="FL-SIM102",
+        detail="SIM102 预计离港时间顺延 25 分钟",
         status="pending",
         occurred_at=BASE_TIME,
     )
@@ -276,6 +279,9 @@ def test_event_batch_and_candidate_audits_publish_typed_messages() -> None:
 
     applied_event = EventRuntimeProjection(
         event_id="EVT-001",
+        event_type="delay",
+        flight_id="FL-SIM102",
+        detail="SIM102 预计离港时间顺延 25 分钟",
         status="awaiting_confirmation",
         occurred_at=BASE_TIME,
         applied_at=BASE_TIME,
@@ -471,6 +477,9 @@ def test_manual_replan_and_recoverable_failure_publish_typed_messages() -> None:
     )
     failed_event = EventRuntimeProjection(
         event_id="EVT-FAILED",
+        event_type="delay",
+        flight_id="FL-SIM102",
+        detail="SIM102 预计离港时间顺延 25 分钟",
         status="failed",
         occurred_at=BASE_TIME,
         failure_code="replan_failed",

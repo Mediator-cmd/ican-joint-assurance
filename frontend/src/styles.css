@@ -3302,9 +3302,218 @@ td > strong,
   margin-top: 15px;
 }
 
+.runtime-evidence-layout {
+  grid-template-rows: auto minmax(520px, auto) minmax(270px, auto);
+  align-content: start;
+  overflow-y: auto;
+}
+
+.runtime-plan-detail-panel {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  padding: 0 18px 18px;
+}
+
+.runtime-plan-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border: 1px solid #dce4de;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.runtime-plan-columns.has-candidate {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.plan-detail-column {
+  min-width: 0;
+  padding: 16px;
+  background: #fbfcfb;
+}
+
+.plan-detail-column.candidate {
+  background: #fffaf2;
+  border-left: 1px solid #e2d3b9;
+}
+
+.plan-detail-column > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plan-detail-column > header span,
+.plan-detail-column > header h3 {
+  display: block;
+}
+
+.plan-detail-column > header > div > span {
+  color: var(--quiet);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.plan-detail-column > header h3 {
+  margin: 4px 0 0;
+  font-size: 21px;
+  line-height: 1.25;
+}
+
+.constraint-proof {
+  display: inline-flex !important;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 5px;
+  min-height: 32px;
+  padding: 5px 8px;
+  color: #286341;
+  background: #e5f1e9;
+  border: 1px solid #c7ddce;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.plan-purpose {
+  min-height: 48px;
+  margin: 10px 0 7px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.plan-detail-column > code {
+  display: block;
+  color: #56635b;
+  overflow-wrap: anywhere;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 14px;
+}
+
+.plan-metric-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin-top: 14px;
+  border-block: 1px solid #dfe5e1;
+}
+
+.plan-metric-strip > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 21px minmax(0, 1fr);
+  gap: 2px 7px;
+  padding: 10px 7px;
+}
+
+.plan-metric-strip svg {
+  grid-row: 1 / 3;
+  align-self: center;
+  color: #386b4c;
+}
+
+.plan-metric-strip span {
+  color: var(--quiet);
+  font-size: 13px;
+}
+
+.plan-metric-strip strong {
+  overflow-wrap: anywhere;
+  font-size: 16px;
+}
+
+.plan-list-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.plan-list-heading strong { font-size: 16px; }
+.plan-list-heading span { color: var(--quiet); font-size: 14px; }
+
+.plan-assignment-list {
+  max-height: 410px;
+  margin-top: 7px;
+  overflow-y: auto;
+  border-block: 1px solid #dde4df;
+}
+
+.plan-assignment-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px 14px;
+  padding: 11px 5px;
+  border-bottom: 1px solid #e4e9e5;
+}
+
+.plan-assignment-row:last-child { border-bottom: 0; }
+.plan-assignment-row.unassigned { background: #fff6f0; }
+.plan-assignment-row > div { min-width: 0; }
+.plan-assignment-row span,
+.plan-assignment-row strong { display: block; }
+.plan-assignment-row span { color: var(--quiet); font-size: 13px; }
+.plan-assignment-row strong { margin-top: 3px; overflow-wrap: anywhere; font-size: 14px; line-height: 1.4; }
+.plan-task-identity strong { margin-top: 0; color: #254c35; font-size: 16px; }
+.plan-task-identity span { margin-top: 3px; color: var(--muted); }
+.plan-unassigned-copy { grid-column: 2; }
+
+.plan-difference-section {
+  margin-top: 16px;
+  padding-top: 1px;
+  border-top: 1px solid #dce4de;
+}
+
+.plan-difference-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.plan-difference-list article {
+  min-width: 0;
+  padding: 11px;
+  background: #f7f9f7;
+  border-left: 3px solid #d68a3d;
+}
+
+.plan-difference-list article > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.plan-difference-list article > div strong { font-size: 16px; }
+.plan-difference-list article > div span { color: #8a5524; text-align: right; font-size: 13px; }
+.plan-difference-list p { margin: 7px 0 0; color: var(--muted); overflow-wrap: anywhere; font-size: 14px; line-height: 1.4; }
+.plan-difference-list p span { display: inline-block; min-width: 42px; color: var(--quiet); font-weight: 750; }
+.plan-difference-list small { display: block; margin-top: 7px; color: #8a492e; font-size: 13px; line-height: 1.4; }
+
+.plan-no-change,
+.plan-detail-unavailable {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 14px;
+  color: #405047;
+  background: #f1f5f2;
+  border: 1px solid #d8e2db;
+  border-radius: 4px;
+}
+
+.plan-no-change { grid-column: 1 / -1; align-items: center; }
+.plan-detail-unavailable strong { display: block; font-size: 16px; }
+.plan-detail-unavailable p { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+
 .affected-task-panel {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 3;
 }
 
 .runtime-basis-panel {
@@ -3314,14 +3523,24 @@ td > strong,
 
 .runtime-process-panel {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
 }
 
-@media (min-width: 841px) and (max-width: 1240px) {
+@media (min-width: 841px) and (max-width: 1400px) {
+  .runtime-main {
+    grid-template-rows: 94px auto minmax(0, 1fr) 46px;
+  }
+
   .runtime-control-bar {
-    grid-template-columns: minmax(220px, 0.8fr) auto minmax(430px, 1.25fr);
+    grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1fr);
     gap: 10px;
     padding-inline: 18px;
+  }
+
+  .runtime-commands {
+    grid-column: 1 / 3;
+    display: grid;
+    grid-template-columns: minmax(100px, 1fr) auto minmax(120px, 1fr) 42px;
   }
 
   .runtime-command { padding-inline: 10px; }
@@ -3371,6 +3590,7 @@ td > strong,
 
   .flight-runtime-panel,
   .candidate-panel,
+  .runtime-plan-detail-panel,
   .affected-task-panel,
   .runtime-basis-panel,
   .runtime-process-panel {
@@ -3379,10 +3599,15 @@ td > strong,
   }
 
   .flight-runtime-panel,
+  .runtime-plan-detail-panel,
   .affected-task-panel,
   .runtime-process-panel { min-height: 320px; }
   .candidate-panel { min-height: 430px; }
+  .runtime-plan-detail-panel { min-height: 560px; }
   .runtime-basis-panel { min-height: 330px; }
+
+  .runtime-plan-columns.has-candidate { grid-template-columns: 1fr; }
+  .plan-detail-column.candidate { border-top: 1px solid #e2d3b9; border-left: 0; }
 
   .runtime-resource-row {
     grid-template-columns: minmax(110px, 0.7fr) auto minmax(160px, 1fr) 18px;
@@ -3408,6 +3633,7 @@ td > strong,
   .plan-id-comparison > svg { transform: rotate(90deg); justify-self: center; }
   .candidate-actions { flex-direction: column; }
   .candidate-actions .runtime-command { width: 100%; }
+  .plan-difference-list { grid-template-columns: 1fr; }
   .runtime-notice { align-items: flex-start; flex-wrap: wrap; }
   .runtime-notice button { margin-left: 26px; }
 }

@@ -59,8 +59,9 @@ def test_ready_projection_exposes_plan_without_starting_work() -> None:
     assert {item.status.value for item in projection.tasks} == {"pending", "unassigned"}
     assert tasks["TASK-001"].status.value == "pending"
     assert tasks["TASK-005"].status.value == "unassigned"
-    assert {item.status.value for item in projection.resources} == {"idle"}
+    assert {item.status.value for item in projection.resources} == {"idle", "unavailable"}
     assert resources["WC-01"].next_task_id == "TASK-001"
+    assert resources["WC-02"].status.value == "unavailable"
     assert flights["FL-SIM102"].status.value == "delayed"
     assert flights["FL-SIM218"].status.value == "scheduled"
     assert {item.status.value for item in projection.events} == {"pending"}
@@ -93,8 +94,9 @@ def test_task_and_resource_boundaries_are_left_closed_right_open() -> None:
     assert service_resources["WC-01"].status.value == "serving"
     assert service_resources["WC-01"].position.from_zone_id == "TRANSFER-DESK"
     assert service_resources["WC-01"].position.to_zone_id == "GATE-W03"
-    assert completed_resources["WC-01"].status.value == "idle"
+    assert completed_resources["WC-01"].status.value == "moving"
     assert completed_resources["WC-01"].position.from_zone_id == "GATE-W03"
+    assert completed_resources["WC-01"].current_task_id == "TASK-008"
 
 
 def test_zero_minute_travel_skips_moving_and_resource_availability_is_visible() -> None:
@@ -160,6 +162,10 @@ def test_applied_event_uses_version_evidence_and_scenario_effects() -> None:
     assert events[event.event_id].status.value == "resolved"
     assert events[event.event_id].scenario_version_after == 2
     assert events[event.event_id].applied_at == event.occurred_at
+    assert events[event.event_id].event_type.value == "delay"
+    assert events[event.event_id].flight_id == "FL-SIM102"
+    assert events[event.event_id].detail == "SIM102 预计离港时间顺延 25 分钟"
+    assert events[event.event_id].note == "前序航班保障延误"
     assert events["EVT-SIM218-GATE"].status.value == "pending"
     assert flights["FL-SIM102"].estimated_departure == _at(9, 0)
     assert flights["FL-SIM102"].last_event_id == event.event_id

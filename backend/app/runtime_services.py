@@ -776,6 +776,16 @@ class RuntimeSessionService:
             initial_plan_id=record.initial_plan_id,
             active_plan_id=record.active_plan_id,
             candidate_plan_id=record.candidate_plan_id,
+            active_plan_detail=(
+                record.projection_source.plan
+                if record.projection_source is not None
+                else None
+            ),
+            candidate_plan_detail=(
+                record.projection_source.candidate_plan
+                if record.projection_source is not None
+                else None
+            ),
             status=record.status,
             revision=record.revision,
             clock=RuntimeClockSnapshot(
