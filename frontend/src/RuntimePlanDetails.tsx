@@ -49,7 +49,7 @@ function formatTime(value: string): string {
   }).format(new Date(value));
 }
 
-function algorithmLabel(algorithm: string): string {
+export function runtimePlanAlgorithmLabel(algorithm: string): string {
   if (algorithm === "rolling_cp_sat_v1") return "滚动约束优化";
   if (algorithm === "cp_sat_priority_v1" || algorithm === "cp_sat") {
     return "CP-SAT 约束优化";
@@ -58,6 +58,14 @@ function algorithmLabel(algorithm: string): string {
     return "FIFO 规则方案";
   }
   return "确定性调度方案";
+}
+
+export function runtimePlanFacts(plan: Plan): string {
+  return [
+    `${plan.metrics.assigned_tasks}/${plan.metrics.total_tasks} 项任务已安排`,
+    `关键任务 ${plan.metrics.critical_task_completion_rate_pct.toFixed(0)}%`,
+    `硬约束 ${plan.violations.length}`,
+  ].join(" · ");
 }
 
 function AssignmentList({ plan, scenario }: { plan: Plan; scenario: Scenario }) {
@@ -108,7 +116,7 @@ function PlanColumn({
   return (
     <section className={`plan-detail-column${candidate ? " candidate" : ""}`}>
       <header>
-        <div><span>{label}</span><h3>{algorithmLabel(plan.algorithm)}</h3></div>
+        <div><span>{label}</span><h3>{runtimePlanAlgorithmLabel(plan.algorithm)}</h3></div>
         <span className="constraint-proof"><ShieldCheck size={16} />硬约束 {plan.violations.length}</span>
       </header>
       <p className="plan-purpose">{purpose}</p>
@@ -137,8 +145,8 @@ export default function RuntimePlanDetails({
   eventDetails,
   frozenTaskCount,
 }: {
-  activePlan: Plan | null;
-  candidatePlan: Plan | null;
+  activePlan: Plan | null | undefined;
+  candidatePlan: Plan | null | undefined;
   scenario: Scenario;
   eventDetails: string[];
   frozenTaskCount: number;
@@ -147,7 +155,7 @@ export default function RuntimePlanDetails({
     return (
       <div className="plan-detail-unavailable">
         <AlertTriangle size={22} />
-        <div><strong>当前会话缺少可恢复的方案明细</strong><p>系统只保留审计编号，不会根据页面状态补造任务安排。重置到当前场景后可创建完整运行会话。</p></div>
+        <div><strong>方案明细尚未同步</strong><p>页面只收到了审计编号，没有收到任务、资源和时段事实。请先读取最新权威快照；仍为空时需重新启动项目服务。页面不会根据方案编号补造内容。</p></div>
       </div>
     );
   }

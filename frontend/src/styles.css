@@ -3283,17 +3283,27 @@ td > strong,
 
 .plan-id-comparison article {
   min-width: 0;
-  padding: 11px;
+  min-height: 132px;
+  padding: 13px;
   background: #f5f8f6;
   border: 1px solid #dfe6e1;
   border-radius: 5px;
 }
 
+.plan-id-comparison article.active { border-color: #bfd4c5; }
 .plan-id-comparison article.candidate { background: #f9f3e9; border-color: #e5cfaa; }
 .plan-id-comparison span,
-.plan-id-comparison strong { display: block; }
+.plan-id-comparison strong,
+.plan-id-comparison code,
+.plan-id-comparison small { display: block; }
 .plan-id-comparison span { color: var(--quiet); font-size: 14px; }
-.plan-id-comparison strong { margin-top: 5px; overflow-wrap: anywhere; font-size: 16px; }
+.plan-id-comparison strong { margin-top: 8px; color: #263d2e; font-size: 19px; }
+.plan-id-comparison code { margin-top: 6px; color: #607068; overflow-wrap: anywhere; font-family: "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+.plan-id-comparison small,
+.plan-id-comparison p { margin: 7px 0 0; color: var(--muted); font-size: 14px; line-height: 1.45; }
+.plan-card-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.plan-card-label b { color: #2d6945; font-size: 13px; }
+.plan-id-comparison article.candidate .plan-card-label b { color: #98602b; }
 .plan-id-comparison > svg { color: #879189; }
 
 .candidate-actions {
@@ -3302,15 +3312,34 @@ td > strong,
   margin-top: 15px;
 }
 
-.runtime-evidence-layout {
-  grid-template-rows: auto minmax(520px, auto) minmax(270px, auto);
-  align-content: start;
+.workspace-page.page-evidence {
+  overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c4cec7 transparent;
+}
+
+.runtime-evidence-layout {
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: visible;
+}
+
+.runtime-evidence-layout > .workspace-section {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.runtime-evidence-layout .candidate-panel,
+.runtime-evidence-layout .affected-task-list,
+.runtime-evidence-layout .basis-list,
+.runtime-evidence-layout .process-flow {
+  overflow: visible;
 }
 
 .runtime-plan-detail-panel {
-  grid-column: 1 / -1;
-  grid-row: 2;
   padding: 0 18px 18px;
 }
 
@@ -3436,9 +3465,8 @@ td > strong,
 .plan-list-heading span { color: var(--quiet); font-size: 14px; }
 
 .plan-assignment-list {
-  max-height: 410px;
   margin-top: 7px;
-  overflow-y: auto;
+  overflow: visible;
   border-block: 1px solid #dde4df;
 }
 
@@ -3512,18 +3540,26 @@ td > strong,
 .plan-detail-unavailable p { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
 
 .affected-task-panel {
-  grid-column: 1;
-  grid-row: 3;
+  display: grid;
+  grid-template-rows: auto auto;
 }
 
 .runtime-basis-panel {
-  grid-column: 2;
-  grid-row: 1;
+  grid-template-rows: auto auto;
 }
 
 .runtime-process-panel {
-  grid-column: 2;
-  grid-row: 3;
+  grid-template-rows: auto auto;
+}
+
+.runtime-basis-panel .basis-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 18px;
+}
+
+.runtime-process-panel .process-flow {
+  min-width: 0;
 }
 
 @media (min-width: 841px) and (max-width: 1400px) {
@@ -3599,12 +3635,17 @@ td > strong,
   }
 
   .flight-runtime-panel,
-  .runtime-plan-detail-panel,
-  .affected-task-panel,
-  .runtime-process-panel { min-height: 320px; }
-  .candidate-panel { min-height: 430px; }
-  .runtime-plan-detail-panel { min-height: 560px; }
-  .runtime-basis-panel { min-height: 330px; }
+  .affected-task-panel { min-height: 320px; }
+
+  .runtime-evidence-layout .candidate-panel,
+  .runtime-evidence-layout .runtime-plan-detail-panel,
+  .runtime-evidence-layout .affected-task-panel,
+  .runtime-evidence-layout .runtime-basis-panel,
+  .runtime-evidence-layout .runtime-process-panel { min-height: 0; }
+
+  .runtime-basis-panel .basis-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .runtime-process-panel .process-flow { min-width: 0; grid-template-columns: 1fr; }
+  .runtime-process-panel .process-step > svg { display: none; }
 
   .runtime-plan-columns.has-candidate { grid-template-columns: 1fr; }
   .plan-detail-column.candidate { border-top: 1px solid #e2d3b9; border-left: 0; }
@@ -3634,6 +3675,7 @@ td > strong,
   .candidate-actions { flex-direction: column; }
   .candidate-actions .runtime-command { width: 100%; }
   .plan-difference-list { grid-template-columns: 1fr; }
+  .runtime-basis-panel .basis-list { grid-template-columns: 1fr; }
   .runtime-notice { align-items: flex-start; flex-wrap: wrap; }
   .runtime-notice button { margin-left: 26px; }
 }

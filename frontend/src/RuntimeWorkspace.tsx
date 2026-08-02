@@ -22,7 +22,10 @@ import { useEffect, useMemo, useState } from "react";
 
 import { resolveSelectedId } from "./selection";
 import { runtimeStatusCounts } from "./runtime";
-import RuntimePlanDetails from "./RuntimePlanDetails";
+import RuntimePlanDetails, {
+  runtimePlanAlgorithmLabel,
+  runtimePlanFacts,
+} from "./RuntimePlanDetails";
 import type {
   DemoPayload,
   EventRuntimeProjection,
@@ -317,6 +320,14 @@ export default function RuntimeWorkspace({
       .map((event) => event.detail)
     : [];
   const frozenTaskCount = snapshot.tasks.filter((task) => task.is_locked).length;
+  const activePlanTitle = snapshot.active_plan_detail
+    ? runtimePlanAlgorithmLabel(snapshot.active_plan_detail.algorithm)
+    : "方案明细尚未同步";
+  const candidatePlanTitle = snapshot.candidate_plan_detail
+    ? runtimePlanAlgorithmLabel(snapshot.candidate_plan_detail.algorithm)
+    : snapshot.candidate_plan_id
+      ? "候选方案明细正在同步"
+      : "当前无需人工选择";
   const currentPage = pageInfo[activePage];
   const connection = connectionInfo[runtime.connectionStatus];
   const controlsDisabled = runtime.connectionStatus === "offline_readonly" || runtime.controlBusy !== null;
@@ -701,11 +712,21 @@ export default function RuntimeWorkspace({
             {activePage === "evidence" && (
               <div className="evidence-layout runtime-evidence-layout">
                 <section className={`workspace-section candidate-panel${snapshot.candidate_plan_id ? " awaiting" : ""}`}>
-                  <div className="candidate-heading"><div className="validation-symbol success"><ShieldCheck size={25} /></div><div><span>{snapshot.candidate_plan_id ? "需要人工决定" : "当前执行方案"}</span><h2>{snapshot.candidate_plan_id ? "新的滚动候选已经通过独立约束复核" : "当前没有待确认候选方案"}</h2><p>{snapshot.candidate_plan_id ? "仿真时间保持冻结，确认前当前方案不会被替换。" : "系统会在事件或人工请求触发后生成新的候选。"}</p></div></div>
+                  <div className="candidate-heading"><div className="validation-symbol success"><ShieldCheck size={25} /></div><div><span>{snapshot.candidate_plan_id ? "需要人工决定" : "运行方案状态"}</span><h2>{snapshot.candidate_plan_id ? "新的滚动候选已经通过独立约束复核" : snapshot.active_plan_detail ? `${activePlanTitle}正在执行` : "当前方案正在执行，明细尚未同步"}</h2><p>{snapshot.candidate_plan_id ? "仿真时间保持冻结，确认前当前方案不会被替换。" : snapshot.active_plan_detail ? runtimePlanFacts(snapshot.active_plan_detail) : "当前方案编号已经保存，但运行服务尚未返回任务、资源与时段明细。"}</p></div></div>
                   <div className="plan-id-comparison">
-                    <article><span>当前执行方案</span><strong>{snapshot.active_plan_id}</strong></article>
+                    <article className="active">
+                      <div className="plan-card-label"><span>当前执行方案</span><b>正在生效</b></div>
+                      <strong>{activePlanTitle}</strong>
+                      <code>{snapshot.active_plan_id}</code>
+                      <small>{snapshot.active_plan_detail ? runtimePlanFacts(snapshot.active_plan_detail) : "等待权威快照补齐具体执行内容"}</small>
+                    </article>
                     <ArrowRight size={20} />
-                    <article className={snapshot.candidate_plan_id ? "candidate" : undefined}><span>待确认候选</span><strong>{snapshot.candidate_plan_id ?? "尚未生成"}</strong></article>
+                    <article className={snapshot.candidate_plan_id ? "candidate" : undefined}>
+                      <div className="plan-card-label"><span>待确认候选</span><b>{snapshot.candidate_plan_id ? "等待确认" : "无需处理"}</b></div>
+                      <strong>{candidatePlanTitle}</strong>
+                      {snapshot.candidate_plan_id ? <code>{snapshot.candidate_plan_id}</code> : <p>事件或人工重新计算触发后在这里出现。</p>}
+                      <small>{snapshot.candidate_plan_detail ? runtimePlanFacts(snapshot.candidate_plan_detail) : snapshot.candidate_plan_id ? "已收到候选编号，等待权威快照补齐具体变化" : "当前方案继续生效，不会被静默替换"}</small>
+                    </article>
                   </div>
                   {snapshot.candidate_plan_id && (
                     <div className="candidate-actions">
