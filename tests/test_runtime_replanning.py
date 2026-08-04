@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from backend.app.api_models import CreatePlanRequest
+from backend.app.constraints import validate_plan
 from backend.app.demo_export import DEMO_SCENARIO_PATH
 from backend.app.optimizer import OptimizationError
 from backend.app.planning_models import Plan
@@ -283,6 +284,72 @@ def test_reject_keeps_older_active_plan_with_newer_event_scenario(tmp_path) -> N
     assert source.plan.scenario_version == 2
     assert source.candidate_plan is None
     assert {event.status.value for event in rejected.events} == {"resolved", "pending"}
+
+
+def test_reject_then_later_event_still_creates_safe_candidate(tmp_path) -> None:
+    service, repository, clock, scenario, initial_plan = _service(
+        tmp_path,
+        session_id="RUN-M46-REJECT-CONTINUE",
+    )
+    created = _create(service, scenario, initial_plan)
+    first = service.start_session(
+        created.session_id,
+        RuntimeRevisionRequest(expected_revision=created.revision),
+    )
+    first_accepted = service.accept_candidate(
+        created.session_id,
+        CandidateDecisionRequest(
+            expected_revision=first.revision,
+            candidate_plan_id=first.candidate_plan_id or "",
+        ),
+    )
+    service.start_session(
+        created.session_id,
+        RuntimeRevisionRequest(expected_revision=first_accepted.revision),
+    )
+    clock.advance(16)
+    second = service.get_session(created.session_id)
+    second_rejected = service.reject_candidate(
+        created.session_id,
+        CandidateDecisionRequest(
+            expected_revision=second.revision,
+            candidate_plan_id=second.candidate_plan_id or "",
+            reason="保留当前执行方案后继续运行",
+        ),
+    )
+
+    service.start_session(
+        created.session_id,
+        RuntimeRevisionRequest(expected_revision=second_rejected.revision),
+    )
+    clock.advance(48)
+    third = service.get_session(created.session_id)
+    source = repository.get_session(created.session_id).projection_source
+    assert source is not None
+    assert source.candidate_plan is not None
+
+    assert third.status is RuntimeStatus.AWAITING_CONFIRMATION
+    assert third.clock.simulation_time == _at(8, 16)
+    assert third.current_scenario_version == 4
+    assert third.candidate_plan_id == source.candidate_plan.plan_id
+    assert source.failed_event_codes == {}
+
+    active_assignments = _assignment_map(source.plan)
+    candidate_assignments = _assignment_map(source.candidate_plan)
+    scenario_tasks = {task.task_id: task for task in source.scenario.tasks}
+    for task_id in source.frozen_task_ids:
+        assert candidate_assignments[task_id] == active_assignments[task_id]
+        assert scenario_tasks[task_id].origin_zone_id == active_assignments[task_id].origin_zone_id
+        assert (
+            scenario_tasks[task_id].destination_zone_id
+            == active_assignments[task_id].destination_zone_id
+        )
+    assert validate_plan(
+        source.scenario,
+        source.candidate_plan.assignments,
+        source.candidate_plan.unassigned_tasks,
+    ) == []
+    assert repository.list_audit_records(created.session_id)[-1].action == "candidate_created"
 
 
 def test_same_time_events_share_one_scenario_version_and_replan(tmp_path) -> None:

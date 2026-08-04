@@ -44,8 +44,23 @@ def apply_runtime_event_batch(
 
     scenario = source.scenario.model_copy(deep=True)
     tasks = {task.task_id: task for task in scenario.tasks}
+    assignments_by_task = {
+        assignment.task_id: assignment for assignment in source.plan.assignments
+    }
     for task_id in frozen_task_ids:
-        tasks[task_id].locked = True
+        task = tasks.get(task_id)
+        assignment = assignments_by_task.get(task_id)
+        if task is None or assignment is None:
+            raise RuntimePlanningError(
+                "frozen runtime tasks require current scenario facts and active assignments"
+            )
+        task.locked = True
+        # The active assignment is authoritative once work has started. A task can
+        # become frozen after an earlier event candidate was rejected, so reconcile
+        # its route before applying the next event instead of silently adopting the
+        # rejected candidate or invalidating an already-running assignment.
+        task.origin_zone_id = assignment.origin_zone_id
+        task.destination_zone_id = assignment.destination_zone_id
     flights = {flight.flight_id: flight for flight in scenario.flights}
 
     try:

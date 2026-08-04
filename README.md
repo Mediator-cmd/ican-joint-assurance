@@ -18,8 +18,8 @@
 
 ## 当前状态
 
-- 阶段：M4 实时运行与动态重规划（M4-5C Windows 一键启停修正已完成）。
-- 下一单元：M4-6 端到端、性能、长时间、故障与三轮连续演示验收。
+- 阶段：M4 实时运行与动态重规划已完成。
+- 下一阶段：M5 AI 事件理解与结果解释；尚未开始。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
@@ -38,6 +38,8 @@
 - M4-5A 修正审查：[docs/m4-05a-review.md](docs/m4-05a-review.md)
 - M4-5B 展示修正审查：[docs/m4-05b-review.md](docs/m4-05b-review.md)
 - M4-5C 一键启停修正审查：[docs/m4-05c-review.md](docs/m4-05c-review.md)
+- M4-6 总验收计划：[docs/m4-06-plan.md](docs/m4-06-plan.md)
+- M4-6 总验收审查：[docs/m4-06-review.md](docs/m4-06-review.md)
 
 ## 目录结构
 
@@ -132,7 +134,7 @@ npm install
 npm run dev
 ```
 
-浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `130 passed`，前端回归基线为 `19 passed`，并应同时通过 `npm run typecheck` 和 `npm run build`。
+浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `133 passed`，前端回归基线为 `19 passed`，并应同时通过 `npm run typecheck` 和 `npm run build`。
 
 ## Git 工作流
 
