@@ -1,0 +1,111 @@
+# M5-0 AI 辅助契约
+
+## 1. 文档目的
+
+本文件冻结 M5 的自然语言事件草稿、字段依据、缺失追问、目标建议、方案解释、来源透明度和无模型回退语义。M5-1 至 M5-6 必须复用 `backend/app/ai_models.py`，不得让模型提供方、路由或前端另建一套可绕过版本与人工确认的状态。
+
+M5-0 只交付契约模型、测试和阶段计划，不公开 AI 路由、不调用外部模型、不读取密钥、不应用事件，也不修改 M4 的实时工作区。
+
+> 仅供教学仿真与辅助决策使用，不构成真实机场运行、放行、登机、改签或车辆控制指令。
+
+## 2. 核心原则
+
+1. 所有自然语言均是不可信输入；只有 Pydantic、场景实体和版本校验通过后才能形成事件草稿。
+2. 草稿不是命令。`requires_human_confirmation=true`、`applies_automatically=false` 固定不可改。
+3. 模型不是规划器。目标建议固定 `applied_to_planner=false`，方案解释固定 `modifies_plan=false`。
+4. M4 的场景版本、运行 revision、仿真时间、当前/候选方案、CP-SAT、硬约束与人工确认继续是唯一权威链。
+5. 无模型时使用确定性规则；规则不能理解时追问或拒绝，不猜测。
+6. API 不回显原始输入、内部提示词、密钥、提供方 URL、原始异常、堆栈或本机路径。
+
+## 3. 事件草稿请求
+
+计划路径：`POST /api/v1/assistant/event-drafts`。M5-0 不提前实现或公开该路由。
+
+`EventDraftRequest.context` 是判别联合：
+
+- `scope=scenario`：携带 `scenario_id`、`expected_version` 和带时区 `reference_time`。
+- `scope=runtime`：携带 `session_id` 和 `expected_revision`；服务从权威快照取得场景版本与仿真时间，不能信任前端自报时间。
+
+`assistance_mode` 只允许：
+
+- `auto`：模型可用时尝试模型，任何安全失败后回退规则。
+- `deterministic_only`：禁止外部调用，只使用规则。
+
+原始 `text` 限制为 1 至 1000 字符，不进入响应或默认持久化记录。
+
+## 4. 事件草稿响应
+
+`EventDraftResponse.status` 有三种：
+
+| 状态 | `event` | 缺失字段/追问 | 语义 |
+| --- | --- | --- | --- |
+| `ready_for_review` | 完整 `FlightEvent` | 必须为空 | 已校验草稿，仍需人工复核 |
+| `needs_clarification` | 必须为空 | 每个缺失字段恰有一个问题 | 信息不足，不能构造事件 |
+| `unsupported` | 必须为空 | 必须为空 | 当前仅支持有限事件类型，并返回安全说明 |
+
+M5 首轮事件字段限定为：事件类型、航班 ID、发生时间、延误分钟、原登机口和新登机口。事件 ID 由后端生成，不从文本信任读取。
+
+完整草稿必须为每个必填字段提供 `ExtractedFieldEvidence`：规范化值、来源和可选原文片段。来自用户文本的证据必须保留有限原文片段；来自场景或运行快照的字段标记为权威上下文；相对时间的确定性换算标记为确定性派生。证据值与最终 `FlightEvent` 不一致时契约拒绝响应。
+
+## 5. 来源与回退
+
+`AssistanceTrace` 公开最小可诊断信息：
+
+- `source=language_model` 时必须确实尝试提供方并显示非敏感模型标签，不能同时声称回退。
+- `source=deterministic_rules` 可以表示主动规则模式或模型失败后的回退。
+- 回退原因只允许：未配置、超时、提供方错误、模型输出未通过校验。
+- 超时、提供方错误和非法输出必须对应真实调用尝试；未配置不能声称已调用。
+
+提供方的原始错误、响应正文和内部模型配置不进入公开契约。
+
+## 6. 目标建议
+
+`PlanningObjectiveProfile` 只允许：
+
+- `balanced`：沿用当前覆盖、优先级、等待与移动的确定性词典序基线。
+- `critical_first`：关键任务优先。
+- `minimum_wait`：在安全覆盖前提下降低等待。
+- `minimum_change`：滚动阶段优先减少未来任务变化。
+
+`ObjectiveRecommendation` 只表达建议、理由和有限原文依据，固定要求人工确认且尚未应用。M5-3 在确定性优化器实现并测试相应配置前，不得把除 `balanced` 外的建议描述成已经改变排班。
+
+## 7. 方案解释请求与响应
+
+计划路径：`POST /api/v1/assistant/plan-explanations`。请求上下文是判别联合：
+
+- `scenario_plan`：场景 ID、场景版本、被解释方案和可选基线方案。
+- `runtime_plan`：会话 ID、revision、被解释方案和可选基线方案。
+
+基线与被解释方案不得相同。运行解释必须在读取时重新核对 revision 和方案 ID，避免页面对陈旧候选获取看似有效的说明。
+
+服务先从权威数据构造 `ExplanationEvidence`。摘要、每项取舍和下一步都是独立 `ExplanationClaim`，每条 claim 至少引用一个存在的 evidence ID；引用未知或重复 ID 时契约拒绝。证据类型限定为计划指标、任务分配、未安排任务、约束、事件、方案变化和目标配置。
+
+解释可以包含摘要、取舍、下一步和未解决问题，但固定不能修改计划，并继续要求人工确认。
+
+## 8. 计划错误语义
+
+M5-1 起继续使用统一 `ApiErrorResponse`，计划错误码如下：
+
+| HTTP | code | 场景 |
+| --- | --- | --- |
+| `404` | `assistant_context_not_found` | 场景、会话或方案不存在 |
+| `409` | `assistant_version_conflict` | 场景版本已变化 |
+| `409` | `assistant_revision_conflict` | 运行 revision 已变化 |
+| `409` | `assistant_plan_context_mismatch` | 方案不属于指定场景/会话 |
+| `422` | `validation_error` | 请求或生成结果不符合契约 |
+
+不能理解的自然语言通常返回 200 的 `needs_clarification` 或 `unsupported`，不是 500。模型未配置或失败也不直接返回 5xx；服务应回退规则，并在 trace 中说明安全原因。
+
+## 9. M5-0 退出条件
+
+- [x] 事件草稿请求绑定场景 version 或运行 revision。
+- [x] 完整、追问和不支持三种响应状态无歧义。
+- [x] 完整事件的每个必填字段都必须有一致证据。
+- [x] 模型与规则来源、调用尝试和回退原因不能互相矛盾。
+- [x] 目标建议不能自动进入规划器。
+- [x] 场景与运行方案解释上下文均绑定版本事实。
+- [x] 解释的每条摘要、取舍和下一步只能引用响应中存在的权威证据 ID。
+- [x] 自动应用事件、修改方案和绕过人工确认在模型层被禁止。
+- [x] 完整教学仿真安全声明固定在草稿与解释响应中。
+
+满足以上条件后进入 M5-1。若实现发现契约缺陷，必须先更新本文件、`ai_models.py` 和契约测试并记录原因。
