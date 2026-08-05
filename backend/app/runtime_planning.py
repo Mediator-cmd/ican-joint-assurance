@@ -12,11 +12,40 @@ from .fifo_scheduler import build_plan_metrics
 from .models import FlightEvent, FlightEventType, FlightStatus, ResourceStatus, Scenario
 from .optimizer import OptimizationError, build_optimized_plan
 from .planning_models import Plan, PlanStatus
+from .planning_objectives import PlanningObjectiveProfile
 from .runtime_projection import RuntimeProjectionSource
 
 
 class RuntimePlanningError(RuntimeError):
     """Raised when runtime facts cannot produce a safe candidate plan."""
+
+
+def source_with_objective(
+    source: RuntimeProjectionSource,
+    objective_profile: PlanningObjectiveProfile,
+) -> RuntimeProjectionSource:
+    payload = source.model_dump(mode="python")
+    payload["objective_profile"] = objective_profile
+    return RuntimeProjectionSource.model_validate(payload)
+
+
+def source_with_registered_event(
+    source: RuntimeProjectionSource,
+    event: FlightEvent,
+    objective_profile: PlanningObjectiveProfile,
+) -> RuntimeProjectionSource:
+    catalog_ids = {item.event_id for item in source.event_catalog}
+    if event.event_id in catalog_ids:
+        raise ValueError("runtime event is already registered")
+
+    validation_scenario = source.scenario.model_copy(deep=True)
+    validation_scenario.events.append(event.model_copy(deep=True))
+    Scenario.model_validate(validation_scenario.model_dump(mode="python"))
+
+    payload = source.model_dump(mode="python")
+    payload["event_catalog"] = [*source.event_catalog, event.model_copy(deep=True)]
+    payload["objective_profile"] = objective_profile
+    return RuntimeProjectionSource.model_validate(payload)
 
 
 def apply_runtime_event_batch(
@@ -99,6 +128,7 @@ def apply_runtime_event_batch(
     return RuntimeProjectionSource(
         scenario=scenario,
         plan=source.plan,
+        objective_profile=source.objective_profile,
         event_catalog=source.event_catalog,
         applied_event_versions=applied_versions,
         initial_scenario=source.initial_scenario,
@@ -124,6 +154,7 @@ def build_rolling_candidate(
     session_id: str,
     replan_revision: int,
     max_time_seconds: float = 5.0,
+    objective_profile: PlanningObjectiveProfile = PlanningObjectiveProfile.BALANCED,
 ) -> Plan:
     """Optimize only future work, then independently validate the merged plan."""
 
@@ -174,6 +205,12 @@ def build_rolling_candidate(
         future_plan = build_optimized_plan(
             residual,
             max_time_seconds=max_time_seconds,
+            objective_profile=objective_profile,
+            baseline_plan=(
+                active_plan
+                if objective_profile is PlanningObjectiveProfile.MINIMUM_CHANGE
+                else None
+            ),
         )
     except OptimizationError:
         raise
@@ -196,13 +233,20 @@ def build_rolling_candidate(
         raise RuntimePlanningError("rolling candidate failed independent constraint validation")
 
     status = PlanStatus.PARTIAL if unassigned_tasks else PlanStatus.EXECUTABLE
+    profile_suffix = (
+        ""
+        if objective_profile is PlanningObjectiveProfile.BALANCED
+        else f"-{objective_profile.value.upper().replace('_', '-')}"
+    )
     candidate = Plan(
         plan_id=(
-            f"PLAN-{session_id.removeprefix('RUN-')}-R{replan_revision}-CP-SAT"
+            f"PLAN-{session_id.removeprefix('RUN-')}-R{replan_revision}"
+            f"-CP-SAT{profile_suffix}"
         ),
         scenario_id=scenario.scenario_id,
         scenario_version=scenario.version,
         algorithm="rolling_cp_sat_v1",
+        objective_profile=objective_profile,
         generated_at=simulation_time,
         status=status,
         assignments=assignments,
@@ -228,6 +272,7 @@ def source_with_candidate(
     return RuntimeProjectionSource(
         scenario=source.scenario,
         plan=source.plan,
+        objective_profile=source.objective_profile,
         event_catalog=source.event_catalog,
         applied_event_versions=source.applied_event_versions,
         initial_scenario=source.initial_scenario,
@@ -262,6 +307,7 @@ def source_after_candidate_decision(
     return RuntimeProjectionSource(
         scenario=source.scenario,
         plan=candidate if accept else source.plan,
+        objective_profile=source.objective_profile,
         event_catalog=source.event_catalog,
         applied_event_versions=source.applied_event_versions,
         initial_scenario=source.initial_scenario,
@@ -288,6 +334,7 @@ def source_after_replan_failure(
     return RuntimeProjectionSource(
         scenario=source.scenario,
         plan=source.plan,
+        objective_profile=source.objective_profile,
         event_catalog=source.event_catalog,
         applied_event_versions=source.applied_event_versions,
         initial_scenario=source.initial_scenario,
@@ -309,6 +356,7 @@ def reset_runtime_source(source: RuntimeProjectionSource) -> RuntimeProjectionSo
     return RuntimeProjectionSource(
         scenario=initial_scenario,
         plan=initial_plan,
+        objective_profile=initial_plan.objective_profile,
         event_catalog=source.event_catalog,
         applied_event_versions=source.initial_applied_event_versions or {},
         initial_scenario=initial_scenario,

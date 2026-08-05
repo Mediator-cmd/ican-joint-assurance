@@ -29,6 +29,11 @@ from .fifo_scheduler import build_fifo_plan
 from .models import ResourceStatus, Scenario
 from .optimizer import build_optimized_plan
 from .planning_models import Plan, PlanStatus
+from .planning_objectives import (
+    OBJECTIVE_DISPLAY_NAMES,
+    PlanningObjectiveProfile,
+    cp_sat_algorithm_name,
+)
 from .repository import (
     EventAlreadyAppliedError,
     EventAlreadyRegisteredError,
@@ -53,10 +58,14 @@ class ScenarioNotReadyForPlanningError(ValueError):
         self.warnings = list(warnings)
 
 
+class PlanningObjectiveNotSupportedError(ValueError):
+    pass
+
+
 def _plan_algorithm(plan: Plan) -> PlanAlgorithm:
     if plan.algorithm == _ALGORITHM_STORAGE_NAMES[PlanAlgorithm.FIFO]:
         return PlanAlgorithm.FIFO
-    if plan.algorithm == _ALGORITHM_STORAGE_NAMES[PlanAlgorithm.CP_SAT]:
+    if plan.algorithm.startswith("cp_sat_"):
         return PlanAlgorithm.CP_SAT
     raise ValueError(f"unsupported stored planning algorithm: {plan.algorithm}")
 
@@ -95,10 +104,20 @@ def _plan_guidance(plan: Plan) -> PlanGuidance:
         recommended_action = "查看未分配原因，决定补充资源、调整时间或保留人工处置"
 
     if algorithm is PlanAlgorithm.CP_SAT:
-        display_name = "系统优化建议"
+        objective_name = OBJECTIVE_DISPLAY_NAMES[plan.objective_profile]
+        display_name = (
+            "系统优化建议"
+            if plan.objective_profile is PlanningObjectiveProfile.BALANCED
+            else f"系统优化建议（{objective_name}）"
+        )
+        objective_basis = {
+            PlanningObjectiveProfile.BALANCED: "先保护紧急任务，再兼顾任务覆盖、优先级与等待",
+            PlanningObjectiveProfile.CRITICAL_FIRST: "先保护紧急任务与高优先级任务，再扩大任务覆盖",
+            PlanningObjectiveProfile.MINIMUM_WAIT: "在紧急任务和任务覆盖不降低的前提下优先减少等待",
+            PlanningObjectiveProfile.MINIMUM_CHANGE: "在紧急任务和任务覆盖不降低的前提下优先保留资源安排",
+        }[plan.objective_profile]
         tradeoff_summary = (
-            "系统先保护紧急任务，再减少未安排任务和总等待；"
-            f"当前平均等待 {metrics.average_wait_minutes:.1f} 分钟"
+            f"{objective_basis}；当前平均等待 {metrics.average_wait_minutes:.1f} 分钟"
         )
     else:
         display_name = "原规则方案"
@@ -324,10 +343,22 @@ class ScenarioService:
         if not summary.operational.ready_for_planning:
             raise ScenarioNotReadyForPlanningError(summary.operational.warnings)
 
+        if (
+            request.algorithm is PlanAlgorithm.CP_SAT
+            and request.applied_objective is PlanningObjectiveProfile.MINIMUM_CHANGE
+        ):
+            raise PlanningObjectiveNotSupportedError(
+                "minimum_change is only available for rolling runtime planning"
+            )
+        storage_algorithm = (
+            _ALGORITHM_STORAGE_NAMES[PlanAlgorithm.FIFO]
+            if request.algorithm is PlanAlgorithm.FIFO
+            else cp_sat_algorithm_name(request.applied_objective)
+        )
         existing_plans = self.repository.list_plans(
             scenario_id,
             scenario_version=request.expected_version,
-            algorithm=_ALGORITHM_STORAGE_NAMES[request.algorithm],
+            algorithm=storage_algorithm,
         )
         if existing_plans:
             raise PlanAlreadyExistsError(
@@ -340,6 +371,7 @@ class ScenarioService:
             plan = build_optimized_plan(
                 scenario,
                 max_time_seconds=request.max_time_seconds,
+                objective_profile=request.applied_objective,
             )
 
         independent_violations = validate_plan(
@@ -368,12 +400,17 @@ class ScenarioService:
     ) -> PlanListResponse:
         if scenario_version is not None:
             self.repository.get_scenario(scenario_id, version=scenario_version)
-        storage_algorithm = _ALGORITHM_STORAGE_NAMES[algorithm] if algorithm else None
         plans = self.repository.list_plans(
             scenario_id,
             scenario_version=scenario_version,
-            algorithm=storage_algorithm,
+            algorithm=(
+                _ALGORITHM_STORAGE_NAMES[PlanAlgorithm.FIFO]
+                if algorithm is PlanAlgorithm.FIFO
+                else None
+            ),
         )
+        if algorithm is PlanAlgorithm.CP_SAT:
+            plans = tuple(plan for plan in plans if plan.algorithm.startswith("cp_sat_"))
         items = [self._build_plan_summary(plan) for plan in plans]
         return PlanListResponse(items=items, total=len(items))
 
@@ -433,6 +470,7 @@ class ScenarioService:
             scenario_id=plan.scenario_id,
             scenario_version=plan.scenario_version,
             algorithm=_plan_algorithm(plan),
+            objective_profile=plan.objective_profile,
             display_name=guidance.display_name,
             status=plan.status,
             status_label=guidance.status_label,

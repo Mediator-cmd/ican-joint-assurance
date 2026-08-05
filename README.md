@@ -18,8 +18,8 @@
 
 ## 当前状态
 
-- 阶段：M5 AI 事件理解与结果解释（M5-0 辅助契约已完成）。
-- 下一单元：M5-1 确定性中文事件解析与无模型追问回退。
+- 阶段：M5 AI 事件理解与结果解释（M5-0 至 M5-3 已完成）。
+- 下一单元：M5-4 权威方案事实与可追溯解释。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
@@ -43,6 +43,9 @@
 - M5 AI 辅助实施计划：[docs/m5-ai-assistance-plan.md](docs/m5-ai-assistance-plan.md)
 - M5-0 AI 辅助契约：[docs/m5-ai-contract.md](docs/m5-ai-contract.md)
 - M5-0 契约审查：[docs/m5-00-review.md](docs/m5-00-review.md)
+- M5-1 规则解析审查：[docs/m5-01-review.md](docs/m5-01-review.md)
+- M5-2 模型回退审查：[docs/m5-02-review.md](docs/m5-02-review.md)
+- M5-3 人工提交与目标配置审查：[docs/m5-03-review.md](docs/m5-03-review.md)
 
 ## 目录结构
 
@@ -86,7 +89,9 @@ scripts/                # 场景校验、数据生成和发布辅助脚本
 
 当前合成场景包含 08:00 至 08:52 的 6 条固定、一次性扰动以及 10 项匿名保障任务。每条事件到时由后端原子应用并生成独立滚动候选，场景在 09:30 正常完成，不循环播放、不随机制造业务变化。方案页直接展示后端当前/候选计划的中文算法、任务、资源、服务时段、路线、指标、人工协调原因和真实差异；方案 ID 仅作为次级审计信息，全部板块按内容自然展开且不使用内部滚动。
 
-M5-2 已提供可替换的 OpenAI-compatible 结构化输出适配器。`POST /api/v1/assistant/event-drafts` 在 `auto` 模式且进程环境完整配置 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 时先尝试模型；未配置、超时、提供方错误或输出未通过结构、原文证据、权威实体与时间核对时，自动回退 M5-1 确定性规则。`deterministic_only` 始终零外部调用。接口仍不应用事件、不写审计、不修改场景或运行状态，草稿必须在后续人工复核后才能进入现有版本保护链。
+M5-2 已提供可替换的 OpenAI-compatible 结构化输出适配器。`POST /api/v1/assistant/event-drafts` 在 `auto` 模式且进程环境完整配置 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 时先尝试模型；未配置、超时、提供方错误或输出未通过结构、原文证据、权威实体与时间核对时，自动回退 M5-1 确定性规则。`deterministic_only` 始终零外部调用。草稿生成本身不写状态；只有用户通过 `POST /api/v1/assistant/event-drafts/submit` 回传完整草稿并显式确认事件后，才会进入原有 version/revision 保护链。运行事件还必须人工确认四选一的有限调度目标，生成的候选仍需人工采用或保留。
+
+M5-3 的确定性目标只允许 `balanced`、`critical_first`、`minimum_wait` 和 `minimum_change`。旧 CP-SAT 请求未显式选择目标时继续精确使用原 `balanced` 行为；`minimum_change` 只用于已有当前方案的运行滚动规划。所有目标仍由 CP-SAT 求解并经过独立硬约束复核，模型不能提供任意权重、自由排班或自动采用候选。
 
 前端不自行推进时钟、推导业务状态或运行规划器。SSE 连续失败后，每 2 秒读取一次 REST 权威快照，流恢复后停止轮询；所有修改命令携带当前 revision，冲突时只刷新最新状态，不自动重放旧命令。只有运行 API 不可用时才显示原有三套静态快照，并明确标为“离线只读，时间不会推进”，所有运行控制禁用。
 
@@ -128,7 +133,7 @@ python -m venv .venv
 - 场景 API 支持结构化导入、可规划摘要、数据缺口提示、分页和当前/历史版本查询。
 - 事件与计划 API 支持版本化结构事件应用、FIFO/CP-SAT 计划创建、不可变计划查询，以及普通语言结果摘要和人工确认提示。
 - 运行 API 支持事件到时自动暂停、同刻事件批处理、滚动候选生成，以及使用 revision 和候选 ID 保护的采用/拒绝；`/stream` 提供共享 sequence、类型化消息、断线补发和完整快照回退，普通 GET 快照可作为短轮询入口。
-- 辅助 API 支持确定性规则和可选 OpenAI-compatible 模型抽取；模型只接收当前文本、参考时间窗、匿名航班和登机口最小事实，密钥只从进程环境读取，响应公开安全来源与回退原因，任何路径都不自动应用草稿。
+- 辅助 API 支持确定性规则和可选 OpenAI-compatible 模型抽取；模型只接收当前文本、参考时间窗、匿名航班和登机口最小事实，密钥只从进程环境读取，响应公开安全来源与回退原因。草稿只能在用户明确确认事件和运行目标后提交，不能由模型自动提交。
 - Swagger 中的完整操作顺序、请求体、重复提交处理和 PowerShell 示例见 [docs/m3-openapi-guide.md](docs/m3-openapi-guide.md)。
 - M3 阶段能力、验证证据和已知边界见 [docs/m3-review.md](docs/m3-review.md)。
 
@@ -140,7 +145,7 @@ npm install
 npm run dev
 ```
 
-浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `184 passed`，前端回归基线为 `19 passed`，并应同时通过 `npm run typecheck` 和 `npm run build`。
+浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `196 passed`，前端回归基线为 `19 passed`，并应同时通过 `npm run typecheck` 和 `npm run build`。
 
 ## Git 工作流
 

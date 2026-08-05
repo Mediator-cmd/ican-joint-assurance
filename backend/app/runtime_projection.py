@@ -16,6 +16,7 @@ from .models import (
     Scenario,
 )
 from .planning_models import Assignment, Plan
+from .planning_objectives import PlanningObjectiveProfile
 from .runtime_models import (
     EventRuntimeProjection,
     FlightRuntimeProjection,
@@ -34,6 +35,7 @@ class RuntimeProjectionSource(ModelBase):
 
     scenario: Scenario
     plan: Plan
+    objective_profile: PlanningObjectiveProfile = PlanningObjectiveProfile.BALANCED
     event_catalog: list[FlightEvent] = Field(default_factory=list)
     applied_event_versions: dict[str, int] = Field(default_factory=dict)
     initial_scenario: Scenario | None = None

@@ -16,6 +16,7 @@ from .planning_models import (
     UnassignedReason,
     UnassignedTask,
 )
+from .planning_objectives import PlanningObjectiveProfile, cp_sat_algorithm_name
 from .travel import RouteNotFoundError, shortest_travel_minutes
 
 
@@ -31,6 +32,26 @@ def _solve(model: cp_model.CpModel, solver: cp_model.CpSolver) -> None:
     status = solver.Solve(model)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         raise OptimizationError(f"CP-SAT returned status {solver.StatusName(status)}")
+
+
+def _maximize_and_lock(
+    model: cp_model.CpModel,
+    solver: cp_model.CpSolver,
+    expression: cp_model.LinearExpr | int,
+) -> None:
+    model.Maximize(expression)
+    _solve(model, solver)
+    model.Add(expression == int(solver.Value(expression)))
+
+
+def _minimize_and_lock(
+    model: cp_model.CpModel,
+    solver: cp_model.CpSolver,
+    expression: cp_model.LinearExpr | int,
+) -> None:
+    model.Minimize(expression)
+    _solve(model, solver)
+    model.Add(expression == int(solver.Value(expression)))
 
 
 def _unassigned_detail(scenario: Scenario, task: ServiceTask) -> UnassignedTask:
@@ -86,8 +107,19 @@ def _unassigned_detail(scenario: Scenario, task: ServiceTask) -> UnassignedTask:
     )
 
 
-def build_optimized_plan(scenario: Scenario, max_time_seconds: float = 5.0) -> Plan:
+def build_optimized_plan(
+    scenario: Scenario,
+    max_time_seconds: float = 5.0,
+    objective_profile: PlanningObjectiveProfile = PlanningObjectiveProfile.BALANCED,
+    baseline_plan: Plan | None = None,
+) -> Plan:
     """Build a lexicographic CP-SAT plan and validate it independently."""
+
+    if objective_profile is PlanningObjectiveProfile.MINIMUM_CHANGE:
+        if baseline_plan is None:
+            raise ValueError("minimum_change requires a baseline plan")
+        if baseline_plan.scenario_id != scenario.scenario_id:
+            raise ValueError("minimum_change baseline must belong to the scenario")
 
     model = cp_model.CpModel()
     horizon = _minute(scenario, scenario.window_end)
@@ -212,31 +244,69 @@ def build_optimized_plan(scenario: Scenario, max_time_seconds: float = 5.0) -> P
     solver.parameters.num_search_workers = 1
     solver.parameters.random_seed = 0
 
-    critical_vars = [assigned[task.task_id] for task in scenario.tasks if task.priority == 1]
-    if critical_vars:
-        critical_count = sum(critical_vars)
-        model.Maximize(critical_count)
-        _solve(model, solver)
-        model.Add(critical_count == int(solver.Value(critical_count)))
-
+    critical_count = sum(
+        assigned[task.task_id] for task in scenario.tasks if task.priority == 1
+    )
     total_count = sum(assigned.values())
-    model.Maximize(total_count)
-    _solve(model, solver)
-    model.Add(total_count == int(solver.Value(total_count)))
-
     priority_score = sum(
         assigned[task.task_id] * (6 - task.priority) for task in scenario.tasks
     )
-    model.Maximize(priority_score)
-    _solve(model, solver)
-    model.Add(priority_score == int(solver.Value(priority_score)))
-
-    model.Minimize(
+    total_wait = sum(waits.values())
+    movement_and_tie_break_cost = (
         sum(waits.values()) * 1000
         + sum(transition_costs) * 10
         + sum(resource_rank_costs)
     )
-    _solve(model, solver)
+    critical_vars_present = any(task.priority == 1 for task in scenario.tasks)
+
+    if objective_profile is PlanningObjectiveProfile.BALANCED:
+        if critical_vars_present:
+            _maximize_and_lock(model, solver, critical_count)
+        _maximize_and_lock(model, solver, total_count)
+        _maximize_and_lock(model, solver, priority_score)
+        model.Minimize(movement_and_tie_break_cost)
+        _solve(model, solver)
+    elif objective_profile is PlanningObjectiveProfile.CRITICAL_FIRST:
+        if critical_vars_present:
+            _maximize_and_lock(model, solver, critical_count)
+        _maximize_and_lock(model, solver, priority_score)
+        _maximize_and_lock(model, solver, total_count)
+        model.Minimize(movement_and_tie_break_cost)
+        _solve(model, solver)
+    elif objective_profile is PlanningObjectiveProfile.MINIMUM_WAIT:
+        if critical_vars_present:
+            _maximize_and_lock(model, solver, critical_count)
+        _maximize_and_lock(model, solver, total_count)
+        _minimize_and_lock(model, solver, total_wait)
+        _maximize_and_lock(model, solver, priority_score)
+        model.Minimize(
+            sum(transition_costs) * 10 + sum(resource_rank_costs)
+        )
+        _solve(model, solver)
+    else:
+        assert baseline_plan is not None
+        baseline_assignments = {
+            assignment.task_id: assignment for assignment in baseline_plan.assignments
+        }
+        change_terms: list[cp_model.LinearExpr | int] = []
+        for task in scenario.tasks:
+            baseline_assignment = baseline_assignments.get(task.task_id)
+            if baseline_assignment is None:
+                change_terms.append(assigned[task.task_id])
+                continue
+            baseline_key = (task.task_id, baseline_assignment.resource_id)
+            if baseline_key in use_resource:
+                change_terms.append(1 - use_resource[baseline_key])
+            else:
+                change_terms.append(1)
+        change_count = sum(change_terms)
+        if critical_vars_present:
+            _maximize_and_lock(model, solver, critical_count)
+        _maximize_and_lock(model, solver, total_count)
+        _minimize_and_lock(model, solver, change_count)
+        _maximize_and_lock(model, solver, priority_score)
+        model.Minimize(movement_and_tie_break_cost)
+        _solve(model, solver)
 
     assigned_by_resource: dict[str, list[ServiceTask]] = {
         resource_id: [] for resource_id in resource_by_id
@@ -304,11 +374,20 @@ def build_optimized_plan(scenario: Scenario, max_time_seconds: float = 5.0) -> P
     else:
         status = PlanStatus.EXECUTABLE
 
+    profile_suffix = (
+        ""
+        if objective_profile is PlanningObjectiveProfile.BALANCED
+        else f"-{objective_profile.value.upper().replace('_', '-')}"
+    )
     return Plan(
-        plan_id=f"PLAN-{scenario.scenario_id.removeprefix('SCN-')}-V{scenario.version}-CP-SAT",
+        plan_id=(
+            f"PLAN-{scenario.scenario_id.removeprefix('SCN-')}-V{scenario.version}"
+            f"-CP-SAT{profile_suffix}"
+        ),
         scenario_id=scenario.scenario_id,
         scenario_version=scenario.version,
-        algorithm="cp_sat_priority_v1",
+        algorithm=cp_sat_algorithm_name(objective_profile),
+        objective_profile=objective_profile,
         generated_at=scenario.window_start,
         status=status,
         assignments=assignments,

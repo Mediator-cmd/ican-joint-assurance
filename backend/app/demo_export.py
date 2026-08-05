@@ -9,6 +9,7 @@ from .events import apply_events
 from .fifo_scheduler import build_fifo_plan
 from .models import FlightEvent, FlightEventType, Scenario
 from .optimizer import build_optimized_plan
+from .planning_models import Plan
 from .scenario_loader import load_scenario
 
 
@@ -95,6 +96,14 @@ def _scenario_changes(baseline: Scenario, updated: Scenario) -> list[dict[str, A
     return changes
 
 
+def _legacy_plan_view(plan: Plan) -> dict[str, Any]:
+    """Keep the M2/M3 offline demo payload stable as the live plan model evolves."""
+
+    payload = plan.model_dump(mode="json")
+    payload.pop("objective_profile", None)
+    return payload
+
+
 def build_demo_payload(baseline: Scenario) -> dict[str, Any]:
     updated = apply_events(baseline)
     baseline_plan = build_fifo_plan(baseline)
@@ -114,17 +123,17 @@ def build_demo_payload(baseline: Scenario) -> dict[str, Any]:
             "baseline": {
                 "label": "扰动前 FIFO 基线",
                 "scenario": baseline.model_dump(mode="json"),
-                "plan": baseline_plan.model_dump(mode="json"),
+                "plan": _legacy_plan_view(baseline_plan),
             },
             "after_events_fifo": {
                 "label": "事件后 FIFO 重规划",
                 "scenario": updated.model_dump(mode="json"),
-                "plan": updated_fifo_plan.model_dump(mode="json"),
+                "plan": _legacy_plan_view(updated_fifo_plan),
             },
             "optimized": {
                 "label": "事件后 CP-SAT 优化",
                 "scenario": updated.model_dump(mode="json"),
-                "plan": optimized_plan.model_dump(mode="json"),
+                "plan": _legacy_plan_view(optimized_plan),
             },
         },
     }

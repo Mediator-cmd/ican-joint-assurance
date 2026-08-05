@@ -10,6 +10,7 @@ from pydantic import Field, field_validator, model_validator
 
 from .demo_export import SAFETY_NOTICE
 from .models import FlightEvent, FlightEventType, ModelBase
+from .planning_objectives import PlanningObjectiveProfile
 
 
 ShortMessage = Annotated[str, Field(min_length=1, max_length=320)]
@@ -174,13 +175,6 @@ class ClarificationQuestion(ModelBase):
         return value
 
 
-class PlanningObjectiveProfile(str, Enum):
-    BALANCED = "balanced"
-    CRITICAL_FIRST = "critical_first"
-    MINIMUM_WAIT = "minimum_wait"
-    MINIMUM_CHANGE = "minimum_change"
-
-
 class ObjectiveRecommendation(ModelBase):
     profile: PlanningObjectiveProfile
     display_name: str = Field(min_length=1, max_length=80)
@@ -272,6 +266,30 @@ class EventDraftResponse(ModelBase):
         for field, expected_value in expected.items():
             if evidence_by_field[field].normalized_value != expected_value:
                 raise ValueError("event evidence must match the normalized event")
+
+
+class EventDraftSubmissionRequest(ModelBase):
+    scope: Literal["scenario", "runtime"]
+    draft: EventDraftResponse
+    confirm_event: Literal[True]
+    objective_profile: PlanningObjectiveProfile | None = None
+    confirm_objective: bool = False
+
+    @model_validator(mode="after")
+    def validate_review_submission(self) -> EventDraftSubmissionRequest:
+        if self.draft.status is not EventDraftStatus.READY_FOR_REVIEW:
+            raise ValueError("only a reviewable event draft can be submitted")
+        if self.draft.event is None:
+            raise ValueError("a submitted event draft requires an event")
+        is_runtime = self.draft.basis.runtime_session_id is not None
+        if (self.scope == "runtime") != is_runtime:
+            raise ValueError("submission scope must match the draft basis")
+        if self.scope == "scenario":
+            if self.objective_profile is not None or self.confirm_objective:
+                raise ValueError("scenario event submission does not run a planner")
+        elif self.objective_profile is None or not self.confirm_objective:
+            raise ValueError("runtime event submission requires a confirmed objective")
+        return self
 
 
 class ExplanationFocus(str, Enum):

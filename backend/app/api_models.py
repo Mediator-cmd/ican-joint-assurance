@@ -9,6 +9,7 @@ from pydantic import Field, model_validator
 
 from .models import DataClassification, FlightEvent, ModelBase, RunMode, Scenario
 from .planning_models import Plan, PlanStatus
+from .planning_objectives import PlanningObjectiveProfile
 
 
 class HealthResponse(ModelBase):
@@ -104,6 +105,24 @@ class CreatePlanRequest(ModelBase):
     expected_version: int = Field(ge=1)
     algorithm: PlanAlgorithm
     max_time_seconds: float = Field(default=5.0, gt=0, le=30)
+    objective_profile: PlanningObjectiveProfile | None = None
+    confirm_objective: bool = False
+
+    @model_validator(mode="after")
+    def validate_objective_confirmation(self) -> CreatePlanRequest:
+        if self.algorithm is PlanAlgorithm.FIFO:
+            if self.objective_profile is not None or self.confirm_objective:
+                raise ValueError("FIFO does not accept an optimization objective")
+            return self
+        if self.objective_profile is None and self.confirm_objective:
+            raise ValueError("objective confirmation requires an explicit profile")
+        if self.objective_profile is not None and not self.confirm_objective:
+            raise ValueError("an explicit planning objective requires confirmation")
+        return self
+
+    @property
+    def applied_objective(self) -> PlanningObjectiveProfile:
+        return self.objective_profile or PlanningObjectiveProfile.BALANCED
 
 
 class PlanGuidance(ModelBase):
@@ -128,6 +147,7 @@ class PlanSummary(ModelBase):
     scenario_id: str = Field(min_length=1)
     scenario_version: int = Field(ge=1)
     algorithm: PlanAlgorithm
+    objective_profile: PlanningObjectiveProfile
     display_name: str = Field(min_length=1)
     status: PlanStatus
     status_label: str = Field(min_length=1)

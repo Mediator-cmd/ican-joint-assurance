@@ -11,6 +11,7 @@ from pydantic import Field, computed_field, field_validator, model_validator
 from .demo_export import SAFETY_NOTICE
 from .models import FlightEventType, FlightStatus, ModelBase
 from .planning_models import Plan
+from .planning_objectives import PlanningObjectiveProfile
 
 
 SESSION_ID_PATTERN = r"^RUN-[A-Z0-9-]+$"
@@ -348,6 +349,7 @@ class RuntimeSessionSnapshot(ModelBase):
     candidate_plan_id: str | None = Field(default=None, min_length=1)
     active_plan_detail: Plan | None = None
     candidate_plan_detail: Plan | None = None
+    objective_profile: PlanningObjectiveProfile = PlanningObjectiveProfile.BALANCED
     status: RuntimeStatus
     revision: int = Field(ge=1)
     clock: RuntimeClockSnapshot
@@ -477,6 +479,16 @@ class ResetRuntimeSessionRequest(RuntimeRevisionRequest):
 
 class ReplanRuntimeSessionRequest(RuntimeRevisionRequest):
     reason: str | None = Field(default=None, max_length=240)
+    objective_profile: PlanningObjectiveProfile | None = None
+    confirm_objective: bool = False
+
+    @model_validator(mode="after")
+    def validate_objective_confirmation(self) -> ReplanRuntimeSessionRequest:
+        if self.objective_profile is None and self.confirm_objective:
+            raise ValueError("objective confirmation requires an explicit profile")
+        if self.objective_profile is not None and not self.confirm_objective:
+            raise ValueError("an explicit planning objective requires confirmation")
+        return self
 
 
 class CandidateDecisionRequest(RuntimeRevisionRequest):

@@ -19,7 +19,7 @@ M5-0 只交付契约模型、测试和阶段计划，不公开 AI 路由、不�
 
 ## 3. 事件草稿请求
 
-计划路径：`POST /api/v1/assistant/event-drafts`。M5-0 不提前实现或公开该路由。
+当前路径：`POST /api/v1/assistant/event-drafts`。M5-0 冻结契约时未提前公开该路由，M5-1 已按本契约实现。
 
 `EventDraftRequest.context` 是判别联合：
 
@@ -67,7 +67,7 @@ M5 首轮事件字段限定为：事件类型、航班 ID、发生时间、延�
 - `minimum_wait`：在安全覆盖前提下降低等待。
 - `minimum_change`：滚动阶段优先减少未来任务变化。
 
-`ObjectiveRecommendation` 只表达建议、理由和有限原文依据，固定要求人工确认且尚未应用。M5-3 在确定性优化器实现并测试相应配置前，不得把除 `balanced` 外的建议描述成已经改变排班。
+`ObjectiveRecommendation` 只表达建议、理由和有限原文依据，固定要求人工确认且尚未应用。M5-3 已在确定性优化器实现四种有限配置：显式目标必须确认后才能进入规划器；旧请求仍默认 `balanced`；`minimum_change` 只适用于有当前方案基线的运行滚动规划。建议本身仍不能描述成已经改变排班。
 
 ## 7. 方案解释请求与响应
 
@@ -92,6 +92,10 @@ M5-1 起继续使用统一 `ApiErrorResponse`，计划错误码如下：
 | `409` | `assistant_version_conflict` | 场景版本已变化 |
 | `409` | `assistant_revision_conflict` | 运行 revision 已变化 |
 | `409` | `assistant_plan_context_mismatch` | 方案不属于指定场景/会话 |
+| `400` | `planning_objective_not_supported` | 静态场景请求使用仅限滚动规划的最小变更目标 |
+| `409` | `runtime_event_already_registered` | 运行事件 ID 已存在 |
+| `409` | `runtime_event_time_conflict` | 事件时间早于权威仿真时间 |
+| `400` | `runtime_event_not_applicable` | 事件实体与当前运行场景不一致 |
 | `422` | `validation_error` | 请求或生成结果不符合契约 |
 
 不能理解的自然语言通常返回 200 的 `needs_clarification` 或 `unsupported`，不是 500。模型未配置或失败也不直接返回 5xx；服务应回退规则，并在 trace 中说明安全原因。
@@ -109,3 +113,15 @@ M5-1 起继续使用统一 `ApiErrorResponse`，计划错误码如下：
 - [x] 完整教学仿真安全声明固定在草稿与解释响应中。
 
 满足以上条件后进入 M5-1。若实现发现契约缺陷，必须先更新本文件、`ai_models.py` 和契约测试并记录原因。
+
+## 10. M5-3 已实现的提交契约
+
+`POST /api/v1/assistant/event-drafts/submit` 接收完整 `EventDraftSubmissionRequest`：
+
+- `draft` 必须仍是 `ready_for_review`，包含完整事件和一致字段依据；`confirm_event` 只能为字面量 `true`。
+- `scope=scenario` 时，草稿 basis 的场景版本就是 `expected_version`，提交复用既有版本化事件应用服务，不接受规划目标字段。
+- `scope=runtime` 时，草稿 basis 必须匹配当前 session、revision、场景和版本；还必须提交四选一 `objective_profile` 与 `confirm_objective=true`。
+- 运行提交只允许 `ready` 或 `paused`。事件不得早于权威仿真时间，也不得引用场景外实体；当前时刻事件直接进入原事件边界与重规划链，未来事件只登记并等待权威时钟触发。
+- 任何候选仍保持 `awaiting_confirmation`，活动方案不会被静默替换。服务不保存原始自然语言、内部提示词或第二份草稿状态。
+
+四种目标均由确定性 CP-SAT 实现并独立调用 `validate_plan`。`Plan`、运行投影和运行快照公开有限 `objective_profile`；旧计划和旧 SQLite 投影缺字段时默认 `balanced`。详细证据见 [m5-03-review.md](m5-03-review.md)。

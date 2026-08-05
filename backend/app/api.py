@@ -11,7 +11,11 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
-from .ai_models import EventDraftRequest, EventDraftResponse
+from .ai_models import (
+    EventDraftRequest,
+    EventDraftResponse,
+    EventDraftSubmissionRequest,
+)
 from .ai_services import (
     AssistantContextNotFoundError,
     AssistantRevisionConflictError,
@@ -68,6 +72,9 @@ from .runtime_repository import (
 )
 from .runtime_services import (
     RuntimeCandidateMismatchError,
+    RuntimeEventAlreadyRegisteredError,
+    RuntimeEventNotApplicableError,
+    RuntimeEventTimeConflictError,
     RuntimeInvalidTransitionError,
     RuntimePlanHasViolationsError,
     RuntimePlanNotFoundError,
@@ -78,7 +85,11 @@ from .runtime_services import (
 )
 from .runtime_planning import RuntimePlanningError
 from .runtime_stream import RuntimeStreamBroker, encode_sse_event
-from .services import ScenarioNotReadyForPlanningError, ScenarioService
+from .services import (
+    PlanningObjectiveNotSupportedError,
+    ScenarioNotReadyForPlanningError,
+    ScenarioService,
+)
 
 
 APP_VERSION = "0.1.0"
@@ -338,6 +349,19 @@ def _raise_domain_error(error: Exception) -> Never:
                 )
             ],
         ) from error
+    if isinstance(error, PlanningObjectiveNotSupportedError):
+        raise ApiError(
+            400,
+            "planning_objective_not_supported",
+            "该目标不适用于当前规划上下文；最小变更只用于有当前方案的滚动重规划",
+            [
+                ApiErrorDetail(
+                    location=["body", "objective_profile"],
+                    message="请选择均衡、关键任务优先或最小等待",
+                    type="unsupported_planning_objective",
+                )
+            ],
+        ) from error
     if isinstance(error, RuntimeSessionNotFoundError):
         raise ApiError(
             404,
@@ -451,6 +475,45 @@ def _raise_domain_error(error: Exception) -> Never:
                 )
             ],
         ) from error
+    if isinstance(error, RuntimeEventAlreadyRegisteredError):
+        raise ApiError(
+            409,
+            "runtime_event_already_registered",
+            "该事件已经登记到运行会话，不能重复提交",
+            [
+                ApiErrorDetail(
+                    location=["body", "draft", "event", "event_id"],
+                    message=f"事件 {error.event_id} 已存在",
+                    type="duplicate_runtime_event",
+                )
+            ],
+        ) from error
+    if isinstance(error, RuntimeEventTimeConflictError):
+        raise ApiError(
+            409,
+            "runtime_event_time_conflict",
+            "事件时间早于当前冻结的仿真时间，请刷新会话后重新生成草稿",
+            [
+                ApiErrorDetail(
+                    location=["body", "draft", "event", "occurred_at"],
+                    message="事件不能让权威仿真时钟回退",
+                    type="stale_runtime_event_time",
+                )
+            ],
+        ) from error
+    if isinstance(error, RuntimeEventNotApplicableError):
+        raise ApiError(
+            400,
+            "runtime_event_not_applicable",
+            "复核事件与当前运行场景不一致，请重新生成草稿",
+            [
+                ApiErrorDetail(
+                    location=["body", "draft", "event"],
+                    message="航班、登机口或时间不属于当前运行事实",
+                    type="invalid_runtime_event",
+                )
+            ],
+        ) from error
     if isinstance(error, RuntimeScenarioClassificationError):
         raise ApiError(
             400,
@@ -497,6 +560,38 @@ def create_event_draft(
         AssistantVersionConflictError,
         AssistantRevisionConflictError,
         RuntimePersistenceError,
+    ) as error:
+        _raise_domain_error(error)
+
+
+@router.post(
+    "/assistant/event-drafts/submit",
+    response_model=ScenarioRecord | RuntimeSessionSnapshot,
+    tags=["assistant"],
+    summary="人工确认后把事件草稿提交到权威事件链",
+)
+def submit_event_draft(
+    payload: EventDraftSubmissionRequest,
+    service: Annotated[EventAssistantService, Depends(get_event_assistant_service)],
+) -> ScenarioRecord | RuntimeSessionSnapshot:
+    try:
+        return service.submit_event_draft(payload)
+    except (
+        AssistantContextNotFoundError,
+        AssistantVersionConflictError,
+        AssistantRevisionConflictError,
+        VersionConflictError,
+        EventAlreadyAppliedError,
+        EventAlreadyRegisteredError,
+        InvalidRevisionError,
+        RuntimeSessionNotFoundError,
+        RuntimeRevisionConflictError,
+        RuntimeInvalidTransitionError,
+        RuntimeEventAlreadyRegisteredError,
+        RuntimeEventTimeConflictError,
+        RuntimeEventNotApplicableError,
+        RuntimePersistenceError,
+        RuntimePlanningError,
     ) as error:
         _raise_domain_error(error)
 
@@ -894,6 +989,7 @@ def create_plan(
         VersionConflictError,
         PlanAlreadyExistsError,
         ScenarioNotReadyForPlanningError,
+        PlanningObjectiveNotSupportedError,
     ) as error:
         _raise_domain_error(error)
 

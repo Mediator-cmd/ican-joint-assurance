@@ -13,6 +13,7 @@ from .audit_models import AuditAction
 from .constraints import validate_plan
 from .models import DataClassification, FlightEvent, Scenario
 from .planning_models import Plan
+from .planning_objectives import PlanningObjectiveProfile
 from .optimizer import OptimizationError
 from .repository import InMemoryScenarioRepository, PlanNotFoundError, RepositoryError
 from .runtime_models import (
@@ -45,7 +46,9 @@ from .runtime_planning import (
     reset_runtime_source,
     source_after_candidate_decision,
     source_after_replan_failure,
+    source_with_objective,
     source_with_candidate,
+    source_with_registered_event,
 )
 
 
@@ -88,6 +91,23 @@ class RuntimeCandidateMismatchError(RuntimeServiceError):
         )
         self.submitted_candidate_id = submitted_candidate_id
         self.current_candidate_id = current_candidate_id
+
+
+class RuntimeEventAlreadyRegisteredError(RuntimeServiceError):
+    def __init__(self, event_id: str) -> None:
+        super().__init__(f"runtime event {event_id} is already registered")
+        self.event_id = event_id
+
+
+class RuntimeEventTimeConflictError(RuntimeServiceError):
+    def __init__(self, occurred_at: datetime, simulation_time: datetime) -> None:
+        super().__init__("runtime event occurred_at is before the frozen simulation time")
+        self.occurred_at = occurred_at
+        self.simulation_time = simulation_time
+
+
+class RuntimeEventNotApplicableError(RuntimeServiceError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -400,6 +420,15 @@ class RuntimeSessionService:
         self._require_status(record, "replan", {RuntimeStatus.PAUSED})
         if record.projection_source is None:
             raise RuntimePlanningError("runtime projection facts are unavailable")
+        objective_profile = (
+            request.objective_profile
+            if request.objective_profile is not None
+            else record.projection_source.objective_profile
+        )
+        objective_source = source_with_objective(
+            record.projection_source,
+            objective_profile,
+        )
         replanning = replace(
             record,
             status=RuntimeStatus.REPLANNING,
@@ -407,6 +436,7 @@ class RuntimeSessionService:
             candidate_plan_id=None,
             failure=None,
             updated_at=max(record.updated_at, self._now()),
+            projection_source=objective_source,
         )
         stored = self.runtime_repository.update_session(
             replanning,
@@ -419,6 +449,71 @@ class RuntimeSessionService:
             ),
         )
         return self._build_snapshot(self._finish_replan(stored))
+
+    def submit_reviewed_event(
+        self,
+        session_id: str,
+        *,
+        expected_revision: int,
+        event: FlightEvent,
+        objective_profile: PlanningObjectiveProfile,
+    ) -> RuntimeSessionSnapshot:
+        record = self._load_for_control(session_id, expected_revision)
+        self._require_status(
+            record,
+            "event_submit",
+            {RuntimeStatus.READY, RuntimeStatus.PAUSED},
+        )
+        source = record.projection_source
+        if source is None:
+            raise RuntimePlanningError("runtime projection facts are unavailable")
+        if event.event_id in {item.event_id for item in source.event_catalog}:
+            raise RuntimeEventAlreadyRegisteredError(event.event_id)
+        if event.occurred_at < record.simulation_time:
+            raise RuntimeEventTimeConflictError(
+                event.occurred_at,
+                record.simulation_time,
+            )
+        try:
+            registered_source = source_with_registered_event(
+                source,
+                event,
+                objective_profile,
+            )
+        except ValueError as error:
+            raise RuntimeEventNotApplicableError(
+                "reviewed event does not match the runtime scenario"
+            ) from error
+
+        if event.occurred_at == record.simulation_time:
+            batch = sorted(
+                (
+                    item
+                    for item in registered_source.event_catalog
+                    if item.event_id not in registered_source.applied_event_versions
+                    and item.occurred_at == event.occurred_at
+                ),
+                key=lambda item: item.event_id,
+            )
+            updated_record = replace(record, projection_source=registered_source)
+            return self._build_snapshot(
+                self._apply_event_boundary(updated_record, event.occurred_at, batch)
+            )
+
+        updated = replace(
+            record,
+            revision=record.revision + 1,
+            failure=None,
+            updated_at=max(record.updated_at, self._now()),
+            projection_source=registered_source,
+        )
+        stored = self.runtime_repository.update_session(
+            updated,
+            expected_revision=record.revision,
+            action="runtime_event_registered",
+            summary=f"人工复核事件 {event.event_id} 已登记并等待仿真时间触发",
+        )
+        return self._build_snapshot(stored)
 
     def accept_candidate(
         self,
@@ -556,7 +651,7 @@ class RuntimeSessionService:
         source = record.projection_source
         if source is None:
             raise RuntimePlanningError("runtime projection facts are unavailable")
-        projection = project_runtime_state(source, boundary, RuntimeStatus.RUNNING)
+        projection = project_runtime_state(source, boundary, record.status)
         frozen_task_ids = set(source.frozen_task_ids)
         frozen_task_ids.update(
             task.task_id
@@ -638,6 +733,7 @@ class RuntimeSessionService:
                 record.session_id,
                 record.revision,
                 5.0,
+                objective_profile=source.objective_profile,
             )
             independent_violations = validate_plan(
                 source.scenario,
@@ -786,6 +882,11 @@ class RuntimeSessionService:
                 if record.projection_source is not None
                 else None
             ),
+            objective_profile=(
+                record.projection_source.objective_profile
+                if record.projection_source is not None
+                else PlanningObjectiveProfile.BALANCED
+            ),
             status=record.status,
             revision=record.revision,
             clock=RuntimeClockSnapshot(
@@ -846,6 +947,7 @@ class RuntimeSessionService:
         return RuntimeProjectionSource(
             scenario=scenario,
             plan=plan,
+            objective_profile=plan.objective_profile,
             event_catalog=list(
                 self.scenario_repository.get_events(scenario.scenario_id)
             ),

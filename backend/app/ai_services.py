@@ -22,6 +22,7 @@ from .ai_models import (
     EventDraftBasis,
     EventDraftRequest,
     EventDraftResponse,
+    EventDraftSubmissionRequest,
     RequestedAssistanceMode,
     RuntimeEventDraftContext,
     ScenarioEventDraftContext,
@@ -33,9 +34,12 @@ from .ai_provider import (
     EventExtractionProvider,
 )
 from .models import Scenario
+from .api_models import ApplyEventsRequest, ScenarioRecord
 from .repository import InMemoryScenarioRepository, ScenarioNotFoundError
 from .runtime_repository import RuntimeSessionNotFoundError
 from .runtime_services import RuntimeSessionService
+from .runtime_models import RuntimeSessionSnapshot
+from .services import ScenarioService
 
 
 class AssistantServiceError(Exception):
@@ -145,6 +149,65 @@ class EventAssistantService:
             missing_fields=parsed.missing_fields,
             clarification_questions=parsed.clarification_questions,
             warnings=parsed.warnings,
+        )
+
+    def submit_event_draft(
+        self,
+        request: EventDraftSubmissionRequest,
+    ) -> ScenarioRecord | RuntimeSessionSnapshot:
+        event = request.draft.event
+        assert event is not None
+        basis = request.draft.basis
+        if request.scope == "scenario":
+            try:
+                state = self.scenario_repository.get_state_snapshot(basis.scenario_id)
+            except ScenarioNotFoundError as error:
+                raise AssistantContextNotFoundError(
+                    f"assistant scenario {basis.scenario_id} was not found"
+                ) from error
+            if state.current_version != basis.scenario_version:
+                raise AssistantVersionConflictError(
+                    basis.scenario_version,
+                    state.current_version,
+                )
+            return ScenarioService(self.scenario_repository).apply_events(
+                basis.scenario_id,
+                ApplyEventsRequest(
+                    expected_version=basis.scenario_version,
+                    events=[event],
+                ),
+            )
+
+        session_id = basis.runtime_session_id
+        expected_revision = basis.runtime_revision
+        objective_profile = request.objective_profile
+        assert session_id is not None
+        assert expected_revision is not None
+        assert objective_profile is not None
+        try:
+            snapshot = self.runtime_service.get_session(session_id)
+        except RuntimeSessionNotFoundError as error:
+            raise AssistantContextNotFoundError(
+                f"assistant runtime session {session_id} was not found"
+            ) from error
+        if snapshot.revision != expected_revision:
+            raise AssistantRevisionConflictError(
+                expected_revision,
+                snapshot.revision,
+            )
+        if (
+            snapshot.scenario_id != basis.scenario_id
+            or snapshot.current_scenario_version != basis.scenario_version
+        ):
+            raise AssistantRevisionConflictError(
+                expected_revision,
+                snapshot.revision,
+            )
+        return self.runtime_service.submit_reviewed_event(
+            session_id,
+            expected_revision=expected_revision,
+            event=event,
+            objective_profile=objective_profile,
         )
 
     @staticmethod

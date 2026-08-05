@@ -8,6 +8,7 @@ from enum import Enum
 from pydantic import Field, model_validator
 
 from .models import ModelBase, ResourceType
+from .planning_objectives import PlanningObjectiveProfile
 
 
 class PlanStatus(str, Enum):
@@ -113,6 +114,7 @@ class Plan(ModelBase):
     scenario_id: str = Field(min_length=1)
     scenario_version: int = Field(ge=1)
     algorithm: str = Field(min_length=1)
+    objective_profile: PlanningObjectiveProfile = PlanningObjectiveProfile.BALANCED
     generated_at: datetime
     status: PlanStatus
     assignments: list[Assignment] = Field(default_factory=list)
