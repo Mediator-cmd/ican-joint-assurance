@@ -13,6 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from .ai_provider import EventExtractionProvider, build_event_provider_from_environment
 from .ai_services import EventAssistantService
 from .api import APP_VERSION, router
 from .api_models import ApiErrorBody, ApiErrorDetail, ApiErrorResponse
@@ -189,6 +190,7 @@ def create_app(
     runtime_session_id_factory: Callable[[], str] | None = None,
     recover_runtime_sessions: bool = True,
     runtime_stream_broker: RuntimeStreamBroker | None = None,
+    event_provider: EventExtractionProvider | None = None,
 ) -> FastAPI:
     scenario_repository = repository or InMemoryScenarioRepository()
     if seed_demo:
@@ -226,6 +228,7 @@ def create_app(
     application.state.event_assistant_service = EventAssistantService(
         scenario_repository,
         runtime_service,
+        event_provider=event_provider,
     )
 
     @application.middleware("http")
@@ -240,4 +243,4 @@ def create_app(
     return application
 
 
-app = create_app()
+app = create_app(event_provider=build_event_provider_from_environment())

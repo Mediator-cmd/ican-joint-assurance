@@ -11,8 +11,10 @@ from .ai_event_parser import (
     AuthoritativeEventContext,
     AuthoritativeFlightRef,
     AuthoritativeGateRef,
+    ParsedEventDraft,
     parse_event_text,
 )
+from .ai_model_parser import parse_model_extraction
 from .ai_models import (
     AssistanceFallbackReason,
     AssistanceSource,
@@ -23,6 +25,12 @@ from .ai_models import (
     RequestedAssistanceMode,
     RuntimeEventDraftContext,
     ScenarioEventDraftContext,
+)
+from .ai_provider import (
+    AIProviderInvalidOutputError,
+    AIProviderRequestError,
+    AIProviderTimeoutError,
+    EventExtractionProvider,
 )
 from .models import Scenario
 from .repository import InMemoryScenarioRepository, ScenarioNotFoundError
@@ -72,11 +80,13 @@ class EventAssistantService:
         scenario_repository: InMemoryScenarioRepository,
         runtime_service: RuntimeSessionService,
         *,
+        event_provider: EventExtractionProvider | None = None,
         draft_id_factory: Callable[[], str] | None = None,
         event_id_factory: Callable[[], str] | None = None,
     ) -> None:
         self.scenario_repository = scenario_repository
         self.runtime_service = runtime_service
+        self._event_provider = event_provider
         self._draft_id_factory = draft_id_factory or (
             lambda: f"DRAFT-{uuid4().hex[:16].upper()}"
         )
@@ -86,30 +96,75 @@ class EventAssistantService:
 
     def create_event_draft(self, request: EventDraftRequest) -> EventDraftResponse:
         resolved = self._resolve_context(request.context)
-        parsed = parse_event_text(
-            request.text,
-            resolved.parser_context,
-            event_id=self._event_id_factory(),
-        )
-        fallback_reason = (
-            AssistanceFallbackReason.MODEL_NOT_CONFIGURED
-            if request.assistance_mode is RequestedAssistanceMode.AUTO
-            else None
-        )
+        event_id = self._event_id_factory()
+        if request.assistance_mode is RequestedAssistanceMode.DETERMINISTIC_ONLY:
+            parsed = self._parse_deterministically(request, resolved, event_id)
+            trace = AssistanceTrace(source=AssistanceSource.DETERMINISTIC_RULES)
+        elif self._event_provider is None:
+            parsed = self._parse_deterministically(request, resolved, event_id)
+            trace = AssistanceTrace(
+                source=AssistanceSource.DETERMINISTIC_RULES,
+                fallback_reason=AssistanceFallbackReason.MODEL_NOT_CONFIGURED,
+            )
+        else:
+            try:
+                extraction = self._event_provider.extract_event(
+                    request.text,
+                    resolved.parser_context,
+                )
+                parsed = parse_model_extraction(
+                    extraction,
+                    request.text,
+                    resolved.parser_context,
+                    event_id=event_id,
+                )
+            except AIProviderTimeoutError:
+                parsed = self._parse_deterministically(request, resolved, event_id)
+                trace = self._fallback_trace(AssistanceFallbackReason.MODEL_TIMEOUT)
+            except AIProviderRequestError:
+                parsed = self._parse_deterministically(request, resolved, event_id)
+                trace = self._fallback_trace(AssistanceFallbackReason.PROVIDER_ERROR)
+            except AIProviderInvalidOutputError:
+                parsed = self._parse_deterministically(request, resolved, event_id)
+                trace = self._fallback_trace(
+                    AssistanceFallbackReason.INVALID_MODEL_OUTPUT
+                )
+            else:
+                trace = AssistanceTrace(
+                    source=AssistanceSource.LANGUAGE_MODEL,
+                    provider_attempted=True,
+                    model_label=self._event_provider.model_label,
+                )
         return EventDraftResponse(
             draft_id=self._draft_id_factory(),
             basis=resolved.basis,
             status=parsed.status,
-            trace=AssistanceTrace(
-                source=AssistanceSource.DETERMINISTIC_RULES,
-                provider_attempted=False,
-                fallback_reason=fallback_reason,
-            ),
+            trace=trace,
             event=parsed.event,
             evidence=parsed.evidence,
             missing_fields=parsed.missing_fields,
             clarification_questions=parsed.clarification_questions,
             warnings=parsed.warnings,
+        )
+
+    @staticmethod
+    def _parse_deterministically(
+        request: EventDraftRequest,
+        resolved: _ResolvedEventContext,
+        event_id: str,
+    ) -> ParsedEventDraft:
+        return parse_event_text(
+            request.text,
+            resolved.parser_context,
+            event_id=event_id,
+        )
+
+    @staticmethod
+    def _fallback_trace(reason: AssistanceFallbackReason) -> AssistanceTrace:
+        return AssistanceTrace(
+            source=AssistanceSource.DETERMINISTIC_RULES,
+            provider_attempted=True,
+            fallback_reason=reason,
         )
 
     def _resolve_context(

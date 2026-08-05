@@ -365,6 +365,15 @@ def _extract_occurred_at(
     return _ExtractedTime(None, None, None)
 
 
+def extract_event_time(
+    text: str,
+    context: AuthoritativeEventContext,
+) -> _ExtractedTime:
+    """Resolve a quoted time expression using only authoritative context."""
+    normalized = unicodedata.normalize("NFKC", text).strip()
+    return _extract_occurred_at(normalized, context)
+
+
 def _invalid_time(quote: str) -> _ExtractedTime:
     return _ExtractedTime(
         None,
@@ -477,3 +486,57 @@ def _clarification_question(
         )
     raise ValueError(f"unsupported clarification field: {field.value}")
 
+
+def build_clarification_question(
+    field: EventDraftField,
+    context: AuthoritativeEventContext,
+    *,
+    current_gate_id: str | None,
+    reason: str | None,
+) -> ClarificationQuestion:
+    """Build the same exact clarification wording for rule and model paths."""
+    return _clarification_question(
+        field,
+        context,
+        current_gate_id=current_gate_id,
+        reason=reason,
+    )
+
+
+def find_referenced_flight_ids(
+    text: str,
+    context: AuthoritativeEventContext,
+) -> set[str]:
+    """Return every authoritative flight explicitly mentioned in the text."""
+    normalized = unicodedata.normalize("NFKC", text)
+    return {
+        flight.flight_id
+        for flight in context.flights
+        if any(
+            re.search(re.escape(alias), normalized, re.IGNORECASE) is not None
+            for alias in {flight.flight_id, flight.display_code}
+        )
+    }
+
+
+def find_referenced_gate_ids(
+    text: str,
+    context: AuthoritativeEventContext,
+) -> set[str]:
+    """Return every authoritative gate explicitly mentioned in the text."""
+    normalized = unicodedata.normalize("NFKC", text)
+    return {
+        mention.normalized_value
+        for mention in _find_gate_mentions(normalized, context)
+    }
+
+
+def detect_deterministic_event_types(text: str) -> set[FlightEventType]:
+    """Expose known intent signals so model output cannot reverse them."""
+    normalized = unicodedata.normalize("NFKC", text)
+    detected: set[FlightEventType] = set()
+    if _DELAY_PATTERN.search(normalized) is not None:
+        detected.add(FlightEventType.DELAY)
+    if _GATE_CHANGE_PATTERN.search(normalized) is not None:
+        detected.add(FlightEventType.GATE_CHANGE)
+    return detected
