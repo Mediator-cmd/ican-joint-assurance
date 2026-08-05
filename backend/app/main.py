@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Callable
 from uuid import uuid4
-from datetime import datetime
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from .ai_services import EventAssistantService
 from .api import APP_VERSION, router
 from .api_models import ApiErrorBody, ApiErrorDetail, ApiErrorResponse
 from .demo_export import DEMO_SCENARIO_PATH, SAFETY_NOTICE
@@ -39,7 +40,7 @@ OPENAPI_DESCRIPTION = f"""
 4. 在新版本生成 CP-SAT 系统优化建议；
 5. 比较两套已保存方案并查询审计记录。
 
-事件应用和计划创建受期望版本与重复提交检查保护；方案比较会校验两套方案均已保存、互不相同且属于请求场景。M4-4 运行会话、事件版本、冻结执行事实、当前方案和待确认候选保存在 SQLite；事件到时自动冻结仿真时间并生成经过独立硬约束复核的滚动候选，必须由用户明确采用或拒绝。运行变化可通过每会话共享的 SSE 流实时订阅，断线后按 `Last-Event-ID` 补发或回到完整快照。场景与普通 M3 方案仍沿用进程内仓库，五页前端实时控制将在后续单元接入。
+事件应用和计划创建受期望版本与重复提交检查保护；方案比较会校验两套方案均已保存、互不相同且属于请求场景。M4 运行会话、事件版本、冻结执行事实、当前方案和待确认候选保存在 SQLite；事件到时自动冻结仿真时间并生成经过独立硬约束复核的滚动候选，必须由用户明确采用或拒绝。运行变化可通过每会话共享的 SSE 流实时订阅，断线后按 `Last-Event-ID` 补发或回到完整快照。M5-1 辅助接口只用确定性规则把中文航班变化解析为待人工复核草稿，不应用事件、不修改运行状态。
 
 **安全边界：{SAFETY_NOTICE}**
 """.strip()
@@ -68,6 +69,10 @@ OPENAPI_TAGS = [
     {
         "name": "runtime",
         "description": "创建、找回并控制后端权威仿真会话，处理到时事件、滚动候选、人工确认和可恢复 SSE 推送。",
+    },
+    {
+        "name": "assistant",
+        "description": "生成绑定场景版本或运行修订的只读事件草稿、字段依据与缺失追问。",
     },
 ]
 
@@ -218,6 +223,10 @@ def create_app(
     application.state.runtime_repository = durable_runtime_repository
     application.state.runtime_service = runtime_service
     application.state.runtime_stream_broker = stream_broker
+    application.state.event_assistant_service = EventAssistantService(
+        scenario_repository,
+        runtime_service,
+    )
 
     @application.middleware("http")
     async def add_request_id(request: Request, call_next):

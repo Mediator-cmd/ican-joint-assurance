@@ -41,8 +41,10 @@ def test_openapi_document_contains_health_route() -> None:
         "plans",
         "audit",
         "runtime",
+        "assistant",
     }
     assert "/api/v1/health" in document["paths"]
+    assert "/api/v1/assistant/event-drafts" in document["paths"]
     assert (
         document["paths"]["/api/v1/health"]["get"]["summary"]
         == "检查业务 API 是否就绪"

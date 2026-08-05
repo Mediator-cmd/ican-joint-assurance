@@ -11,6 +11,13 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
+from .ai_models import EventDraftRequest, EventDraftResponse
+from .ai_services import (
+    AssistantContextNotFoundError,
+    AssistantRevisionConflictError,
+    AssistantVersionConflictError,
+    EventAssistantService,
+)
 from .api_models import (
     ApplyEventsRequest,
     ApiErrorDetail,
@@ -118,7 +125,56 @@ def get_runtime_stream_broker(request: Request) -> RuntimeStreamBroker:
     return request.app.state.runtime_stream_broker
 
 
+def get_event_assistant_service(request: Request) -> EventAssistantService:
+    return request.app.state.event_assistant_service
+
+
 def _raise_domain_error(error: Exception) -> Never:
+    if isinstance(error, AssistantContextNotFoundError):
+        raise ApiError(
+            404,
+            "assistant_context_not_found",
+            "未找到绑定的场景或运行会话，请刷新上下文后重试",
+            [
+                ApiErrorDetail(
+                    location=["body", "context"],
+                    message="辅助请求上下文不存在",
+                    type="missing_assistant_context",
+                )
+            ],
+        ) from error
+    if isinstance(error, AssistantVersionConflictError):
+        raise ApiError(
+            409,
+            "assistant_version_conflict",
+            "场景版本已变化，请刷新场景后重新生成事件草稿",
+            [
+                ApiErrorDetail(
+                    location=["body", "context", "expected_version"],
+                    message=(
+                        f"提交版本 {error.expected_version}，"
+                        f"当前版本 {error.current_version}"
+                    ),
+                    type="stale_assistant_scenario_version",
+                )
+            ],
+        ) from error
+    if isinstance(error, AssistantRevisionConflictError):
+        raise ApiError(
+            409,
+            "assistant_revision_conflict",
+            "运行状态已变化，请刷新权威快照后重新生成事件草稿",
+            [
+                ApiErrorDetail(
+                    location=["body", "context", "expected_revision"],
+                    message=(
+                        f"提交修订 {error.expected_revision}，"
+                        f"当前修订 {error.current_revision}"
+                    ),
+                    type="stale_assistant_runtime_revision",
+                )
+            ],
+        ) from error
     if isinstance(error, ScenarioAlreadyExistsError):
         raise ApiError(
             409,
@@ -422,6 +478,27 @@ def _raise_domain_error(error: Exception) -> Never:
             "运行状态暂时无法安全保存，请稍后重试并保留当前页面",
         ) from error
     raise error
+
+
+@router.post(
+    "/assistant/event-drafts",
+    response_model=EventDraftResponse,
+    tags=["assistant"],
+    summary="把中文航班变化解析为待人工复核的事件草稿",
+)
+def create_event_draft(
+    payload: EventDraftRequest,
+    service: Annotated[EventAssistantService, Depends(get_event_assistant_service)],
+) -> EventDraftResponse:
+    try:
+        return service.create_event_draft(payload)
+    except (
+        AssistantContextNotFoundError,
+        AssistantVersionConflictError,
+        AssistantRevisionConflictError,
+        RuntimePersistenceError,
+    ) as error:
+        _raise_domain_error(error)
 
 
 @router.post(
