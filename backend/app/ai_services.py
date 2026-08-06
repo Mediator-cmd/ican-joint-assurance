@@ -70,6 +70,12 @@ class AssistantRevisionConflictError(AssistantServiceError):
         self.current_revision = current_revision
 
 
+class AssistantPlanContextMismatchError(AssistantServiceError):
+    def __init__(self, plan_id: str) -> None:
+        super().__init__(f"assistant plan {plan_id} does not belong to the requested context")
+        self.plan_id = plan_id
+
+
 @dataclass(frozen=True, slots=True)
 class _ResolvedEventContext:
     basis: EventDraftBasis

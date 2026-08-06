@@ -82,6 +82,10 @@ M5 首轮事件字段限定为：事件类型、航班 ID、发生时间、延�
 
 解释可以包含摘要、取舍、下一步和未解决问题，但固定不能修改计划，并继续要求人工确认。
 
+M5-4 实现说明：场景解释从请求指定的不可变场景版本和已保存方案读取；运行解释由 `RuntimeSessionService.get_explanation_context(session_id, expected_revision)` 一次性取得 revision 绑定的 `RuntimeSessionSnapshot` 与 `RuntimeProjectionSource` 深拷贝。请求中的方案 ID 必须属于该 revision 的当前方案或候选方案，旧 revision 返回 `assistant_revision_conflict`。解释服务不直接访问 SQLite 或从仓库猜测运行场景版本。
+
+无 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 时，确定性规则直接返回完整解释。配置模型后，服务只发送有限事实和解释重点；模型响应必须通过结构校验且所有 `evidence_ids` 都属于后端白名单，否则回退规则解释。成功的模型响应也不会改变 `modifies_plan=false`、`requires_human_confirmation=true` 或安全声明。
+
 ## 8. 计划错误语义
 
 M5-1 起继续使用统一 `ApiErrorResponse`，计划错误码如下：
@@ -125,3 +129,12 @@ M5-1 起继续使用统一 `ApiErrorResponse`，计划错误码如下：
 - 任何候选仍保持 `awaiting_confirmation`，活动方案不会被静默替换。服务不保存原始自然语言、内部提示词或第二份草稿状态。
 
 四种目标均由确定性 CP-SAT 实现并独立调用 `validate_plan`。`Plan`、运行投影和运行快照公开有限 `objective_profile`；旧计划和旧 SQLite 投影缺字段时默认 `balanced`。详细证据见 [m5-03-review.md](m5-03-review.md)。
+
+## 11. M5-4 解释实现退出记录
+
+- [x] 场景与运行方案解释均绑定权威版本/revision。
+- [x] 运行当前方案、候选方案、旧版本当前方案和基线差异均有专项覆盖。
+- [x] 每条 claim 只允许引用后端生成且响应中存在的 `FACT-*` ID。
+- [x] 模型成功、超时、提供方错误、非法输出和未知事实引用均安全回退。
+- [x] 解释请求不增加 revision、不写审计、不应用事件、不改变方案。
+- [x] 无模型时完整可用，OpenAI-compatible 配置只通过服务端环境变量读取。

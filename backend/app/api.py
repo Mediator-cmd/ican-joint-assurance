@@ -15,9 +15,13 @@ from .ai_models import (
     EventDraftRequest,
     EventDraftResponse,
     EventDraftSubmissionRequest,
+    PlanExplanationRequest,
+    PlanExplanationResponse,
 )
+from .ai_explanation_services import PlanExplanationService
 from .ai_services import (
     AssistantContextNotFoundError,
+    AssistantPlanContextMismatchError,
     AssistantRevisionConflictError,
     AssistantVersionConflictError,
     EventAssistantService,
@@ -140,6 +144,10 @@ def get_event_assistant_service(request: Request) -> EventAssistantService:
     return request.app.state.event_assistant_service
 
 
+def get_plan_explanation_service(request: Request) -> PlanExplanationService:
+    return request.app.state.plan_explanation_service
+
+
 def _raise_domain_error(error: Exception) -> Never:
     if isinstance(error, AssistantContextNotFoundError):
         raise ApiError(
@@ -183,6 +191,19 @@ def _raise_domain_error(error: Exception) -> Never:
                         f"当前修订 {error.current_revision}"
                     ),
                     type="stale_assistant_runtime_revision",
+                )
+            ],
+        ) from error
+    if isinstance(error, AssistantPlanContextMismatchError):
+        raise ApiError(
+            409,
+            "assistant_plan_context_mismatch",
+            "请求的方案不属于当前解释上下文，请刷新方案后重试",
+            [
+                ApiErrorDetail(
+                    location=["body", "context", "plan_id"],
+                    message=f"方案 {error.plan_id} 不在指定场景版本或运行修订中",
+                    type="assistant_plan_context_mismatch",
                 )
             ],
         ) from error
@@ -590,6 +611,31 @@ def submit_event_draft(
         RuntimeEventAlreadyRegisteredError,
         RuntimeEventTimeConflictError,
         RuntimeEventNotApplicableError,
+        RuntimePersistenceError,
+        RuntimePlanningError,
+    ) as error:
+        _raise_domain_error(error)
+
+
+@router.post(
+    "/assistant/plan-explanations",
+    response_model=PlanExplanationResponse,
+    tags=["assistant"],
+    summary="基于权威方案事实生成带引用的只读解释",
+)
+def create_plan_explanation(
+    payload: PlanExplanationRequest,
+    service: Annotated[
+        PlanExplanationService,
+        Depends(get_plan_explanation_service),
+    ],
+) -> PlanExplanationResponse:
+    try:
+        return service.explain_plan(payload)
+    except (
+        AssistantContextNotFoundError,
+        AssistantRevisionConflictError,
+        AssistantPlanContextMismatchError,
         RuntimePersistenceError,
         RuntimePlanningError,
     ) as error:

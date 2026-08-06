@@ -268,6 +268,24 @@ class RuntimeSessionService:
         record = self.runtime_repository.get_session(session_id)
         return self._build_snapshot(self._materialize_runtime_boundary(record))
 
+    def get_explanation_context(
+        self,
+        session_id: str,
+        expected_revision: int,
+    ) -> tuple[RuntimeSessionSnapshot, RuntimeProjectionSource]:
+        """Return one revision-bound snapshot and its authoritative projection facts."""
+        record = self._materialize_runtime_boundary(
+            self.runtime_repository.get_session(session_id)
+        )
+        if record.revision != expected_revision:
+            raise RuntimeRevisionConflictError(expected_revision, record.revision)
+        record = self._hydrate_projection_source(record)
+        if record.projection_source is None:
+            raise RuntimePlanningError("runtime projection facts are unavailable")
+        snapshot = self._build_snapshot(record)
+        source = record.projection_source.model_copy(deep=True)
+        return snapshot, source
+
     def start_session(
         self,
         session_id: str,

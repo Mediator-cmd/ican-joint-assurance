@@ -13,6 +13,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from .ai_explanation_provider import (
+    PlanExplanationProvider,
+    build_plan_explanation_provider_from_environment,
+)
+from .ai_explanation_services import PlanExplanationService
 from .ai_provider import EventExtractionProvider, build_event_provider_from_environment
 from .ai_services import EventAssistantService
 from .api import APP_VERSION, router
@@ -41,7 +46,7 @@ OPENAPI_DESCRIPTION = f"""
 4. 在新版本生成 CP-SAT 系统优化建议；
 5. 比较两套已保存方案并查询审计记录。
 
-事件应用和计划创建受期望版本与重复提交检查保护；方案比较会校验两套方案均已保存、互不相同且属于请求场景。M4 运行会话、事件版本、冻结执行事实、当前方案和待确认候选保存在 SQLite；事件到时自动冻结仿真时间并生成经过独立硬约束复核的滚动候选，必须由用户明确采用或拒绝。运行变化可通过每会话共享的 SSE 流实时订阅，断线后按 `Last-Event-ID` 补发或回到完整快照。M5-1 辅助接口只用确定性规则把中文航班变化解析为待人工复核草稿，不应用事件、不修改运行状态。
+事件应用和计划创建受期望版本与重复提交检查保护；方案比较会校验两套方案均已保存、互不相同且属于请求场景。M4 运行会话、事件版本、冻结执行事实、当前方案和待确认候选保存在 SQLite；事件到时自动冻结仿真时间并生成经过独立硬约束复核的滚动候选，必须由用户明确采用或拒绝。运行变化可通过每会话共享的 SSE 流实时订阅，断线后按 `Last-Event-ID` 补发或回到完整快照。M5 辅助接口把匿名中文变化解析为待复核草稿，并基于权威方案事实生成带引用的只读解释；无模型配置时使用确定性规则，任何解释都不能修改方案或运行状态。
 
 **安全边界：{SAFETY_NOTICE}**
 """.strip()
@@ -73,7 +78,7 @@ OPENAPI_TAGS = [
     },
     {
         "name": "assistant",
-        "description": "生成绑定场景版本或运行修订的只读事件草稿、字段依据与缺失追问。",
+        "description": "生成绑定场景版本或运行修订的事件草稿、人工提交，以及引用权威事实的只读方案解释。",
     },
 ]
 
@@ -191,6 +196,7 @@ def create_app(
     recover_runtime_sessions: bool = True,
     runtime_stream_broker: RuntimeStreamBroker | None = None,
     event_provider: EventExtractionProvider | None = None,
+    plan_explanation_provider: PlanExplanationProvider | None = None,
 ) -> FastAPI:
     scenario_repository = repository or InMemoryScenarioRepository()
     if seed_demo:
@@ -230,6 +236,11 @@ def create_app(
         runtime_service,
         event_provider=event_provider,
     )
+    application.state.plan_explanation_service = PlanExplanationService(
+        scenario_repository,
+        runtime_service,
+        provider=plan_explanation_provider,
+    )
 
     @application.middleware("http")
     async def add_request_id(request: Request, call_next):
@@ -243,4 +254,7 @@ def create_app(
     return application
 
 
-app = create_app(event_provider=build_event_provider_from_environment())
+app = create_app(
+    event_provider=build_event_provider_from_environment(),
+    plan_explanation_provider=build_plan_explanation_provider_from_environment(),
+)

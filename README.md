@@ -18,8 +18,8 @@
 
 ## 当前状态
 
-- 阶段：M5 AI 事件理解与结果解释（M5-0 至 M5-3 已完成）。
-- 下一单元：M5-4 权威方案事实与可追溯解释。
+- 阶段：M5 AI 事件理解与结果解释（M5-0 至 M5-4 已完成）。
+- 下一单元：M5-5 前端辅助交互接入。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
@@ -46,6 +46,8 @@
 - M5-1 规则解析审查：[docs/m5-01-review.md](docs/m5-01-review.md)
 - M5-2 模型回退审查：[docs/m5-02-review.md](docs/m5-02-review.md)
 - M5-3 人工提交与目标配置审查：[docs/m5-03-review.md](docs/m5-03-review.md)
+- M5-4 方案事实与可追溯解释计划：[docs/m5-04-plan.md](docs/m5-04-plan.md)
+- M5-4 方案事实与可追溯解释审查：[docs/m5-04-review.md](docs/m5-04-review.md)
 
 ## 目录结构
 
@@ -92,6 +94,8 @@ scripts/                # 场景校验、数据生成和发布辅助脚本
 M5-2 已提供可替换的 OpenAI-compatible 结构化输出适配器。`POST /api/v1/assistant/event-drafts` 在 `auto` 模式且进程环境完整配置 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 时先尝试模型；未配置、超时、提供方错误或输出未通过结构、原文证据、权威实体与时间核对时，自动回退 M5-1 确定性规则。`deterministic_only` 始终零外部调用。草稿生成本身不写状态；只有用户通过 `POST /api/v1/assistant/event-drafts/submit` 回传完整草稿并显式确认事件后，才会进入原有 version/revision 保护链。运行事件还必须人工确认四选一的有限调度目标，生成的候选仍需人工采用或保留。
 
 M5-3 的确定性目标只允许 `balanced`、`critical_first`、`minimum_wait` 和 `minimum_change`。旧 CP-SAT 请求未显式选择目标时继续精确使用原 `balanced` 行为；`minimum_change` 只用于已有当前方案的运行滚动规划。所有目标仍由 CP-SAT 求解并经过独立硬约束复核，模型不能提供任意权重、自由排班或自动采用候选。
+
+M5-4 新增只读 `POST /api/v1/assistant/plan-explanations`。服务从场景版本或运行 revision 的后端权威事实生成确定性中文解释；摘要、取舍和建议下一步都带 `FACT-*` 来源。配置 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 后，OpenAI-compatible 模型只做表达增强，任何超时、错误或事实引用不合法都会回退规则解释。无 AI 配置时核心实时闭环和完整解释照常可用，密钥不会进入 GitHub、前端或响应。
 
 前端不自行推进时钟、推导业务状态或运行规划器。SSE 连续失败后，每 2 秒读取一次 REST 权威快照，流恢复后停止轮询；所有修改命令携带当前 revision，冲突时只刷新最新状态，不自动重放旧命令。只有运行 API 不可用时才显示原有三套静态快照，并明确标为“离线只读，时间不会推进”，所有运行控制禁用。
 
