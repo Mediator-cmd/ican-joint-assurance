@@ -1,13 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  createRuntimeEventDraft,
+  createRuntimePlanExplanation,
   DemoPayloadLoadError,
   findOrCreateRuntimeSession,
   loadDemoPayload,
   postRuntimeAction,
+  submitRuntimeEventDraft,
 } from "./api";
 import type { Fetcher } from "./api";
-import type { DemoPayload, RuntimeSessionSnapshot } from "./types";
+import type { DemoPayload, EventDraftResponse, RuntimeSessionSnapshot } from "./types";
 
 const demoPayload = {
   project: {},
@@ -50,6 +53,79 @@ const runtimeSnapshot = {
   flights: [],
   events: [],
 } as unknown as RuntimeSessionSnapshot;
+
+const eventDraft = {
+  draft_id: "DRAFT-0123456789ABCDEF",
+  basis: {
+    scenario_id: "SCN-DEMO",
+    scenario_version: 1,
+    reference_time: "2026-08-01T08:00:00+08:00",
+    runtime_session_id: "RUN-DEMO",
+    runtime_revision: 3,
+  },
+  status: "ready_for_review",
+  trace: {
+    source: "deterministic_rules",
+    provider_attempted: false,
+    model_label: null,
+    fallback_reason: "model_not_configured",
+  },
+  event: {
+    event_id: "EVT-NEW-DELAY",
+    event_type: "delay",
+    flight_id: "FL-SIM330",
+    occurred_at: "2026-08-01T08:25:00+08:00",
+    delay_minutes: 15,
+    previous_gate_id: null,
+    new_gate_id: null,
+    note: null,
+  },
+  evidence: [{
+    field: "flight_id",
+    normalized_value: "FL-SIM330",
+    origin: "user_text",
+    source_quote: "SIM330",
+  }],
+  missing_fields: [],
+  clarification_questions: [],
+  objective_recommendation: null,
+  warnings: [],
+  requires_human_confirmation: true,
+  applies_automatically: false,
+  safety_notice: "safe",
+} as EventDraftResponse;
+
+const planExplanation = {
+  explanation_id: "EXPL-0123456789ABCDEF",
+  context: {
+    scope: "runtime_plan",
+    session_id: "RUN-DEMO",
+    revision: 3,
+    plan_id: "PLAN-CANDIDATE",
+    baseline_plan_id: "PLAN-ACTIVE",
+  },
+  trace: {
+    source: "deterministic_rules",
+    provider_attempted: false,
+    model_label: null,
+    fallback_reason: null,
+  },
+  summary: { statement: "候选方案覆盖全部任务。", evidence_ids: ["FACT-METRIC-1"] },
+  tradeoffs: [],
+  recommended_next_step: { statement: "请人工复核后决定。", evidence_ids: ["FACT-METRIC-1"] },
+  evidence: [{
+    evidence_id: "FACT-METRIC-1",
+    kind: "plan_metric",
+    entity_ids: ["PLAN-CANDIDATE"],
+    field: "assigned_tasks",
+    value: "10",
+    statement: "已安排 10 项任务。",
+  }],
+  unresolved_questions: [],
+  requires_human_confirmation: true,
+  modifies_plan: false,
+  safety_notice: "safe",
+};
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -247,5 +323,102 @@ describe("runtime API errors", () => {
       status: 409,
       code: "runtime_revision_conflict",
     });
+  });
+});
+
+describe("runtime assistant API", () => {
+  it("binds an event draft request to the current runtime revision", async () => {
+    const fetcher = vi.fn<Fetcher>(async () => jsonResponse(eventDraft));
+
+    const result = await createRuntimeEventDraft(
+      "RUN-DEMO",
+      3,
+      "SIM330 于 08:25 确认延误 15 分钟",
+      "deterministic_only",
+      { fetcher },
+    );
+
+    expect(result.draft_id).toBe("DRAFT-0123456789ABCDEF");
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toEqual({
+      context: { scope: "runtime", session_id: "RUN-DEMO", expected_revision: 3 },
+      text: "SIM330 于 08:25 确认延误 15 分钟",
+      assistance_mode: "deterministic_only",
+    });
+  });
+
+  it("rejects an incomplete event draft response", async () => {
+    const fetcher = vi.fn<Fetcher>(async () => jsonResponse({
+      ...eventDraft,
+      basis: { ...eventDraft.basis, runtime_revision: null },
+    }));
+
+    await expect(createRuntimeEventDraft(
+      "RUN-DEMO",
+      3,
+      "SIM330 延误",
+      "auto",
+      { fetcher },
+    )).rejects.toMatchObject({ code: "invalid_response" });
+  });
+
+  it("submits only a reviewed event with a confirmed planning objective", async () => {
+    const fetcher = vi.fn<Fetcher>(async () => jsonResponse(runtimeSnapshot));
+
+    await submitRuntimeEventDraft(eventDraft, "minimum_change", { fetcher });
+
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toEqual({
+      scope: "runtime",
+      draft: eventDraft,
+      confirm_event: true,
+      objective_profile: "minimum_change",
+      confirm_objective: true,
+    });
+  });
+
+  it("requests a candidate explanation against the active-plan baseline", async () => {
+    const fetcher = vi.fn<Fetcher>(async () => jsonResponse(planExplanation));
+
+    const result = await createRuntimePlanExplanation(
+      "RUN-DEMO",
+      3,
+      "PLAN-CANDIDATE",
+      "PLAN-ACTIVE",
+      "task_changes",
+      "  ",
+      "auto",
+      { fetcher },
+    );
+
+    expect(result.explanation_id).toBe("EXPL-0123456789ABCDEF");
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toEqual({
+      context: {
+        scope: "runtime_plan",
+        session_id: "RUN-DEMO",
+        revision: 3,
+        plan_id: "PLAN-CANDIDATE",
+        baseline_plan_id: "PLAN-ACTIVE",
+      },
+      focus: "task_changes",
+      assistance_mode: "auto",
+    });
+  });
+
+  it("rejects explanation claims that cite absent authority facts", async () => {
+    const fetcher = vi.fn<Fetcher>(async () => jsonResponse({
+      ...planExplanation,
+      summary: { statement: "无依据结论", evidence_ids: ["FACT-MISSING"] },
+    }));
+
+    await expect(createRuntimePlanExplanation(
+      "RUN-DEMO",
+      3,
+      "PLAN-CANDIDATE",
+      "PLAN-ACTIVE",
+      "summary",
+      "",
+      "deterministic_only",
+      { fetcher },
+    )).rejects.toMatchObject({ code: "invalid_response" });
   });
 });

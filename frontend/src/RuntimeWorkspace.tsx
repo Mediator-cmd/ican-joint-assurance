@@ -26,6 +26,8 @@ import RuntimePlanDetails, {
   runtimePlanAlgorithmLabel,
   runtimePlanFacts,
 } from "./RuntimePlanDetails";
+import RuntimeEventAssistant from "./RuntimeEventAssistant";
+import RuntimePlanExplanation from "./RuntimePlanExplanation";
 import type {
   DemoPayload,
   EventRuntimeProjection,
@@ -597,6 +599,13 @@ export default function RuntimeWorkspace({
 
             {activePage === "events" && (
               <div className="events-layout runtime-events-layout">
+                <RuntimeEventAssistant
+                  snapshot={snapshot}
+                  connectionStatus={runtime.connectionStatus}
+                  controlBusy={runtime.controlBusy}
+                  submitReviewedEvent={runtime.submitReviewedEvent}
+                />
+                <div className="runtime-events-overview">
                 <section className="workspace-section event-catalog">
                   <div className="section-heading"><div><p className="eyebrow">处理时间流</p><h2>{snapshot.events.length} 项运行扰动</h2></div><span className="section-note">事件只应用一次</span></div>
                   <div className="event-selector runtime-event-selector">
@@ -640,6 +649,7 @@ export default function RuntimeWorkspace({
                     ))}
                   </div>
                 </section>
+                </div>
               </div>
             )}
 
@@ -746,6 +756,11 @@ export default function RuntimeWorkspace({
                     frozenTaskCount={frozenTaskCount}
                   />
                 </section>
+
+                <RuntimePlanExplanation
+                  snapshot={snapshot}
+                  connectionStatus={runtime.connectionStatus}
+                />
 
                 <section className="workspace-section affected-task-panel">
                   <div className="section-heading"><div><p className="eyebrow">变化范围</p><h2>受影响任务</h2></div><span className="section-note">{affectedTasks.length} 项</span></div>

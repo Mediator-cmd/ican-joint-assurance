@@ -1,9 +1,14 @@
 import type {
+  AssistanceMode,
   DemoDataSource,
   DemoLoadFailure,
   DemoLoadResult,
   DemoPayload,
+  EventDraftResponse,
+  ExplanationFocus,
   PlanListResponse,
+  PlanExplanationResponse,
+  PlanningObjectiveProfile,
   PlanRecord,
   RuntimeSessionListResponse,
   RuntimeSessionSnapshot,
@@ -236,6 +241,105 @@ function requireRuntimeSnapshot(value: RuntimeSessionSnapshot): RuntimeSessionSn
   return value;
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function isAssistanceTrace(value: unknown): boolean {
+  return isRecord(value)
+    && ["language_model", "deterministic_rules"].includes(String(value.source))
+    && typeof value.provider_attempted === "boolean"
+    && (value.model_label === null || typeof value.model_label === "string")
+    && (value.fallback_reason === null || typeof value.fallback_reason === "string");
+}
+
+function isEventDraftResponse(value: unknown): value is EventDraftResponse {
+  if (
+    !isRecord(value)
+    || typeof value.draft_id !== "string"
+    || !isRecord(value.basis)
+    || !["ready_for_review", "needs_clarification", "unsupported"].includes(String(value.status))
+    || !isAssistanceTrace(value.trace)
+    || !Array.isArray(value.evidence)
+    || !isStringArray(value.missing_fields)
+    || !Array.isArray(value.clarification_questions)
+    || !isStringArray(value.warnings)
+    || value.requires_human_confirmation !== true
+    || value.applies_automatically !== false
+    || typeof value.safety_notice !== "string"
+  ) {
+    return false;
+  }
+  const basis = value.basis;
+  if (
+    typeof basis.scenario_id !== "string"
+    || typeof basis.scenario_version !== "number"
+    || typeof basis.reference_time !== "string"
+    || (basis.runtime_session_id !== null && typeof basis.runtime_session_id !== "string")
+    || (basis.runtime_revision !== null && typeof basis.runtime_revision !== "number")
+    || ((basis.runtime_session_id === null) !== (basis.runtime_revision === null))
+  ) {
+    return false;
+  }
+  return value.status === "ready_for_review"
+    ? isRecord(value.event) && typeof value.event.event_id === "string"
+    : value.event === null;
+}
+
+function isExplanationClaim(value: unknown): boolean {
+  return isRecord(value)
+    && typeof value.statement === "string"
+    && isStringArray(value.evidence_ids)
+    && value.evidence_ids.length > 0;
+}
+
+function isPlanExplanationResponse(value: unknown): value is PlanExplanationResponse {
+  if (
+    !isRecord(value)
+    || typeof value.explanation_id !== "string"
+    || !isRecord(value.context)
+    || value.context.scope !== "runtime_plan"
+    || typeof value.context.session_id !== "string"
+    || typeof value.context.revision !== "number"
+    || typeof value.context.plan_id !== "string"
+    || (value.context.baseline_plan_id !== null
+      && typeof value.context.baseline_plan_id !== "string")
+    || !isAssistanceTrace(value.trace)
+    || !isExplanationClaim(value.summary)
+    || !Array.isArray(value.tradeoffs)
+    || !value.tradeoffs.every(isExplanationClaim)
+    || !isExplanationClaim(value.recommended_next_step)
+    || !Array.isArray(value.evidence)
+    || !isStringArray(value.unresolved_questions)
+    || value.requires_human_confirmation !== true
+    || value.modifies_plan !== false
+    || typeof value.safety_notice !== "string"
+  ) {
+    return false;
+  }
+  const evidenceIds = new Set<string>();
+  for (const item of value.evidence) {
+    if (!isRecord(item) || typeof item.evidence_id !== "string") return false;
+    evidenceIds.add(item.evidence_id);
+  }
+  const claims = [value.summary, ...value.tradeoffs, value.recommended_next_step];
+  return claims.every((claim) => claim.evidence_ids.every((id: string) => evidenceIds.has(id)));
+}
+
+function requireEventDraftResponse(value: unknown): EventDraftResponse {
+  if (!isEventDraftResponse(value)) {
+    throw new ApiRequestError(200, "invalid_response", "事件草稿结构不完整，请稍后重试。");
+  }
+  return value;
+}
+
+function requirePlanExplanationResponse(value: unknown): PlanExplanationResponse {
+  if (!isPlanExplanationResponse(value)) {
+    throw new ApiRequestError(200, "invalid_response", "方案解释结构不完整，请稍后重试。");
+  }
+  return value;
+}
+
 function query(parameters: Record<string, string | number>): string {
   const search = new URLSearchParams();
   Object.entries(parameters).forEach(([key, value]) => search.set(key, String(value)));
@@ -335,6 +439,84 @@ export async function postRuntimeAction(
   return requireRuntimeSnapshot(await requestJson<RuntimeSessionSnapshot>(
     `/api/v1/runtime-sessions/${encodeURIComponent(sessionId)}/${action}`,
     { ...options, method: "POST", body },
+  ));
+}
+
+export async function createRuntimeEventDraft(
+  sessionId: string,
+  expectedRevision: number,
+  text: string,
+  assistanceMode: AssistanceMode,
+  options: RuntimeApiOptions = {},
+): Promise<EventDraftResponse> {
+  return requireEventDraftResponse(await requestJson<unknown>(
+    "/api/v1/assistant/event-drafts",
+    {
+      ...options,
+      method: "POST",
+      body: {
+        context: {
+          scope: "runtime",
+          session_id: sessionId,
+          expected_revision: expectedRevision,
+        },
+        text,
+        assistance_mode: assistanceMode,
+      },
+    },
+  ));
+}
+
+export async function submitRuntimeEventDraft(
+  draft: EventDraftResponse,
+  objectiveProfile: PlanningObjectiveProfile,
+  options: RuntimeApiOptions = {},
+): Promise<RuntimeSessionSnapshot> {
+  return requireRuntimeSnapshot(await requestJson<RuntimeSessionSnapshot>(
+    "/api/v1/assistant/event-drafts/submit",
+    {
+      ...options,
+      method: "POST",
+      body: {
+        scope: "runtime",
+        draft,
+        confirm_event: true,
+        objective_profile: objectiveProfile,
+        confirm_objective: true,
+      },
+    },
+  ));
+}
+
+export async function createRuntimePlanExplanation(
+  sessionId: string,
+  revision: number,
+  planId: string,
+  baselinePlanId: string | null,
+  focus: ExplanationFocus,
+  question: string,
+  assistanceMode: AssistanceMode,
+  options: RuntimeApiOptions = {},
+): Promise<PlanExplanationResponse> {
+  const normalizedQuestion = question.trim();
+  return requirePlanExplanationResponse(await requestJson<unknown>(
+    "/api/v1/assistant/plan-explanations",
+    {
+      ...options,
+      method: "POST",
+      body: {
+        context: {
+          scope: "runtime_plan",
+          session_id: sessionId,
+          revision,
+          plan_id: planId,
+          baseline_plan_id: baselinePlanId,
+        },
+        focus,
+        ...(normalizedQuestion ? { question: normalizedQuestion } : {}),
+        assistance_mode: assistanceMode,
+      },
+    },
   ));
 }
 

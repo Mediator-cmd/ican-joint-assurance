@@ -7,6 +7,7 @@ import {
   postRuntimeAction,
   runtimeStreamUrl,
   speedRequest,
+  submitRuntimeEventDraft,
 } from "./api";
 import {
   isRuntimeStreamEvent,
@@ -16,6 +17,8 @@ import {
 } from "./runtime";
 import type {
   DemoPayload,
+  EventDraftResponse,
+  PlanningObjectiveProfile,
   RuntimeConnectionStatus,
   RuntimeSessionSnapshot,
   RuntimeStreamEventType,
@@ -44,6 +47,10 @@ export interface RuntimeSessionController {
   replan: () => Promise<void>;
   acceptCandidate: () => Promise<void>;
   rejectCandidate: () => Promise<void>;
+  submitReviewedEvent: (
+    draft: EventDraftResponse,
+    objectiveProfile: PlanningObjectiveProfile,
+  ) => Promise<boolean>;
   refresh: () => Promise<void>;
 }
 
@@ -263,6 +270,37 @@ export function useRuntimeSession({
     }
   }, [execute]);
 
+  const submitReviewedEvent = useCallback(async (
+    draft: EventDraftResponse,
+    objectiveProfile: PlanningObjectiveProfile,
+  ): Promise<boolean> => {
+    const current = snapshotRef.current;
+    if (current === null || controlBusyRef.current !== null) return false;
+    controlBusyRef.current = "event_submit";
+    setControlBusy("event_submit");
+    setNotice(null);
+    try {
+      const next = await submitRuntimeEventDraft(draft, objectiveProfile);
+      commitSnapshot(next);
+      return true;
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 409) {
+        try {
+          commitSnapshot(await getRuntimeSession(current.session_id));
+          setNotice("运行状态已更新，事件草稿已过期；已载入最新快照，请重新生成并复核。");
+        } catch (refreshError) {
+          setNotice(publicError(refreshError));
+        }
+      } else {
+        setNotice(publicError(error));
+      }
+      return false;
+    } finally {
+      controlBusyRef.current = null;
+      setControlBusy(null);
+    }
+  }, [commitSnapshot]);
+
   return {
     snapshot,
     connectionStatus,
@@ -277,6 +315,7 @@ export function useRuntimeSession({
     replan,
     acceptCandidate,
     rejectCandidate,
+    submitReviewedEvent,
     refresh,
   };
 }

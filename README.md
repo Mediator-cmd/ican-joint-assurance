@@ -18,8 +18,8 @@
 
 ## 当前状态
 
-- 阶段：M5 AI 事件理解与结果解释（M5-0 至 M5-4 已完成）。
-- 下一单元：M5-5 前端辅助交互接入。
+- 阶段：M5 AI 事件理解与结果解释（M5-0 至 M5-5 已完成）。
+- 下一单元：M5-6 总验收。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
@@ -48,6 +48,8 @@
 - M5-3 人工提交与目标配置审查：[docs/m5-03-review.md](docs/m5-03-review.md)
 - M5-4 方案事实与可追溯解释计划：[docs/m5-04-plan.md](docs/m5-04-plan.md)
 - M5-4 方案事实与可追溯解释审查：[docs/m5-04-review.md](docs/m5-04-review.md)
+- M5-5 前端辅助交互计划：[docs/m5-05-plan.md](docs/m5-05-plan.md)
+- M5-5 前端辅助交互审查：[docs/m5-05-review.md](docs/m5-05-review.md)
 
 ## 目录结构
 
@@ -96,6 +98,8 @@ M5-2 已提供可替换的 OpenAI-compatible 结构化输出适配器。`POST /a
 M5-3 的确定性目标只允许 `balanced`、`critical_first`、`minimum_wait` 和 `minimum_change`。旧 CP-SAT 请求未显式选择目标时继续精确使用原 `balanced` 行为；`minimum_change` 只用于已有当前方案的运行滚动规划。所有目标仍由 CP-SAT 求解并经过独立硬约束复核，模型不能提供任意权重、自由排班或自动采用候选。
 
 M5-4 新增只读 `POST /api/v1/assistant/plan-explanations`。服务从场景版本或运行 revision 的后端权威事实生成确定性中文解释；摘要、取舍和建议下一步都带 `FACT-*` 来源。配置 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 后，OpenAI-compatible 模型只做表达增强，任何超时、错误或事实引用不合法都会回退规则解释。无 AI 配置时核心实时闭环和完整解释照常可用，密钥不会进入 GitHub、前端或响应。
+
+M5-5 已把上述能力接入现有五页共享运行工作台。“事件影响”页可输入匿名教学事件、查看缺失追问和逐字段来源，在确认事件字段及四选一确定性目标后提交；“方案依据”页可切换当前/候选方案、解释重点和匿名问题，并查看规则/模型来源、结论和 `FACT-*` 引用。输入、revision、方案或解释条件变化后旧结果立即标记过期；事件不会自动提交，候选不会自动采用。新板块按内容自然展开，不使用卡片内部滚动，前端不包含 API 密钥、提供方 URL 或硬编码模型名。
 
 前端不自行推进时钟、推导业务状态或运行规划器。SSE 连续失败后，每 2 秒读取一次 REST 权威快照，流恢复后停止轮询；所有修改命令携带当前 revision，冲突时只刷新最新状态，不自动重放旧命令。只有运行 API 不可用时才显示原有三套静态快照，并明确标为“离线只读，时间不会推进”，所有运行控制禁用。
 

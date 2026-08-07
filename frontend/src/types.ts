@@ -122,6 +122,7 @@ export interface Plan {
   scenario_id: string;
   scenario_version: number;
   algorithm: string;
+  objective_profile?: PlanningObjectiveProfile;
   generated_at: string;
   status: "executable" | "partial" | "invalid";
   assignments: Assignment[];
@@ -141,6 +142,136 @@ export interface DemoPayload {
   events: DemoEvent[];
   changes: ScenarioChange[];
   views: Record<ViewKey, DemoView>;
+}
+
+export type PlanningObjectiveProfile =
+  | "balanced"
+  | "critical_first"
+  | "minimum_wait"
+  | "minimum_change";
+
+export type AssistanceMode = "auto" | "deterministic_only";
+export type AssistanceSource = "language_model" | "deterministic_rules";
+export type AssistanceFallbackReason =
+  | "model_not_configured"
+  | "model_timeout"
+  | "provider_error"
+  | "invalid_model_output";
+
+export interface AssistanceTrace {
+  source: AssistanceSource;
+  provider_attempted: boolean;
+  model_label: string | null;
+  fallback_reason: AssistanceFallbackReason | null;
+}
+
+export type EventDraftStatus = "ready_for_review" | "needs_clarification" | "unsupported";
+export type EventDraftField =
+  | "event_type"
+  | "flight_id"
+  | "occurred_at"
+  | "delay_minutes"
+  | "previous_gate_id"
+  | "new_gate_id";
+export type EvidenceOrigin = "user_text" | "authoritative_context" | "deterministic_derivation";
+
+export interface EventDraftBasis {
+  scenario_id: string;
+  scenario_version: number;
+  reference_time: string;
+  runtime_session_id: string | null;
+  runtime_revision: number | null;
+}
+
+export interface ExtractedFieldEvidence {
+  field: EventDraftField;
+  normalized_value: string;
+  origin: EvidenceOrigin;
+  source_quote: string | null;
+}
+
+export interface ClarificationOption {
+  value: string;
+  label: string;
+}
+
+export interface ClarificationQuestion {
+  field: EventDraftField;
+  question: string;
+  reason: string;
+  options: ClarificationOption[];
+}
+
+export interface ObjectiveRecommendation {
+  profile: PlanningObjectiveProfile;
+  display_name: string;
+  rationale: string;
+  source_quote: string | null;
+  requires_human_confirmation: true;
+  applied_to_planner: false;
+}
+
+export interface FlightEventDraft {
+  event_id: string;
+  event_type: "delay" | "gate_change";
+  flight_id: string;
+  occurred_at: string;
+  delay_minutes: number | null;
+  previous_gate_id: string | null;
+  new_gate_id: string | null;
+  note: string | null;
+}
+
+export interface EventDraftResponse {
+  draft_id: string;
+  basis: EventDraftBasis;
+  status: EventDraftStatus;
+  trace: AssistanceTrace;
+  event: FlightEventDraft | null;
+  evidence: ExtractedFieldEvidence[];
+  missing_fields: EventDraftField[];
+  clarification_questions: ClarificationQuestion[];
+  objective_recommendation: ObjectiveRecommendation | null;
+  warnings: string[];
+  requires_human_confirmation: true;
+  applies_automatically: false;
+  safety_notice: string;
+}
+
+export type ExplanationFocus = "summary" | "tradeoffs" | "task_changes" | "manual_handling";
+
+export interface ExplanationEvidence {
+  evidence_id: string;
+  kind: string;
+  entity_ids: string[];
+  field: string;
+  value: string;
+  statement: string;
+}
+
+export interface ExplanationClaim {
+  statement: string;
+  evidence_ids: string[];
+}
+
+export interface PlanExplanationResponse {
+  explanation_id: string;
+  context: {
+    scope: "runtime_plan";
+    session_id: string;
+    revision: number;
+    plan_id: string;
+    baseline_plan_id: string | null;
+  };
+  trace: AssistanceTrace;
+  summary: ExplanationClaim;
+  tradeoffs: ExplanationClaim[];
+  recommended_next_step: ExplanationClaim;
+  evidence: ExplanationEvidence[];
+  unresolved_questions: string[];
+  requires_human_confirmation: true;
+  modifies_plan: false;
+  safety_notice: string;
 }
 
 export type DemoDataSource = "api" | "static_fallback";
@@ -278,6 +409,7 @@ export interface RuntimeSessionSnapshot {
   candidate_plan_id: string | null;
   active_plan_detail: Plan | null;
   candidate_plan_detail: Plan | null;
+  objective_profile: PlanningObjectiveProfile;
   status: RuntimeStatus;
   status_label: string;
   revision: number;
