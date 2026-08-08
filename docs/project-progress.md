@@ -746,3 +746,14 @@ M3 已关闭，M4-0 契约冻结、M4-1 运行会话、M4-2 确定性状态投�
 - 自动验证：PowerShell 脚本语法、后端全量 `218 passed in 10.43s`、前端 `24 passed`、`npm run typecheck`、生产构建、`compileall` 和 `pip check` 通过。Vite/Vitest 在受限沙箱内因子进程权限返回 `spawn EPERM`，在获准的普通进程环境复测正常。
 - 范围：本次是 M6-0 后的本地启动可靠性维护，不进入 M6-1，不修改实时状态所有权、调度器、AI 边界、机场数据边界、GitHub 远程或公网部署计划。
 - 详细审查：[m6-00a-startup-recovery-review.md](m6-00a-startup-recovery-review.md)。下一阶段入口仍为 M6-1。
+
+### 2026-08-08 / M6-1 确定性规模场景工厂
+
+- 完成：新增 `backend/app/scale_scenario_factory.py`，从 `small`、`medium`、`large_aggregate` 三个规范档位生成 100/500/2000 项任务、20/50/200 项资源、5/10/20 个区域和 10/50/200 个匿名航班的严格 `Scenario`。
+- 纯函数边界：工厂只使用固定 `2026-08-01` 教学日期和确定性编号/时间规律，不读取网络、系统时间、真实数据、AI 配置、运行会话或用户输入；场景固定为 `simulation + synthetic` 且事件集为空。
+- 完整性：每个区域包含到全部区域的对称路网；所有任务的航班、起终区域引用闭合，任务/资源时间落在固定 12 小时窗口，三种资源类型和四种任务类型均被覆盖，每项任务存在类型与容量匹配资源。
+- 指纹：新增严格 `ScaleScenarioArtifact`，绑定规范档位、场景和规范 JSON 的 SHA-256。三个档位分别冻结为 `7dc3827d...bcf11`、`5775f0c5...3d649`、`a5e0bae3...9c70e`；连续生成和 JSON 往返保持一致，内容篡改携带旧摘要会被拒绝。
+- 专项验证：M6-0/M6-1 聚焦 `18 passed in 0.77s`，覆盖精确计数、固定摘要、调用隔离、JSON 往返、引用、路网、时间窗、资源类型/容量、篡改和未知档位拒绝。该耗时不是规划基准，未产生 2/5/15 秒性能结论。
+- 全量验证：后端 `232 passed in 10.86s`；前端 3 个测试文件、`24 passed`；类型检查、Vite 生产构建、`compileall`、`pip check`、PowerShell 语法、新代码纯 ASCII、`git diff --check` 和仅计数的 key-like 扫描通过。
+- 范围：未调用或修改 FIFO、CP-SAT、`validate_plan()`、公开 API、前端、SQLite 或 AI 链路，不生成基准样本、性能报告或回退结果，不接真实机场生产流或部署公网。
+- 详细审查：[m6-01-review.md](m6-01-review.md)。下一唯一入口为 M6-2 有界可扩展规划与显式安全回退；M6-3 前不得发布性能结论。
