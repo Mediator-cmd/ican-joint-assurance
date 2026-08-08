@@ -55,6 +55,7 @@
 - M6 规模与部署准备计划：[docs/m6-scale-deployment-plan.md](docs/m6-scale-deployment-plan.md)
 - M6-0 规模与基准契约：[docs/m6-scale-contract.md](docs/m6-scale-contract.md)
 - M6-0 契约审查：[docs/m6-00-review.md](docs/m6-00-review.md)
+- M6-0B 真实 AI 激活审查：[docs/m6-00b-real-ai-activation-review.md](docs/m6-00b-real-ai-activation-review.md)
 - M6-0A 一键启动陈旧 PID 恢复审查：[docs/m6-00a-startup-recovery-review.md](docs/m6-00a-startup-recovery-review.md)
 
 ## 目录结构
@@ -117,10 +118,12 @@ M6-0 已冻结三个匿名合成规模档位：100 任务/20 资源/5 区域、5
 
 - 双击项目根目录的 `启动联保智调.cmd`：刷新演示数据，先启动 FastAPI，等待健康检查通过后再启动 Vite，并优先使用 Microsoft Edge 打开页面。
 - 双击项目根目录的 `停止联保智调.cmd`：按“前端 → 后端”顺序只停止由状态文件记录的本项目服务，不会结束其他 Node/Python 进程，也不会关闭 Edge。
+- 双击项目根目录的 `配置AI.cmd`：在本机遮蔽输入 OpenAI-compatible API key、base URL 和模型名；密钥使用当前 Windows 用户 DPAPI 加密写入忽略提交的 `.runtime/ai-config.json`，随后自动重启服务。默认 DeepSeek 模型为 `deepseek-v4-flash`。
 - 后端默认从 `8000-8020` 选择端口，前端默认从 `4173-4199` 选择端口；端口占用时自动换用范围内空闲端口，实际 URL 以 `.runtime/server-state.json` 为准。
 - 运行状态和本地日志保存在忽略提交的 `.runtime/` 目录。启动脚本已运行时再次双击会复用已通过健康检查的服务组，只打开现有页面，不创建第二组进程。
 - 状态文件保存明确的 Python/Node 可执行路径；旧版误记为系统 DLL 时，只允许按项目 Python 和当前 Node 可信路径兼容校验，其他进程身份不匹配仍会拒绝操作。
 - 若服务已停止后旧 PID 被其他程序复用，启动脚本会把该记录识别为陈旧状态并安全重建服务组；停止脚本只跳过该无关进程并清理陈旧状态，不会按 PID 误杀。
+- AI 配置变化会使启动脚本重启后端，避免继续复用未配置模型的旧进程；配置文件解密失败会阻止启动并要求重新配置。后端只在启动子进程时短暂注入密钥，前端、状态 API、日志和 Git 均不接触明文。
 - 启动失败会回收本次已创建的服务；停止前会校验项目路径、服务名、PID、进程名和启动时间，状态异常时保留文件并停止操作。
 
 首次安装后端依赖：
@@ -153,6 +156,7 @@ python -m venv .venv
 - 事件与计划 API 支持版本化结构事件应用、FIFO/CP-SAT 计划创建、不可变计划查询，以及普通语言结果摘要和人工确认提示。
 - 运行 API 支持事件到时自动暂停、同刻事件批处理、滚动候选生成，以及使用 revision 和候选 ID 保护的采用/拒绝；`/stream` 提供共享 sequence、类型化消息、断线补发和完整快照回退，普通 GET 快照可作为短轮询入口。
 - 辅助 API 支持确定性规则和可选 OpenAI-compatible 模型抽取；模型只接收当前文本、参考时间窗、匿名航班和登机口最小事实，密钥只从进程环境读取，响应公开安全来源与回退原因。草稿只能在用户明确确认事件和运行目标后提交，不能由模型自动提交。
+- 真实模型验证：模型请求成功时，事件草稿或方案解释响应的 `trace.source` 必须为 `language_model`，并带实际配置的 `trace.model_label`；任何超时、提供方错误或非法结构仍回退确定性规则。DeepSeek 官方 OpenAI 格式文档见 [Your First API Call](https://api-docs.deepseek.com/) 和 [JSON Output](https://api-docs.deepseek.com/guides/json_mode)。
 - Swagger 中的完整操作顺序、请求体、重复提交处理和 PowerShell 示例见 [docs/m3-openapi-guide.md](docs/m3-openapi-guide.md)。
 - M3 阶段能力、验证证据和已知边界见 [docs/m3-review.md](docs/m3-review.md)。
 

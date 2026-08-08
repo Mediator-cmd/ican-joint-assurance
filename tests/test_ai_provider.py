@@ -55,7 +55,20 @@ def settings():
 def completion(content: str, request: httpx2.Request) -> httpx2.Response:
     return httpx2.Response(
         200,
-        json={"choices": [{"message": {"content": content}}]},
+        json={
+            "id": "chatcmpl-test",
+            "object": "chat.completion",
+            "created": 1_786_174_682,
+            "model": "test-chat-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": content},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 20, "completion_tokens": 30},
+        },
         request=request,
     )
 
@@ -147,6 +160,7 @@ def test_openai_compatible_adapter_sends_only_minimum_context_and_json_schema() 
     assert body["temperature"] == 0
     assert body["stream"] is False
     assert body["response_format"] == {"type": "json_object"}
+    assert "thinking" not in body
     assert "JSON" in body["messages"][0]["content"]
     user_payload = json.loads(body["messages"][1]["content"])
     assert set(user_payload) == {
@@ -160,6 +174,35 @@ def test_openai_compatible_adapter_sends_only_minimum_context_and_json_schema() 
     assert "scenario_id" not in body["messages"][1]["content"]
     assert "runtime" not in body["messages"][1]["content"].lower()
     assert "sk-test-only-placeholder" not in json.dumps(body)
+
+
+def test_deepseek_v4_adapter_disables_default_thinking_for_json_output() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        captured["body"] = json.loads(request.content)
+        return completion(valid_extraction_json(), request)
+
+    deepseek_settings = load_ai_provider_settings(
+        {
+            "AI_API_KEY": "sk-test-only-placeholder",
+            "AI_BASE_URL": "https://api.deepseek.com",
+            "AI_MODEL": "deepseek-v4-flash",
+        }
+    )
+    assert deepseek_settings is not None
+    provider = OpenAICompatibleEventProvider(
+        deepseek_settings,
+        transport=httpx2.MockTransport(handler),
+    )
+
+    extraction = provider.extract_event(
+        "SIM102 在 08:12 的出发安排要往后挪二十分钟",
+        event_context(),
+    )
+
+    assert extraction.delay_minutes == 20
+    assert captured["body"]["thinking"] == {"type": "disabled"}
 
 
 def test_adapter_classifies_timeout_without_exposing_transport_error() -> None:
@@ -228,4 +271,3 @@ def test_adapter_rejects_non_json_or_contract_invalid_output(response_content) -
 
     with pytest.raises(AIProviderInvalidOutputError):
         provider.extract_event("SIM102 延误", event_context())
-

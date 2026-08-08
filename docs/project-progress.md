@@ -724,6 +724,19 @@ M3 已关闭，M4-0 契约冻结、M4-1 运行会话、M4-2 确定性状态投�
 - 详细计划、契约与审查：[m6-scale-deployment-plan.md](m6-scale-deployment-plan.md)、[m6-scale-contract.md](m6-scale-contract.md)、[m6-00-review.md](m6-00-review.md)。
 - 下一步：只进入 M6-1，实现确定性规模场景工厂、稳定指纹以及 100/500/2000 档位的数据完整性测试；不得提前发布性能结论、静默回退、部署公网或接入生产数据。
 
+### 2026-08-08 / M6-0B 真实 AI 激活
+
+- 真实模型入口：新增 `配置AI.cmd` 与 `scripts/configure-ai.ps1`。用户在本机遮蔽输入 API key、OpenAI-compatible base URL 和模型名；密钥以当前 Windows 用户 DPAPI 密文保存于忽略提交的 `.runtime/ai-config.json`，不会进入仓库、前端、日志或响应。
+- 启动所有权：`start-project.ps1` 在后端子进程启动前解密并短暂注入 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL`，启动完成后恢复父进程环境；运行状态只保存配置文件指纹。配置变化会停止并重建现有服务组，避免旧的无模型后端继续运行。
+- 模型选择：依据 DeepSeek 官方当前 OpenAI-compatible 文档，默认 `deepseek-v4-flash`；它与 `deepseek-v4-pro` 均支持 JSON Output。模型名仍可在配置窗口修改。
+- 保留边界：模型只负责事件字段抽取和权威事实表达增强；原文引用、航班/登机口实体、时间、四选一调度目标、硬约束和人工候选决定仍由后端确定性链路拥有。无模型配置、模型超时、提供方错误或非法输出继续回退规则。
+- 部署边界：`.env.example` 只定义变量名和非秘密默认值；GitHub/公网部署使用平台 Secret Manager 或进程环境，不使用 DPAPI 本机文件，不接真实机场生产数据或外部控制系统。
+- 真实冒烟已完成：匿名事件 `SIM102 在 08:12 确认延误 20 分钟` 返回 HTTP 200，草稿状态为 `ready_for_review`，`trace.source=language_model`、`trace.provider_attempted=true`、模型为 `deepseek-v4-flash`，无回退原因；方案 `PLAN-TERMINAL-DISTURBANCE-01-V1-CP-SAT` 的解释也返回 `trace.source=language_model`，包含 20 条权威证据、8 个合法 `FACT-*` 引用，`modifies_plan=false` 且 `requires_human_confirmation=true`。
+- 兼容性修复：DeepSeek V4 结构化请求显式禁用默认 thinking；OpenAI-compatible 响应信封改为忽略合法标准元数据，业务输出仍严格拒绝未知字段。浏览器页面显示“模型辅助解释 · deepseek-v4-flash”和“仍需人工确认”，控制台 0 error / 0 warning。
+- 自动验证：后端全量 `219 passed in 10.17s`；前端 3 个测试文件、`24 passed`；类型检查、Vite 生产构建、`compileall`、`pip check`、全部 PowerShell 语法与纯 ASCII 检查、`git diff --check` 和仅计数的 key-like 扫描均通过；`.runtime/ai-config.json` 未被 Git 跟踪。
+- 阶段收口：M6-0B 已完成；下一入口仍为 M6-1 确定性规模场景工厂与 100/500/2000 档位的数据完整性测试。M6-1 未开始，不发布性能结论、不接入真实机场生产流、不创建 GitHub 远程或部署公网。
+- 详细审查：[m6-00b-real-ai-activation-review.md](m6-00b-real-ai-activation-review.md)。
+
 ### 2026-08-08 / M6-0A 一键启动陈旧 PID 恢复修正
 
 - 根因：`.runtime/server-state.json` 残留已结束服务的 PID，其中一个 PID 后续被无关 Windows 进程复用。旧启动脚本能发现进程身份不一致并避免误杀，但把安全的 PID 复用与损坏状态一并视为不可恢复冲突，因此无法清理状态并重新启动网页。

@@ -22,6 +22,7 @@ $DemoGenerator = Join-Path $ProjectRoot "scripts\generate_demo_output.py"
 $DemoOutput = Join-Path $FrontendRoot "public\demo-output.json"
 $RuntimeRoot = Join-Path $ProjectRoot ".runtime"
 $StateFile = Join-Path $RuntimeRoot "server-state.json"
+$AIConfigFile = Join-Path $RuntimeRoot "ai-config.json"
 $BackendStdoutLog = Join-Path $RuntimeRoot "backend.stdout.log"
 $BackendStderrLog = Join-Path $RuntimeRoot "backend.stderr.log"
 $FrontendStdoutLog = Join-Path $RuntimeRoot "frontend.stdout.log"
@@ -41,6 +42,101 @@ function Get-PropertyValue {
         return $property.Value
     }
     return $null
+}
+
+function Get-TextSha256 {
+    param([string]$Text)
+
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($Text)
+        $hash = $sha256.ComputeHash($bytes)
+        return (-join ($hash | ForEach-Object { $_.ToString("x2") }))
+    }
+    finally {
+        $sha256.Dispose()
+    }
+}
+
+function Get-EffectiveAIConfiguration {
+    if (Test-Path -LiteralPath $AIConfigFile) {
+        try {
+            $rawConfig = Get-Content -LiteralPath $AIConfigFile -Raw -Encoding UTF8
+            $config = $rawConfig | ConvertFrom-Json
+            $schemaVersion = [int](Get-PropertyValue -InputObject $config -Name "schema_version")
+            $provider = [string](Get-PropertyValue -InputObject $config -Name "provider")
+            $baseUrl = [string](Get-PropertyValue -InputObject $config -Name "base_url")
+            $model = [string](Get-PropertyValue -InputObject $config -Name "model")
+            $protectedApiKey = [string](Get-PropertyValue -InputObject $config -Name "api_key_protected")
+            if ($schemaVersion -ne 1 -or $provider -ne "openai_compatible" -or
+                [string]::IsNullOrWhiteSpace($baseUrl) -or [string]::IsNullOrWhiteSpace($model) -or
+                [string]::IsNullOrWhiteSpace($protectedApiKey)) {
+                throw "The local AI configuration is incomplete."
+            }
+
+            $parsedUrl = $null
+            if (-not [System.Uri]::TryCreate($baseUrl, [System.UriKind]::Absolute, [ref]$parsedUrl) -or
+                $parsedUrl.Scheme -notin @("http", "https") -or [string]::IsNullOrWhiteSpace($parsedUrl.Host) -or
+                $parsedUrl.UserInfo -or $parsedUrl.Query -or $parsedUrl.Fragment) {
+                throw "The local AI base URL is invalid."
+            }
+            if ($model.Length -gt 80 -or $model -notmatch '^[A-Za-z0-9._:/-]+$') {
+                throw "The local AI model label is invalid."
+            }
+
+            $secureApiKey = ConvertTo-SecureString -String $protectedApiKey
+            return [pscustomobject]@{
+                configured = $true
+                source = "encrypted_file"
+                baseUrl = $baseUrl.TrimEnd("/")
+                model = $model
+                secureApiKey = $secureApiKey
+                fingerprint = (Get-FileHash -LiteralPath $AIConfigFile -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+        }
+        catch {
+            throw "Local AI configuration could not be loaded safely. Re-run the Configure AI entry. $($_.Exception.Message)"
+        }
+    }
+
+    $environmentApiKey = [string]$env:AI_API_KEY
+    $environmentBaseUrl = [string]$env:AI_BASE_URL
+    $environmentModel = [string]$env:AI_MODEL
+    if (-not [string]::IsNullOrWhiteSpace($environmentApiKey) -and
+        -not [string]::IsNullOrWhiteSpace($environmentBaseUrl) -and
+        -not [string]::IsNullOrWhiteSpace($environmentModel)) {
+        return [pscustomobject]@{
+            configured = $true
+            source = "environment"
+            baseUrl = $environmentBaseUrl.TrimEnd("/")
+            model = $environmentModel
+            secureApiKey = $null
+            fingerprint = (Get-TextSha256 -Text ("environment|" + $environmentBaseUrl.TrimEnd("/") + "|" + $environmentModel))
+        }
+    }
+
+    return [pscustomobject]@{
+        configured = $false
+        source = "none"
+        baseUrl = $null
+        model = $null
+        secureApiKey = $null
+        fingerprint = $null
+    }
+}
+
+function Set-ProcessEnvironmentValue {
+    param(
+        [string]$Name,
+        [AllowNull()][string]$Value
+    )
+
+    if ($null -eq $Value) {
+        Remove-Item -LiteralPath "Env:$Name" -ErrorAction SilentlyContinue
+    }
+    else {
+        Set-Item -LiteralPath "Env:$Name" -Value $Value
+    }
 }
 
 function Get-ServiceExecutablePath {
@@ -185,7 +281,8 @@ function Write-RuntimeState {
         [string]$Status,
         [string]$BackendUrl,
         [string]$FrontendUrl,
-        [string]$LaunchedAtUtc
+        [string]$LaunchedAtUtc,
+        [AllowNull()][string]$AiConfigFingerprint
     )
 
     $state = [ordered]@{
@@ -195,6 +292,7 @@ function Write-RuntimeState {
         backendUrl = $BackendUrl
         frontendUrl = $FrontendUrl
         launchedAtUtc = $LaunchedAtUtc
+        aiConfigFingerprint = $AiConfigFingerprint
         services = @($Services)
     }
     $temporaryStateFile = "$StateFile.tmp"
@@ -319,6 +417,13 @@ if (-not (Test-Path -LiteralPath $PythonPath)) {
 }
 
 New-Item -ItemType Directory -Force -Path $RuntimeRoot | Out-Null
+$aiConfiguration = Get-EffectiveAIConfiguration
+if ($aiConfiguration.configured) {
+    Write-Host "[OK] AI provider configured: $($aiConfiguration.model)"
+}
+else {
+    Write-Host "[INFO] AI provider is not configured; deterministic assistance remains available."
+}
 
 if (Test-Path -LiteralPath $StateFile) {
     $existingState = $null
@@ -361,7 +466,10 @@ if (Test-Path -LiteralPath $StateFile) {
     }
     else {
         $schemaVersion = Get-PropertyValue -InputObject $existingState -Name "schema_version"
-        $canReuse = [int]$schemaVersion -eq 2 -and $validServices.Count -eq $recordedServices.Count
+        $recordedAiFingerprint = [string](Get-PropertyValue -InputObject $existingState -Name "aiConfigFingerprint")
+        $currentAiFingerprint = [string]$aiConfiguration.fingerprint
+        $canReuse = [int]$schemaVersion -eq 2 -and $validServices.Count -eq $recordedServices.Count -and
+            [string]::Equals($recordedAiFingerprint, $currentAiFingerprint, [System.StringComparison]::OrdinalIgnoreCase)
         $backendRecord = $null
         $frontendRecord = $null
         if ($canReuse) {
@@ -450,14 +558,40 @@ $startedServices = New-Object System.Collections.Generic.List[object]
 
 try {
     Write-Host "[INFO] Starting backend service at $backendUrl ..."
-    $backendProcess = Start-Process `
-        -FilePath $PythonPath `
-        -ArgumentList @("-m", "uvicorn", "backend.app.main:app", "--host", "127.0.0.1", "--port", [string]$backendPort) `
-        -WorkingDirectory $ProjectRoot `
-        -WindowStyle Hidden `
-        -RedirectStandardOutput $BackendStdoutLog `
-        -RedirectStandardError $BackendStderrLog `
-        -PassThru
+    $aiEnvironmentNames = @("AI_API_KEY", "AI_BASE_URL", "AI_MODEL")
+    $previousAiEnvironment = @{}
+    foreach ($name in $aiEnvironmentNames) {
+        $previousAiEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
+    }
+    $apiKeyPointer = [IntPtr]::Zero
+    try {
+        if ($aiConfiguration.source -eq "encrypted_file") {
+            $apiKeyPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($aiConfiguration.secureApiKey)
+            $plainApiKey = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($apiKeyPointer)
+            if ([string]::IsNullOrWhiteSpace($plainApiKey)) {
+                throw "The encrypted AI API key is empty. Re-run the Configure AI entry."
+            }
+            Set-ProcessEnvironmentValue -Name "AI_API_KEY" -Value $plainApiKey
+            Set-ProcessEnvironmentValue -Name "AI_BASE_URL" -Value ([string]$aiConfiguration.baseUrl)
+            Set-ProcessEnvironmentValue -Name "AI_MODEL" -Value ([string]$aiConfiguration.model)
+        }
+        $backendProcess = Start-Process `
+            -FilePath $PythonPath `
+            -ArgumentList @("-m", "uvicorn", "backend.app.main:app", "--host", "127.0.0.1", "--port", [string]$backendPort) `
+            -WorkingDirectory $ProjectRoot `
+            -WindowStyle Hidden `
+            -RedirectStandardOutput $BackendStdoutLog `
+            -RedirectStandardError $BackendStderrLog `
+            -PassThru
+    }
+    finally {
+        if ($apiKeyPointer -ne [IntPtr]::Zero) {
+            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($apiKeyPointer)
+        }
+        foreach ($name in $aiEnvironmentNames) {
+            Set-ProcessEnvironmentValue -Name $name -Value $previousAiEnvironment[$name]
+        }
+    }
     $backendRecord = New-ServiceRecord `
         -Name "backend" `
         -Process $backendProcess `
@@ -469,7 +603,7 @@ try {
         -StdoutLog $BackendStdoutLog `
         -StderrLog $BackendStderrLog
     $startedServices.Add($backendRecord)
-    Write-RuntimeState -Services $startedServices.ToArray() -Status "starting" -BackendUrl $backendUrl -FrontendUrl $null -LaunchedAtUtc $launchedAtUtc
+    Write-RuntimeState -Services $startedServices.ToArray() -Status "starting" -BackendUrl $backendUrl -FrontendUrl $null -LaunchedAtUtc $launchedAtUtc -AiConfigFingerprint $aiConfiguration.fingerprint
 
     if (-not (Test-HttpReady -ProcessId $backendProcess.Id -Url $backendHealthUrl)) {
         $recentBackendError = if (Test-Path -LiteralPath $BackendStderrLog) {
@@ -509,7 +643,7 @@ try {
         -StdoutLog $FrontendStdoutLog `
         -StderrLog $FrontendStderrLog
     $startedServices.Add($frontendRecord)
-    Write-RuntimeState -Services $startedServices.ToArray() -Status "starting" -BackendUrl $backendUrl -FrontendUrl $frontendUrl -LaunchedAtUtc $launchedAtUtc
+    Write-RuntimeState -Services $startedServices.ToArray() -Status "starting" -BackendUrl $backendUrl -FrontendUrl $frontendUrl -LaunchedAtUtc $launchedAtUtc -AiConfigFingerprint $aiConfiguration.fingerprint
 
     if (-not (Test-HttpReady -ProcessId $frontendProcess.Id -Url $frontendUrl)) {
         $recentFrontendError = if (Test-Path -LiteralPath $FrontendStderrLog) {
@@ -518,7 +652,7 @@ try {
         throw "Frontend did not become ready. See $FrontendStderrLog.`n$recentFrontendError"
     }
 
-    Write-RuntimeState -Services $startedServices.ToArray() -Status "ready" -BackendUrl $backendUrl -FrontendUrl $frontendUrl -LaunchedAtUtc $launchedAtUtc
+    Write-RuntimeState -Services $startedServices.ToArray() -Status "ready" -BackendUrl $backendUrl -FrontendUrl $frontendUrl -LaunchedAtUtc $launchedAtUtc -AiConfigFingerprint $aiConfiguration.fingerprint
 }
 catch {
     for ($index = $startedServices.Count - 1; $index -ge 0; $index--) {

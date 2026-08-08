@@ -10,6 +10,8 @@ from urllib.parse import urlparse
 
 import httpx2
 from pydantic import (
+    BaseModel,
+    ConfigDict,
     Field,
     SecretStr,
     ValidationError,
@@ -118,15 +120,21 @@ class EventExtractionProvider(Protocol):
     ) -> ModelEventExtraction: ...
 
 
-class _ChatMessage(ModelBase):
+class _ProviderEnvelopeModel(BaseModel):
+    """Read only required OpenAI-compatible fields from provider metadata."""
+
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+
+class _ChatMessage(_ProviderEnvelopeModel):
     content: str = Field(min_length=1, max_length=65_536)
 
 
-class _ChatChoice(ModelBase):
+class _ChatChoice(_ProviderEnvelopeModel):
     message: _ChatMessage
 
 
-class _ChatCompletion(ModelBase):
+class _ChatCompletion(_ProviderEnvelopeModel):
     choices: list[_ChatChoice] = Field(min_length=1, max_length=20)
 
 
@@ -154,6 +162,14 @@ def request_json_object(
         "stream": False,
         "max_tokens": max_tokens,
     }
+    provider_host = (urlparse(settings.base_url).hostname or "").lower()
+    if provider_host == "api.deepseek.com" or settings.model.lower().startswith(
+        "deepseek-"
+    ):
+        # DeepSeek V4 enables long thinking by default. These endpoints only need
+        # short, fact-bound JSON; explicit non-thinking prevents max_tokens from
+        # being consumed by reasoning_content before final content is emitted.
+        request_body["thinking"] = {"type": "disabled"}
     try:
         with httpx2.Client(
             timeout=settings.timeout_seconds,
