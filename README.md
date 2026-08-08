@@ -18,8 +18,8 @@
 
 ## 当前状态
 
-- 阶段：M5 AI 事件理解与结果解释已完成（M5-0 至 M5-6）。
-- 下一阶段：M6 规模、性能与部署准备（尚未开始，等待明确授权）。
+- 阶段：M6 规模测试、体验收敛与部署准备（M6-0 已完成）。
+- 下一单元：M6-1 确定性合成规模场景工厂。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
@@ -52,6 +52,9 @@
 - M5-5 前端辅助交互审查：[docs/m5-05-review.md](docs/m5-05-review.md)
 - M5-6 AI 辅助总验收计划：[docs/m5-06-plan.md](docs/m5-06-plan.md)
 - M5-6 AI 辅助总验收审查：[docs/m5-06-review.md](docs/m5-06-review.md)
+- M6 规模与部署准备计划：[docs/m6-scale-deployment-plan.md](docs/m6-scale-deployment-plan.md)
+- M6-0 规模与基准契约：[docs/m6-scale-contract.md](docs/m6-scale-contract.md)
+- M6-0 契约审查：[docs/m6-00-review.md](docs/m6-00-review.md)
 
 ## 目录结构
 
@@ -105,6 +108,8 @@ M5-5 已把上述能力接入现有五页共享运行工作台。“事件影响
 
 M5-6 已完成模型/无模型、超时/错误/非法输出、未知实体、非法事实引用、提示词注入和同一会话连续三轮总验收。自动测试证明模型只增强事件抽取与事实表达；真实浏览器在每轮都要求事件与有限目标双重确认，候选只在人工采用后成为当前方案。无模型配置时页面明确显示规则回退，核心闭环、中文方案任务书和 `FACT-*` 解释保持完整可用。真实模型密钥只允许通过后端进程环境或部署 secret manager 注入，不能进入仓库、前端或响应。
 
+M6-0 已冻结三个匿名合成规模档位：100 任务/20 资源/5 区域、500/50/10、2000 个聚合任务/200/20，对应 2/5/15 秒测试目标。严格契约要求每次基准公开实际 CP-SAT 或有限回退路径、完整任务覆盖和零硬约束违规，并从样本计算 p50/p95/最大值；当前只完成契约，尚未生成规模场景或声称性能达标。M6 负责形成部署版本，M7 才负责 GitHub 发布和稳定公网地址。
+
 前端不自行推进时钟、推导业务状态或运行规划器。SSE 连续失败后，每 2 秒读取一次 REST 权威快照，流恢复后停止轮询；所有修改命令携带当前 revision，冲突时只刷新最新状态，不自动重放旧命令。只有运行 API 不可用时才显示原有三套静态快照，并明确标为“离线只读，时间不会推进”，所有运行控制禁用。
 
 ### Windows 一键启停
@@ -157,7 +162,7 @@ npm install
 npm run dev
 ```
 
-浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `213 passed`，前端回归基线为 `24 passed`，并应同时通过 `npm run typecheck` 和 `npm run build`。
+浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `218 passed`，前端回归基线为 `24 passed`，并应同时通过 `npm run typecheck` 和 `npm run build`。
 
 ## Git 工作流
 
