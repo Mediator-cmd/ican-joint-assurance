@@ -93,11 +93,11 @@ function Get-ServiceIdentityState {
 
     try {
         if (-not [string]::Equals($process.ProcessName, $processName, [System.StringComparison]::OrdinalIgnoreCase)) {
-            return [pscustomobject]@{ status = "mismatch"; name = $serviceName; process = $process; service = $Service }
+            return [pscustomobject]@{ status = "reused"; name = $serviceName; process = $process; service = $Service }
         }
         $expectedStart = [DateTimeOffset]::Parse($startTimeValue).UtcDateTime
         if ([Math]::Abs(($process.StartTime.ToUniversalTime() - $expectedStart).TotalSeconds) -ge 2) {
-            return [pscustomobject]@{ status = "mismatch"; name = $serviceName; process = $process; service = $Service }
+            return [pscustomobject]@{ status = "reused"; name = $serviceName; process = $process; service = $Service }
         }
 
         $expectedPath = Get-ExpectedExecutablePath -Service $Service
@@ -108,14 +108,14 @@ function Get-ServiceIdentityState {
                 $normalizedExpected = [System.IO.Path]::GetFullPath($expectedPath)
                 $normalizedActual = [System.IO.Path]::GetFullPath($actualPath)
                 if (-not [string]::Equals($normalizedExpected, $normalizedActual, [System.StringComparison]::OrdinalIgnoreCase)) {
-                    return [pscustomobject]@{ status = "mismatch"; name = $serviceName; process = $process; service = $Service }
+                    return [pscustomobject]@{ status = "reused"; name = $serviceName; process = $process; service = $Service }
                 }
             }
         }
         return [pscustomobject]@{ status = "valid"; name = $serviceName; process = $process; service = $Service }
     }
     catch {
-        return [pscustomobject]@{ status = "mismatch"; name = $serviceName; process = $process; service = $Service }
+        return [pscustomobject]@{ status = "invalid"; name = $serviceName; process = $process; service = $Service }
     }
 }
 
@@ -185,7 +185,7 @@ try {
     }
 
     $identityStates = @($services | ForEach-Object { Get-ServiceIdentityState -Service $_ })
-    $unsafeStates = @($identityStates | Where-Object { $_.status -in @("invalid", "mismatch") })
+    $unsafeStates = @($identityStates | Where-Object { $_.status -eq "invalid" })
     if ($unsafeStates.Count -gt 0) {
         $unsafeNames = ($unsafeStates | ForEach-Object { if ($_.name) { $_.name } else { "unknown" } }) -join ", "
         throw "Recorded process identity failed validation for: $unsafeNames."
@@ -208,6 +208,10 @@ try {
     foreach ($identityState in $orderedStates) {
         if ($identityState.status -eq "missing") {
             Write-Host "[INFO] Recorded $($identityState.name) service was already stopped."
+            continue
+        }
+        if ($identityState.status -eq "reused") {
+            Write-Host "[INFO] Recorded $($identityState.name) PID was reused; the unrelated process was not stopped."
             continue
         }
         Stop-RecordedProcess -ProcessId ([int]$identityState.process.Id) -ServiceName $identityState.name

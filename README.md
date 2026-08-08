@@ -55,6 +55,7 @@
 - M6 规模与部署准备计划：[docs/m6-scale-deployment-plan.md](docs/m6-scale-deployment-plan.md)
 - M6-0 规模与基准契约：[docs/m6-scale-contract.md](docs/m6-scale-contract.md)
 - M6-0 契约审查：[docs/m6-00-review.md](docs/m6-00-review.md)
+- M6-0A 一键启动陈旧 PID 恢复审查：[docs/m6-00a-startup-recovery-review.md](docs/m6-00a-startup-recovery-review.md)
 
 ## 目录结构
 
@@ -119,6 +120,7 @@ M6-0 已冻结三个匿名合成规模档位：100 任务/20 资源/5 区域、5
 - 后端默认从 `8000-8020` 选择端口，前端默认从 `4173-4199` 选择端口；端口占用时自动换用范围内空闲端口，实际 URL 以 `.runtime/server-state.json` 为准。
 - 运行状态和本地日志保存在忽略提交的 `.runtime/` 目录。启动脚本已运行时再次双击会复用已通过健康检查的服务组，只打开现有页面，不创建第二组进程。
 - 状态文件保存明确的 Python/Node 可执行路径；旧版误记为系统 DLL 时，只允许按项目 Python 和当前 Node 可信路径兼容校验，其他进程身份不匹配仍会拒绝操作。
+- 若服务已停止后旧 PID 被其他程序复用，启动脚本会把该记录识别为陈旧状态并安全重建服务组；停止脚本只跳过该无关进程并清理陈旧状态，不会按 PID 误杀。
 - 启动失败会回收本次已创建的服务；停止前会校验项目路径、服务名、PID、进程名和启动时间，状态异常时保留文件并停止操作。
 
 首次安装后端依赖：

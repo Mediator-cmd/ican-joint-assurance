@@ -225,11 +225,11 @@ function Get-ServiceIdentityState {
 
     try {
         if (-not [string]::Equals($process.ProcessName, $processName, [System.StringComparison]::OrdinalIgnoreCase)) {
-            return [pscustomobject]@{ status = "mismatch"; name = $serviceName; process = $process }
+            return [pscustomobject]@{ status = "reused"; name = $serviceName; process = $process }
         }
         $expectedStart = [DateTimeOffset]::Parse($startTimeValue).UtcDateTime
         if ([Math]::Abs(($process.StartTime.ToUniversalTime() - $expectedStart).TotalSeconds) -ge 2) {
-            return [pscustomobject]@{ status = "mismatch"; name = $serviceName; process = $process }
+            return [pscustomobject]@{ status = "reused"; name = $serviceName; process = $process }
         }
 
         $expectedPath = Get-ExpectedExecutablePath -Service $Service
@@ -240,14 +240,14 @@ function Get-ServiceIdentityState {
                 $normalizedExpected = [System.IO.Path]::GetFullPath($expectedPath)
                 $normalizedActual = [System.IO.Path]::GetFullPath($actualPath)
                 if (-not [string]::Equals($normalizedExpected, $normalizedActual, [System.StringComparison]::OrdinalIgnoreCase)) {
-                    return [pscustomobject]@{ status = "mismatch"; name = $serviceName; process = $process }
+                    return [pscustomobject]@{ status = "reused"; name = $serviceName; process = $process }
                 }
             }
         }
         return [pscustomobject]@{ status = "valid"; name = $serviceName; process = $process }
     }
     catch {
-        return [pscustomobject]@{ status = "mismatch"; name = $serviceName; process = $process }
+        return [pscustomobject]@{ status = "invalid"; name = $serviceName; process = $process }
     }
 }
 
@@ -350,42 +350,56 @@ if (Test-Path -LiteralPath $StateFile) {
     }
 
     $identityStates = @($recordedServices | ForEach-Object { Get-ServiceIdentityState -Service $_ })
-    if (@($identityStates | Where-Object { $_.status -in @("invalid", "mismatch") }).Count -gt 0) {
-        throw "Runtime process identity does not match the recorded service. Use the stop script or inspect $StateFile; no process was replaced."
+    if (@($identityStates | Where-Object { $_.status -eq "invalid" }).Count -gt 0) {
+        throw "Runtime state contains an invalid service identity. Inspect $StateFile; no process was stopped or replaced."
     }
 
     $validServices = @($identityStates | Where-Object { $_.status -eq "valid" })
     if ($validServices.Count -eq 0) {
-        Write-Warning "Removing stale runtime state; all recorded processes are already stopped."
+        Write-Warning "Removing stale runtime state; recorded processes are stopped or their PIDs have been safely reused."
         Remove-Item -LiteralPath $StateFile -Force
     }
     else {
         $schemaVersion = Get-PropertyValue -InputObject $existingState -Name "schema_version"
-        if ([int]$schemaVersion -ne 2 -or $validServices.Count -ne $recordedServices.Count) {
-            throw "A legacy or partial project service is still running. Double-click the stop script before starting the upgraded service group."
+        $canReuse = [int]$schemaVersion -eq 2 -and $validServices.Count -eq $recordedServices.Count
+        $backendRecord = $null
+        $frontendRecord = $null
+        if ($canReuse) {
+            $backendRecord = $recordedServices | Where-Object { (Get-PropertyValue -InputObject $_ -Name "name") -eq "backend" } | Select-Object -First 1
+            $frontendRecord = $recordedServices | Where-Object { (Get-PropertyValue -InputObject $_ -Name "name") -eq "frontend" } | Select-Object -First 1
+            $canReuse = $null -ne $backendRecord -and $null -ne $frontendRecord
         }
 
-        $backendRecord = $recordedServices | Where-Object { (Get-PropertyValue -InputObject $_ -Name "name") -eq "backend" } | Select-Object -First 1
-        $frontendRecord = $recordedServices | Where-Object { (Get-PropertyValue -InputObject $_ -Name "name") -eq "frontend" } | Select-Object -First 1
-        if (-not $backendRecord -or -not $frontendRecord) {
-            throw "The recorded service group is incomplete. Double-click the stop script before starting again."
+        if ($canReuse) {
+            $backendHealthUrl = [string](Get-PropertyValue -InputObject $backendRecord -Name "healthUrl")
+            $frontendUrl = [string](Get-PropertyValue -InputObject $frontendRecord -Name "url")
+            $backendPid = [int](Get-PropertyValue -InputObject $backendRecord -Name "pid")
+            $frontendPid = [int](Get-PropertyValue -InputObject $frontendRecord -Name "pid")
+            $canReuse = (Test-HttpReady -ProcessId $backendPid -Url $backendHealthUrl -Attempts 4) -and
+                (Test-HttpReady -ProcessId $frontendPid -Url $frontendUrl -Attempts 4)
         }
 
-        $backendHealthUrl = [string](Get-PropertyValue -InputObject $backendRecord -Name "healthUrl")
-        $frontendUrl = [string](Get-PropertyValue -InputObject $frontendRecord -Name "url")
-        $backendPid = [int](Get-PropertyValue -InputObject $backendRecord -Name "pid")
-        $frontendPid = [int](Get-PropertyValue -InputObject $frontendRecord -Name "pid")
-        if (-not (Test-HttpReady -ProcessId $backendPid -Url $backendHealthUrl -Attempts 4) -or
-            -not (Test-HttpReady -ProcessId $frontendPid -Url $frontendUrl -Attempts 4)) {
-            throw "Recorded project processes are running but the service group is not healthy. Use the stop script before restarting."
+        if ($canReuse) {
+            Write-Host "[OK] Backend and frontend are already running: $frontendUrl"
+            if (-not $NoBrowser) {
+                try { Open-ProjectBrowser -Url $frontendUrl }
+                catch { Write-Warning "Services are running, but the browser could not be opened. Visit $frontendUrl manually." }
+            }
+            exit 0
         }
 
-        Write-Host "[OK] Backend and frontend are already running: $frontendUrl"
-        if (-not $NoBrowser) {
-            try { Open-ProjectBrowser -Url $frontendUrl }
-            catch { Write-Warning "Services are running, but the browser could not be opened. Visit $frontendUrl manually." }
+        Write-Warning "Cleaning up a partial or unhealthy recorded service group before restart. Reused PIDs will not be stopped."
+        $validServicesForStop = @(
+            $validServices | Sort-Object @{ Expression = {
+                if ($_.name -eq "frontend") { 0 }
+                elseif ($_.name -eq "backend") { 1 }
+                else { 2 }
+            } }
+        )
+        foreach ($validService in $validServicesForStop) {
+            Stop-NewServerProcess -ProcessId ([int]$validService.process.Id)
         }
-        exit 0
+        Remove-Item -LiteralPath $StateFile -Force
     }
 }
 
