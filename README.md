@@ -18,8 +18,8 @@
 
 ## 当前状态
 
-- 阶段：M5 AI 事件理解与结果解释（M5-0 至 M5-5 已完成）。
-- 下一单元：M5-6 总验收。
+- 阶段：M5 AI 事件理解与结果解释已完成（M5-0 至 M5-6）。
+- 下一阶段：M6 规模、性能与部署准备（尚未开始，等待明确授权）。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
@@ -50,6 +50,8 @@
 - M5-4 方案事实与可追溯解释审查：[docs/m5-04-review.md](docs/m5-04-review.md)
 - M5-5 前端辅助交互计划：[docs/m5-05-plan.md](docs/m5-05-plan.md)
 - M5-5 前端辅助交互审查：[docs/m5-05-review.md](docs/m5-05-review.md)
+- M5-6 AI 辅助总验收计划：[docs/m5-06-plan.md](docs/m5-06-plan.md)
+- M5-6 AI 辅助总验收审查：[docs/m5-06-review.md](docs/m5-06-review.md)
 
 ## 目录结构
 
@@ -100,6 +102,8 @@ M5-3 的确定性目标只允许 `balanced`、`critical_first`、`minimum_wait` 
 M5-4 新增只读 `POST /api/v1/assistant/plan-explanations`。服务从场景版本或运行 revision 的后端权威事实生成确定性中文解释；摘要、取舍和建议下一步都带 `FACT-*` 来源。配置 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 后，OpenAI-compatible 模型只做表达增强，任何超时、错误或事实引用不合法都会回退规则解释。无 AI 配置时核心实时闭环和完整解释照常可用，密钥不会进入 GitHub、前端或响应。
 
 M5-5 已把上述能力接入现有五页共享运行工作台。“事件影响”页可输入匿名教学事件、查看缺失追问和逐字段来源，在确认事件字段及四选一确定性目标后提交；“方案依据”页可切换当前/候选方案、解释重点和匿名问题，并查看规则/模型来源、结论和 `FACT-*` 引用。输入、revision、方案或解释条件变化后旧结果立即标记过期；事件不会自动提交，候选不会自动采用。新板块按内容自然展开，不使用卡片内部滚动，前端不包含 API 密钥、提供方 URL 或硬编码模型名。
+
+M5-6 已完成模型/无模型、超时/错误/非法输出、未知实体、非法事实引用、提示词注入和同一会话连续三轮总验收。自动测试证明模型只增强事件抽取与事实表达；真实浏览器在每轮都要求事件与有限目标双重确认，候选只在人工采用后成为当前方案。无模型配置时页面明确显示规则回退，核心闭环、中文方案任务书和 `FACT-*` 解释保持完整可用。真实模型密钥只允许通过后端进程环境或部署 secret manager 注入，不能进入仓库、前端或响应。
 
 前端不自行推进时钟、推导业务状态或运行规划器。SSE 连续失败后，每 2 秒读取一次 REST 权威快照，流恢复后停止轮询；所有修改命令携带当前 revision，冲突时只刷新最新状态，不自动重放旧命令。只有运行 API 不可用时才显示原有三套静态快照，并明确标为“离线只读，时间不会推进”，所有运行控制禁用。
 
@@ -153,7 +157,7 @@ npm install
 npm run dev
 ```
 
-浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `196 passed`，前端回归基线为 `19 passed`，并应同时通过 `npm run typecheck` 和 `npm run build`。
+浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `213 passed`，前端回归基线为 `24 passed`，并应同时通过 `npm run typecheck` 和 `npm run build`。
 
 ## Git 工作流
 
