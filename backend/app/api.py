@@ -102,6 +102,7 @@ COMMON_ERROR_RESPONSES = {
     400: {"model": ApiErrorResponse, "description": "Invalid business request"},
     404: {"model": ApiErrorResponse, "description": "Resource not found"},
     409: {"model": ApiErrorResponse, "description": "State conflict"},
+    413: {"model": ApiErrorResponse, "description": "Request body is too large"},
     422: {"model": ApiErrorResponse, "description": "Request validation failed"},
     500: {"model": ApiErrorResponse, "description": "Unexpected service error"},
 }

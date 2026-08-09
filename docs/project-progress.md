@@ -9,7 +9,7 @@
 - 参赛方向：2026 年 iCAN AI 应用创新挑战赛，软件赛道，交通出行方向
 - 当前日期：2026-08-09
 - 官方作品提交截止：2026-09-30
-- 当前阶段：M6 规模测试、体验收敛与部署准备（M6-0 至 M6-4 已完成；下一单元 M6-5）
+- 当前阶段：M6 规模测试、体验收敛与部署准备（M6-0 至 M6-5 已完成；下一单元 M6-5A）
 - 文档状态：持续更新
 - 主要规划：[project-plan.md](project-plan.md)
 - 本文档维护原则：只记录已确认事实；候选方案必须标注“候选”；问题解决后保留原因和验证证据。
@@ -807,3 +807,16 @@ M3 已关闭，M4-0 契约冻结、M4-1 运行会话、M4-2 确定性状态投�
 - 状态与 AI：空间层不新增时钟、规划器、候选或业务状态；AI 不能猜坐标、路径或自动执行方案，只可继续做已有限制的事件抽取与事实解释。
 - AI 实用性补充：空间态势必须提供绑定当前 session/revision、仿真时间和地图选择的实际问答，覆盖事件位置、影响范围、活动资源、当前/候选路线、处理阶段和下一权威边界；回答必须引用后端 `SPATIAL-FACT-*`，可返回经白名单校验的地图聚焦 ID。无模型时规则回答仍可用，模型不能成为脱离运行进程的空放聊天框。
 - 详细计划：[airport-spatial-visualization-plan.md](airport-spatial-visualization-plan.md)。本记录只完成规划，尚未实施 M6-5A，也未导入任何机场图或真实生产数据。
+
+### 2026-08-09 / M6-5 provider-neutral 单 origin 部署版本
+
+- 单 origin：FastAPI 在现有 API 路由之后安全托管 Vite 构建；网页、REST 与 SSE 使用同一 origin。真实静态文件按路径返回，无扩展名前端路由回到 `index.html`，未知 `/api` 仍是统一 JSON 404，不能被 SPA HTML 掩盖。
+- 部署配置：新增有限 `APP_RUNTIME_DATABASE_PATH`、`APP_FRONTEND_DIST_PATH`、`APP_MAX_REQUEST_BODY_BYTES` 与 `PORT`；生产入口固定 `0.0.0.0` 和一个 worker。默认请求体上限为 2 MiB，声明长度或实际 chunked 字节超限均返回不回显正文的统一 413。
+- 容器：多阶段 Dockerfile 在 Linux Node 中执行干净 `npm ci` 与 Vite 构建，最终 Python 镜像使用 `jointassurance` UID 10001、`/data` 持久化卷和 `/api/v1/health`；最终层不含 Node、pytest、本机 `.runtime`、DPAPI 配置或密钥。
+- 依赖修正：真实 Linux 构建发现 Windows 锁文件缺少跨平台 `@emnapi` peer 锁项，已用 Linux Node 规范化并同时通过 Windows/Linux `npm ci`；Python 五个直接运行依赖按真实容器版本冻结，pytest 只留在开发清单。
+- 持久化证据：首个测试容器创建运行会话后被替换，新容器从同一命名卷找回完全相同的 session ID、revision 和状态；最终容器健康，根页面同源 200，实际 UID 为 10001，镜像内无 pytest。
+- 无模型证据：容器未注入 AI 环境变量时正常启动；辅助接口返回 `deterministic_rules + model_not_configured`，不尝试提供方，继续要求人工确认且不自动应用。密钥仍只允许由平台 Secret Manager 或后端进程环境注入。
+- 自动验证：后端全量 `267 passed in 31.53s`；前端干净 `npm ci`、5 个文件 `32 passed`、类型检查和 Vite 构建通过；`compileall`、`pip check`、PowerShell 语法、Git 差异通过。npm 官方生产依赖审计为 0 项漏洞。
+- 清理：专用测试容器与测试卷已删除，卷内临时会话不可恢复；本地 `ican-m6-5:local` 镜像保留且未推送。Docker Desktop 因存在无关运行容器未被关闭。
+- 范围：未创建 GitHub 远程、未推送源码或镜像、未选择托管商、未发布公网地址，不接真实机场生产流、个人信息或外部控制系统，也未提前实现 M6-5A。
+- 详细计划：[m6-05-plan.md](m6-05-plan.md)；详细审查：[m6-05-review.md](m6-05-review.md)。下一唯一入口为 M6-5A 机场空间态势、方案路径与 `SPATIAL-FACT-*` AI 进程问答；继续复用同一权威快照和本阶段部署边界。

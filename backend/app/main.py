@@ -23,6 +23,13 @@ from .ai_services import EventAssistantService
 from .api import APP_VERSION, router
 from .api_models import ApiErrorBody, ApiErrorDetail, ApiErrorResponse
 from .demo_export import DEMO_SCENARIO_PATH, SAFETY_NOTICE
+from .deployment import (
+    DEFAULT_MAX_REQUEST_BODY_BYTES,
+    DEFAULT_RUNTIME_DATABASE_PATH,
+    RequestBodyLimitMiddleware,
+    load_deployment_settings,
+    register_single_origin_frontend,
+)
 from .errors import ApiError
 from .repository import InMemoryScenarioRepository
 from .runtime_repository import SQLiteRuntimeSessionRepository
@@ -81,11 +88,6 @@ OPENAPI_TAGS = [
         "description": "生成绑定场景版本或运行修订的事件草稿、人工提交，以及引用权威事实的只读方案解释。",
     },
 ]
-
-
-DEFAULT_RUNTIME_DATABASE_PATH = (
-    Path(__file__).resolve().parents[2] / ".runtime" / "runtime-sessions.sqlite3"
-)
 
 
 def _new_request_id() -> str:
@@ -197,6 +199,8 @@ def create_app(
     runtime_stream_broker: RuntimeStreamBroker | None = None,
     event_provider: EventExtractionProvider | None = None,
     plan_explanation_provider: PlanExplanationProvider | None = None,
+    frontend_dist_path: str | Path | None = None,
+    max_request_body_bytes: int = DEFAULT_MAX_REQUEST_BODY_BYTES,
 ) -> FastAPI:
     scenario_repository = repository or InMemoryScenarioRepository()
     if seed_demo:
@@ -241,20 +245,31 @@ def create_app(
         runtime_service,
         provider=plan_explanation_provider,
     )
+    application.state.max_request_body_bytes = max_request_body_bytes
+    application.add_middleware(
+        RequestBodyLimitMiddleware,
+        max_body_bytes=max_request_body_bytes,
+    )
 
     @application.middleware("http")
     async def add_request_id(request: Request, call_next):
-        request.state.request_id = _new_request_id()
+        request.state.request_id = getattr(request.state, "request_id", None) or _new_request_id()
         response = await call_next(request)
         response.headers.setdefault("X-Request-ID", request.state.request_id)
         return response
 
     _register_exception_handlers(application)
     application.include_router(router)
+    if frontend_dist_path is not None:
+        register_single_origin_frontend(application, frontend_dist_path)
     return application
 
 
+_deployment_settings = load_deployment_settings()
 app = create_app(
+    runtime_database_path=_deployment_settings.runtime_database_path,
     event_provider=build_event_provider_from_environment(),
     plan_explanation_provider=build_plan_explanation_provider_from_environment(),
+    frontend_dist_path=_deployment_settings.frontend_dist_path,
+    max_request_body_bytes=_deployment_settings.max_request_body_bytes,
 )

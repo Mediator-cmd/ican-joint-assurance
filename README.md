@@ -18,8 +18,8 @@
 
 ## 当前状态
 
-- 阶段：M6 规模测试、体验收敛与部署准备（M6-0 至 M6-4 已完成）。
-- 下一单元：M6-5 provider-neutral 单 origin 部署版本。
+- 阶段：M6 规模测试、体验收敛与部署准备（M6-0 至 M6-5 已完成）。
+- 下一单元：M6-5A 机场空间态势、方案路径与 AI 进程问答。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
@@ -62,6 +62,8 @@
 - M6-3 离线基准审查：[docs/m6-03-review.md](docs/m6-03-review.md)
 - M6-3 正式 JSON 报告：[docs/m6-benchmark-report.json](docs/m6-benchmark-report.json)
 - M6-4 大数据工作台审查：[docs/m6-04-review.md](docs/m6-04-review.md)
+- M6-5 单 origin 部署计划：[docs/m6-05-plan.md](docs/m6-05-plan.md)
+- M6-5 单 origin 部署审查：[docs/m6-05-review.md](docs/m6-05-review.md)
 - 机场空间态势与路径可视化计划：[docs/airport-spatial-visualization-plan.md](docs/airport-spatial-visualization-plan.md)
 
 ## 目录结构
@@ -119,6 +121,8 @@ M5-6 已完成模型/无模型、超时/错误/非法输出、未知实体、非
 M6-0 已冻结三个匿名合成规模档位：100 任务/20 资源/5 区域、500/50/10、2000 个聚合任务/200/20，对应 2/5/15 秒测试目标。M6-1 提供固定场景和 SHA-256 指纹；M6-2 实现每任务最多 3 个候选资源的有界 CP-SAT，小型/中型必须走 CP-SAT，大型在建模前公开 `model_size_guard` 并返回经过独立复核的确定性安全方案。M6-3 已在 Windows、Python 3.13.9、OR-Tools 9.15.6755、单 worker 环境按每档 1 次预热和 5 组配对样本生成正式报告：小/中/大型有界入口最大值为 1.022711/3.113737/2.776355 秒，全部完整覆盖任务且零硬约束违规；大型明确使用安全回退。该证据仅适用于冻结合成场景和记录环境，当前轻负载样本中 FIFO 等待低于小/中型 CP-SAT，不能外推为真实机场生产性能或宣称优化方案在所有指标上优于 FIFO。M6 负责形成部署版本，M7 才负责 GitHub 发布和稳定公网地址。
 
 M6-4 在现有 `RuntimeSessionSnapshot` 上增加后端权威集合摘要，并为任务、事件、航班、资源、区域、受影响任务、方案任务书和候选变化提供检索或有界分页。页面始终公开当前范围与总数，只渲染当前页；筛选、页码和选择只属于浏览器展示状态，不增加 revision、不推进业务时间、不触发规划。移动端任务表使用卡片、资源列表使用两列布局，方案内容继续自然展开且不在任务书内部滚动。大集合测试覆盖 2000 项分页、25 项任务书窗口和 20 项候选变化窗口；这些能力服务于合成数据和部署前体验，不表示已经接入真实机场生产数据。
+
+M6-5 已形成 provider-neutral 的单 origin 容器版本。一个非 root Uvicorn worker 同时提供 React 构建产物、`/api/v1`、SSE 和统一错误；SQLite 固定写入可挂载路径，API 请求体默认限制为 2 MiB，未知 API 不会被 SPA HTML 回退掩盖。多阶段镜像不包含 Node、pytest、本机 `.runtime`、DPAPI AI 配置或实际密钥。真实容器替换后能够从同一卷找回会话；无 AI 环境变量时仍使用确定性规则完成核心闭环。M6-5 不创建 GitHub 远程、不推送镜像、不选择托管商或取得公网地址，这些动作仍属于 M7。
 
 M6-5 完成后计划进入 M6-5A，在调度总览加入原创或明确授权的机场空间态势图：事件定位、资源权威进度、当前方案实线、候选方案虚线及处理过程都从同一运行快照派生。空间 AI 将绑定当前 session/revision 和地图选择，以 `SPATIAL-FACT-*` 回答问题位置、影响任务、活动资源、路线变化、处理阶段和下一步，并可聚焦经过后端校验的对象；它不能猜坐标、修改方案或自动执行。第一版采用本地 SVG 2D，不依赖地图 API key；可选 3D 只做渐进增强。未经授权的北京大兴机场平面图、内部运行图、真实坐标或限制区细节不会进入仓库，视觉真实感不改变匿名教学仿真的安全定位。
 
@@ -186,7 +190,26 @@ npm install
 npm run dev
 ```
 
-浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `253 passed`，前端回归基线为 `32 passed`，并应同时通过 `npm run typecheck` 和 `npm run build`。
+浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `267 passed`，前端回归基线为 `32 passed`，并应同时通过 `npm run typecheck` 和 `npm run build`。
+
+### Provider-neutral 单 origin 容器
+
+M6-5 的 `Dockerfile` 会在 Linux Node 构建阶段执行干净 `npm ci` 和 Vite 生产构建，再把静态产物与冻结的最小 Python 运行依赖放入非 root 最终镜像。最小本地启动方式：
+
+```powershell
+docker build --pull=false --tag ican-joint-assurance:local .
+docker volume create ican-joint-assurance-data
+docker run --name ican-joint-assurance --publish 8000:8000 --volume ican-joint-assurance-data:/data ican-joint-assurance:local
+```
+
+- 同一地址提供网页与 API：`http://127.0.0.1:8000/`、`http://127.0.0.1:8000/api/v1/health`。
+- 部署平台必须只运行一个副本、一个 Uvicorn worker，并把持久化卷挂载到 `/data`；当前内存 SSE 缓冲和 SQLite 不支持横向扩容。
+- 平台可覆盖 `PORT`、`APP_RUNTIME_DATABASE_PATH`、`APP_FRONTEND_DIST_PATH` 和 `APP_MAX_REQUEST_BODY_BYTES`。请求体默认 2097152 字节，配置范围为 65536 至 16777216 字节。
+- AI 变量 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL`、`AI_TIMEOUT_SECONDS` 只能通过平台 Secret Manager 或后端进程环境注入。不要把真实值写进 Dockerfile、镜像层、仓库、浏览器环境或构建参数。
+- 健康检查固定为 `/api/v1/health`。平台未配置 AI 时仍可启动并使用确定性规则；模型成功调用时仍以 `trace.source=language_model` 验证。
+- M7 才负责创建 GitHub 远程、选择托管平台、配置线上卷与秘密并取得公网地址。
+
+停止并删除本地容器不会删除命名卷；确认不再需要其中的仿真会话后，再单独删除该卷。
 
 ## Git 工作流
 

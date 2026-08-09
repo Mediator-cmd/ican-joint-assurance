@@ -1,0 +1,5 @@
+pydantic==2.13.4
+ortools==9.15.6755
+fastapi==0.141.1
+uvicorn==0.52.1
+httpx2==2.10.0
