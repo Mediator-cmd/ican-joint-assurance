@@ -7,9 +7,12 @@ from pydantic import ValidationError
 
 from backend.app.demo_export import SAFETY_NOTICE
 from backend.app.scale_models import (
+    CANONICAL_SCALE_SCENARIO_FINGERPRINTS,
+    CANONICAL_SCALE_SOLVER_LIMIT_SECONDS,
     BenchmarkEnvironment,
     ScaleBenchmarkReport,
     ScaleBenchmarkSample,
+    ScalePlanComparison,
     ScaleTier,
     get_scale_profile,
 )
@@ -35,19 +38,78 @@ def _sample(
     execution_path: str = "cp_sat",
     fallback_reason: str | None = None,
     assigned_tasks: int | None = None,
+    average_wait_minutes: float = 10.0,
+    max_wait_minutes: int = 20,
 ) -> ScaleBenchmarkSample:
     profile = get_scale_profile(tier)
     assigned = profile.task_count if assigned_tasks is None else assigned_tasks
+    algorithms = {
+        "fifo_baseline": "fifo_baseline_v1",
+        "cp_sat": "bounded_scale_cp_sat_v2",
+        "deterministic_fallback": "deterministic_scale_fallback_v1",
+    }
     return ScaleBenchmarkSample(
         tier=tier,
         run_index=run_index,
         elapsed_seconds=elapsed_seconds,
         execution_path=execution_path,
+        algorithm=algorithms[execution_path],
         fallback_reason=fallback_reason,
         plan_status="executable" if assigned == profile.task_count else "partial",
         total_tasks=profile.task_count,
         assigned_tasks=assigned,
         unassigned_tasks=profile.task_count - assigned,
+        average_wait_minutes=average_wait_minutes,
+        max_wait_minutes=max_wait_minutes,
+        task_completion_rate_pct=round(assigned / profile.task_count * 100, 2),
+        critical_task_completion_rate_pct=100.0,
+        overall_resource_utilization_pct=12.5,
+    )
+
+
+def _comparison(
+    fifo: ScaleBenchmarkSample,
+    bounded: ScaleBenchmarkSample,
+) -> ScalePlanComparison:
+    return ScalePlanComparison(
+        fifo_assigned_tasks=fifo.assigned_tasks,
+        bounded_assigned_tasks=bounded.assigned_tasks,
+        assigned_task_delta=bounded.assigned_tasks - fifo.assigned_tasks,
+        fifo_average_wait_minutes=fifo.average_wait_minutes,
+        bounded_average_wait_minutes=bounded.average_wait_minutes,
+        average_wait_delta_minutes=round(
+            bounded.average_wait_minutes - fifo.average_wait_minutes,
+            2,
+        ),
+        fifo_max_wait_minutes=fifo.max_wait_minutes,
+        bounded_max_wait_minutes=bounded.max_wait_minutes,
+        max_wait_delta_minutes=bounded.max_wait_minutes - fifo.max_wait_minutes,
+        fifo_task_completion_rate_pct=fifo.task_completion_rate_pct,
+        bounded_task_completion_rate_pct=bounded.task_completion_rate_pct,
+        task_completion_delta_points=round(
+            bounded.task_completion_rate_pct - fifo.task_completion_rate_pct,
+            2,
+        ),
+        fifo_critical_completion_rate_pct=(
+            fifo.critical_task_completion_rate_pct
+        ),
+        bounded_critical_completion_rate_pct=(
+            bounded.critical_task_completion_rate_pct
+        ),
+        critical_completion_delta_points=round(
+            bounded.critical_task_completion_rate_pct
+            - fifo.critical_task_completion_rate_pct,
+            2,
+        ),
+        fifo_resource_utilization_pct=fifo.overall_resource_utilization_pct,
+        bounded_resource_utilization_pct=(
+            bounded.overall_resource_utilization_pct
+        ),
+        resource_utilization_delta_points=round(
+            bounded.overall_resource_utilization_pct
+            - fifo.overall_resource_utilization_pct,
+            2,
+        ),
     )
 
 
@@ -104,6 +166,13 @@ def test_benchmark_sample_requires_complete_safe_task_accounting() -> None:
                 "plan_status": "invalid",
             }
         )
+    with pytest.raises(ValidationError, match="completion rate"):
+        ScaleBenchmarkSample(
+            **{
+                **sample.model_dump(mode="python"),
+                "task_completion_rate_pct": 100,
+            }
+        )
 
 
 def test_fallback_is_explicit_and_only_accepted_for_large_aggregate() -> None:
@@ -130,10 +199,40 @@ def test_fallback_is_explicit_and_only_accepted_for_large_aggregate() -> None:
         )
     with pytest.raises(ValidationError, match="cannot claim a fallback reason"):
         _sample(execution_path="cp_sat", fallback_reason="time_limit")
+    fifo = _sample(execution_path="fifo_baseline")
+    assert fifo.fallback_reason is None
+    with pytest.raises(ValidationError, match="FIFO samples"):
+        _sample(
+            execution_path="fifo_baseline",
+            fallback_reason="model_size_guard",
+        )
 
 
 def test_report_summary_must_come_from_ordered_measured_samples() -> None:
-    samples = [
+    fifo_samples = [
+        _sample(
+            run_index=1,
+            elapsed_seconds=0.2,
+            execution_path="fifo_baseline",
+            average_wait_minutes=12,
+            max_wait_minutes=24,
+        ),
+        _sample(
+            run_index=2,
+            elapsed_seconds=0.3,
+            execution_path="fifo_baseline",
+            average_wait_minutes=12,
+            max_wait_minutes=24,
+        ),
+        _sample(
+            run_index=3,
+            elapsed_seconds=0.4,
+            execution_path="fifo_baseline",
+            average_wait_minutes=12,
+            max_wait_minutes=24,
+        ),
+    ]
+    bounded_samples = [
         _sample(run_index=1, elapsed_seconds=0.7),
         _sample(run_index=2, elapsed_seconds=0.8),
         _sample(run_index=3, elapsed_seconds=0.9),
@@ -142,11 +241,23 @@ def test_report_summary_must_come_from_ordered_measured_samples() -> None:
         report_id="BENCH-SMALL-001",
         generated_at=datetime(2026, 8, 8, 12, 0, tzinfo=TZ),
         profile=get_scale_profile("small"),
+        scenario_id="SCN-SCALE-SMALL-01",
+        scenario_fingerprint=CANONICAL_SCALE_SCENARIO_FINGERPRINTS[
+            ScaleTier.SMALL
+        ],
         environment=_environment(),
-        samples=samples,
+        solver_time_limit_seconds=CANONICAL_SCALE_SOLVER_LIMIT_SECONDS[
+            ScaleTier.SMALL
+        ],
+        fifo_samples=fifo_samples,
+        samples=bounded_samples,
+        fifo_p50_seconds=0.3,
+        fifo_p95_seconds=0.4,
+        fifo_max_seconds=0.4,
         p50_seconds=0.8,
         p95_seconds=0.9,
         max_seconds=0.9,
+        comparison=_comparison(fifo_samples[0], bounded_samples[0]),
         target_met=True,
         fallback_used=False,
     )
@@ -162,21 +273,40 @@ def test_report_summary_must_come_from_ordered_measured_samples() -> None:
     with pytest.raises(ValidationError, match="fallback_used"):
         ScaleBenchmarkReport(**{**payload, "fallback_used": True})
     with pytest.raises(ValidationError, match="contiguous and ordered"):
-        out_of_order = [samples[1], samples[0], samples[2]]
+        out_of_order = [bounded_samples[1], bounded_samples[0], bounded_samples[2]]
         ScaleBenchmarkReport(**{**payload, "samples": out_of_order})
+    with pytest.raises(ValidationError, match="frozen scenario fingerprint"):
+        ScaleBenchmarkReport(**{**payload, "scenario_fingerprint": "0" * 64})
+    with pytest.raises(ValidationError, match="canonical solver limit"):
+        ScaleBenchmarkReport(**{**payload, "solver_time_limit_seconds": 2.0})
+    with pytest.raises(ValidationError, match="FIFO sample group"):
+        ScaleBenchmarkReport(**{**payload, "fifo_samples": bounded_samples})
 
 
 def test_report_rejects_noncanonical_profiles_and_safety_overrides() -> None:
+    fifo_sample = _sample(execution_path="fifo_baseline")
     sample = _sample()
     base = {
         "report_id": "BENCH-SMALL-002",
         "generated_at": datetime(2026, 8, 8, 12, 0, tzinfo=TZ),
         "profile": get_scale_profile("small"),
+        "scenario_id": "SCN-SCALE-SMALL-01",
+        "scenario_fingerprint": CANONICAL_SCALE_SCENARIO_FINGERPRINTS[
+            ScaleTier.SMALL
+        ],
         "environment": _environment(),
+        "solver_time_limit_seconds": CANONICAL_SCALE_SOLVER_LIMIT_SECONDS[
+            ScaleTier.SMALL
+        ],
+        "fifo_samples": [fifo_sample],
         "samples": [sample],
+        "fifo_p50_seconds": 0.8,
+        "fifo_p95_seconds": 0.8,
+        "fifo_max_seconds": 0.8,
         "p50_seconds": 0.8,
         "p95_seconds": 0.8,
         "max_seconds": 0.8,
+        "comparison": _comparison(fifo_sample, sample),
         "target_met": True,
         "fallback_used": False,
     }

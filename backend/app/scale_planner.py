@@ -23,16 +23,15 @@ from .planning_models import (
 )
 from .planning_objectives import PlanningObjectiveProfile
 from .scale_models import (
+    CANONICAL_SCALE_SCENARIO_FINGERPRINTS,
+    CANONICAL_SCALE_SOLVER_LIMIT_SECONDS,
     BenchmarkExecutionPath,
     BenchmarkFallbackReason,
     ScaleProfile,
     ScaleTier,
     get_scale_profile,
 )
-from .scale_scenario_factory import (
-    CANONICAL_SCALE_SCENARIO_FINGERPRINTS,
-    ScaleScenarioArtifact,
-)
+from .scale_scenario_factory import ScaleScenarioArtifact
 from .travel import RouteNotFoundError, shortest_travel_minutes
 
 
@@ -129,9 +128,12 @@ class ScalePlanningResult(ModelBase):
                 raise ValueError("CP-SAT scale results cannot claim a fallback")
             if self.model_estimate.guard_triggered:
                 raise ValueError("guarded scale results cannot claim a CP-SAT path")
-            if self.plan.algorithm != "bounded_scale_cp_sat_v1":
+            if self.plan.algorithm != "bounded_scale_cp_sat_v2":
                 raise ValueError("CP-SAT scale results require the bounded algorithm")
             return self
+
+        if self.execution_path is BenchmarkExecutionPath.FIFO_BASELINE:
+            raise ValueError("scale planning results cannot claim the FIFO baseline path")
 
         if self.profile.tier is not ScaleTier.LARGE_AGGREGATE:
             raise ValueError("scale fallback is allowed only for large_aggregate")
@@ -507,8 +509,9 @@ def _build_bounded_cp_sat_plan(
             ]
             travel_started_at = previous_end
             travel_ended_at = previous_end + timedelta(minutes=reposition_minutes)
-            service_started_at = scenario.window_start + timedelta(
-                minutes=solver.Value(starts[task.task_id])
+            service_started_at = max(
+                task.release_at,
+                travel_ended_at,
             )
             service_ended_at = service_started_at + timedelta(
                 minutes=task.duration_minutes
@@ -528,7 +531,9 @@ def _build_bounded_cp_sat_plan(
                     service_ended_at=service_ended_at,
                     reposition_minutes=reposition_minutes,
                     service_minutes=task.duration_minutes,
-                    wait_minutes=solver.Value(waits[task.task_id]),
+                    wait_minutes=int(
+                        (service_started_at - task.release_at).total_seconds() // 60
+                    ),
                 )
             )
             previous_end = service_ended_at
@@ -549,7 +554,7 @@ def _build_bounded_cp_sat_plan(
         ),
         scenario_id=scenario.scenario_id,
         scenario_version=scenario.version,
-        algorithm="bounded_scale_cp_sat_v1",
+        algorithm="bounded_scale_cp_sat_v2",
         objective_profile=PlanningObjectiveProfile.BALANCED,
         generated_at=scenario.window_start,
         status=status_value,
@@ -598,7 +603,11 @@ def build_bounded_scale_plan(
 
     validated = _validated_artifact(artifact)
     profile = validated.profile
-    time_limit = profile.target_seconds if max_time_seconds is None else max_time_seconds
+    time_limit = (
+        CANONICAL_SCALE_SOLVER_LIMIT_SECONDS[profile.tier]
+        if max_time_seconds is None
+        else max_time_seconds
+    )
     if (
         not isfinite(time_limit)
         or time_limit <= 0

@@ -73,7 +73,7 @@ def test_small_and_medium_use_bounded_cp_sat_with_complete_safe_plans(
     assert result.execution_path is BenchmarkExecutionPath.CP_SAT
     assert result.fallback_reason is None
     assert result.model_estimate.guard_triggered is False
-    assert result.plan.algorithm == "bounded_scale_cp_sat_v1"
+    assert result.plan.algorithm == "bounded_scale_cp_sat_v2"
     assert result.plan.status.value == "executable"
     assert result.plan.metrics.assigned_tasks == artifact.profile.task_count
     assert result.plan.metrics.unassigned_tasks == 0
@@ -83,6 +83,15 @@ def test_small_and_medium_use_bounded_cp_sat_with_complete_safe_plans(
         result.plan.assignments,
         result.plan.unassigned_tasks,
     ) == []
+    tasks_by_id = {task.task_id: task for task in artifact.scenario.tasks}
+    assert all(
+        assignment.service_started_at
+        == max(
+            tasks_by_id[assignment.task_id].release_at,
+            assignment.travel_ended_at,
+        )
+        for assignment in result.plan.assignments
+    )
     assert result.requires_human_confirmation is True
     assert result.safety_notice == SAFETY_NOTICE
 

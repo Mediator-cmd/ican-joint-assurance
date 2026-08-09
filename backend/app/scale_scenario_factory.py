@@ -24,21 +24,18 @@ from .models import (
     TaskType,
     Zone,
 )
-from .scale_models import ScaleProfile, ScaleTier, get_scale_profile
+from .scale_models import (
+    CANONICAL_SCALE_SCENARIO_FINGERPRINTS,
+    ScaleProfile,
+    ScaleTier,
+    get_scale_profile,
+)
 
 
 _FIXTURE_TIMEZONE = timezone(timedelta(hours=8))
 _WINDOW_START = datetime(2026, 8, 1, 8, 0, tzinfo=_FIXTURE_TIMEZONE)
 _WINDOW_END = _WINDOW_START + timedelta(hours=12)
 _FINGERPRINT_NAMESPACE = b"ican-m6-scale-scenario-v1\n"
-
-CANONICAL_SCALE_SCENARIO_FINGERPRINTS = {
-    ScaleTier.SMALL: "7dc3827de6a1d702f73a2383473008f04170ba3ed1491e1817bcab73bb0bcf11",
-    ScaleTier.MEDIUM: "5775f0c58d2d64e47cca1a8879ae14077ea65236a66f18a15816ce244a73d649",
-    ScaleTier.LARGE_AGGREGATE: (
-        "a5e0bae31aa7a91b70568df58326fe93a850ce26d3701234a39e14e620c9c70e"
-    ),
-}
 
 _RESOURCE_CYCLE = (
     ResourceType.WHEELCHAIR,

@@ -18,8 +18,9 @@
 
 ## 2. 单次样本
 
-`ScaleBenchmarkSample` 固定记录：档位、从 1 连续编号的轮次、完整规划耗时、实际执行路径、有限回退原因、计划状态、任务覆盖和硬约束违规数。
+`ScaleBenchmarkSample` 固定记录：档位、从 1 连续编号的轮次、完整规划耗时、实际执行路径、有限回退原因、计划状态、任务覆盖、平均/最大等待、任务/关键任务完成率、资源利用率和硬约束违规数。
 
+- `execution_path=fifo_baseline` 只用于基线样本，不得携带回退原因。
 - `execution_path=cp_sat` 时不得携带回退原因。
 - `execution_path=deterministic_fallback` 只在 `large_aggregate` 可接受，且必须是 `model_size_guard` 或 `time_limit`。
 - 分配数和待协调数之和必须恰好等于规范任务数。
@@ -27,12 +28,14 @@
 
 ## 3. 报告
 
-`ScaleBenchmarkReport` 固定记录非敏感环境口径（`windows/linux/macos` 有限平台枚举、数字格式的 Python/OR-Tools 版本、逻辑 CPU 数、单 worker）、预热次数、有序样本和 p50/p95/最大值。
+`ScaleBenchmarkReport` 固定绑定场景 ID/version、冻结指纹和 1/3/9 秒规范求解预算，并记录非敏感环境口径（`windows/linux/macos` 有限平台枚举、数字格式的 Python/OR-Tools 版本、逻辑 CPU 数、单 worker）、预热次数、等量有序 FIFO/有界样本、第一组配对质量对比及两条路径各自的 p50/p95/最大值。
 
-- 报告档位必须逐字段等于规范 `ScaleProfile`，所有样本必须属于同一档位且编号连续。
-- p50 使用中位数；p95 使用有序样本的 nearest-rank 95%；最大值取样本最大耗时。三项都必须从样本重新计算，不能手写覆盖。
+- 报告档位必须逐字段等于规范 `ScaleProfile`，所有样本必须属于同一档位且编号连续；FIFO 组只能使用 `fifo_baseline`，有界组不得使用该路径。
+- p50 使用中位数；p95 使用有序样本的 nearest-rank 95%；最大值取样本最大耗时。FIFO 和有界六项汇总都必须从各自样本重新计算，不能手写覆盖。
 - `target_met` 只在最大值不超过该档位目标秒数时为真；`fallback_used` 必须与样本实际执行路径一致。
 - 报告固定 `all_hard_constraints_valid=true` 和完整安全声明，未知字段、无时区生成时间、非规范档位、主机名等未定义字段均被拒绝。
+
+`ScaleBenchmarkSuite` 只接受按规范顺序排列的三档报告，要求统一时间、环境、预热和样本数，并从三份报告重新推导总达标状态。
 
 ## 4. 计时和报告边界
 
@@ -56,12 +59,19 @@ M6-1 使用固定 `2026-08-01` 教学日期、`simulation` 模式、`synthetic` 
 
 ## 7. M6-2 有界规划契约
 
-规模规划入口固定先计算 `ScaleModelEstimate`，不得在 guard 之后才构造超限 CP-SAT 模型。当前限制为 500 项任务、1,250,000 个旧全量排序对和每项任务最多 3 个有界候选资源。
+规模规划入口固定先计算 `ScaleModelEstimate`，不得在 guard 之后才构造超限 CP-SAT 模型。当前限制为 500 项任务、1,250,000 个旧全量排序对和每项任务最多 3 个有界候选资源。小/中/大型规范求解预算固定为 1/3/9 秒，为完整 2/5/15 秒入口预留模型构建、任务书构造和独立复核时间；大型 guard 路径不实际进入求解器。
 
-- `small` 和 `medium` 的规范估算不触发 guard，只允许 `execution_path=cp_sat` 和 `bounded_scale_cp_sat_v1`，不得回退。
+- `small` 和 `medium` 的规范估算不触发 guard。M6-3 完整入口预算与真实行程任务书修正后，只允许 `execution_path=cp_sat` 和 `bounded_scale_cp_sat_v2`，不得回退；M6-2 的 v1 结果保留为历史审查记录。
 - `large_aggregate` 在建模前触发 guard，只允许公开 `execution_path=deterministic_fallback`、`fallback_reason=model_size_guard` 和 `deterministic_scale_fallback_v1`。
 - `time_limit` 只表示未触发 guard 的大型求解器返回 `UNKNOWN`；模型无效、不可行、代码错误或硬约束失败不得标记为超时。
 - 每个结果必须绑定规范档位、M6-1 冻结指纹、规范场景 ID/version、实际执行路径、有限回退原因和完整 `Plan`，并固定需要人工确认和安全声明。
 - 返回结果必须覆盖全部任务，`PlanStatus.INVALID`、非零硬约束违规、指标/列表不一致、场景身份错配或静默回退一律拒绝。
+- CP-SAT 内部仍用最大行程缓冲保证无两两排序模型安全；任务书按求解器选定资源和顺序，以真实最短路左移到最早可行服务时间，再执行独立复核，避免把保守建模空闲当成实际等待。
 
-本契约仍不是性能结论。M6-3 必须从独立计时样本证明实际时间目标，不能把 M6-2 的功能测试时间当作 p50/p95/最大值。
+## 8. M6-3 正式基准证据
+
+M6-3 在 Windows、Python 3.13.9、OR-Tools 9.15.6755、24 个逻辑 CPU、单 worker 环境下，对每档执行 1 次预热和 5 组 FIFO/有界配对样本。正式报告为 [m6-benchmark-report.json](m6-benchmark-report.json)，详细解释见 [m6-03-review.md](m6-03-review.md)。
+
+有界入口最大值为小型 1.022711 秒、中型 3.113737 秒、大型聚合 2.776355 秒，满足 2/5/15 秒口径；小/中型全部走 CP-SAT，大型全部明确走 `model_size_guard` 确定性安全回退。全部样本完整覆盖任务且硬约束违规为 0。
+
+该结论只属于冻结合成场景与报告环境。当前轻负载场景的 FIFO 等待低于小/中型 CP-SAT，因此不能声称优化路径在该样本上的速度或等待质量优于 FIFO；报告保留这一真实取舍，不外推为真实机场生产性能。
