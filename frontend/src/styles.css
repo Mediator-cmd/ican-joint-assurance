@@ -3976,3 +3976,293 @@ td > strong,
   .runtime-notice { align-items: flex-start; flex-wrap: wrap; }
   .runtime-notice button { margin-left: 26px; }
 }
+
+/* M6-4 bounded data windows: authoritative collections, browser-only view state. */
+.runtime-loading-state {
+  grid-template-columns: 54px minmax(0, 420px);
+  grid-template-rows: auto auto;
+  align-content: center;
+  text-align: left;
+}
+
+.runtime-loading-state > div strong {
+  display: block;
+  color: #23352a;
+  font-size: 20px;
+}
+
+.runtime-loading-state > div p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.runtime-loading-steps {
+  grid-column: 1 / 3;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 18px 0 0;
+  padding: 0;
+  overflow: hidden;
+  background: #d9e1db;
+  border: 1px solid #d9e1db;
+  border-radius: 5px;
+  list-style: none;
+}
+
+.runtime-loading-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px;
+  color: #526159;
+  background: #f8faf8;
+  font-size: 13px;
+}
+
+.runtime-loading-steps span {
+  color: var(--green);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.runtime-notice-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.data-window-toolbar {
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #f7f9f7;
+  border-block: 1px solid #e3e8e4;
+}
+
+.data-window-toolbar.compact {
+  align-items: center;
+  padding-block: 8px;
+}
+
+.data-window-search {
+  min-width: 220px;
+  display: grid;
+  gap: 4px;
+  color: #5c6861;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.data-window-search input {
+  width: min(360px, 100%);
+  height: 36px;
+  padding: 0 10px;
+  color: #27352c;
+  background: #ffffff;
+  border: 1px solid #cbd5ce;
+  border-radius: 4px;
+  outline: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.data-window-search input:focus {
+  border-color: #6a9a7b;
+  box-shadow: 0 0 0 3px rgb(46 114 73 / 10%);
+}
+
+.data-window-note {
+  max-width: 520px;
+  margin: 0;
+  color: var(--quiet);
+  text-align: right;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.data-window-pagination {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 12px;
+  background: #fafbfa;
+  border-top: 1px solid #e1e7e3;
+  color: #3e4b43;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-window-pagination > span b { font-size: 14px; }
+.data-window-pagination > span small { color: var(--quiet); font-size: 13px; }
+
+.data-window-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.data-window-pagination button {
+  width: 32px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: #31543e;
+  background: #ffffff;
+  border: 1px solid #cbd5ce;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.data-window-pagination button:hover:not(:disabled) { background: #edf4ef; }
+.data-window-pagination button:disabled { cursor: not-allowed; opacity: 0.4; }
+.data-window-pagination > div strong { min-width: 48px; text-align: center; font-size: 13px; }
+
+.workspace-page.page-tasks,
+.workspace-page.page-resources {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c4cec7 transparent;
+}
+
+.workspace-page.page-tasks .tasks-layout,
+.workspace-page.page-resources .runtime-resources-layout {
+  height: auto;
+}
+
+.task-board,
+.event-catalog,
+.flight-runtime-panel,
+.resource-catalog,
+.zone-overview,
+.affected-task-panel {
+  grid-template-rows: auto auto auto auto;
+}
+
+.task-board .table-wrap {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.runtime-event-selector,
+.flight-runtime-list,
+.runtime-resource-list,
+.zone-list,
+.affected-task-list,
+.plan-assignment-list,
+.plan-difference-list {
+  overflow: visible;
+  max-height: none;
+}
+
+.runtime-resources-layout {
+  grid-template-rows: auto auto;
+}
+
+.resource-detail {
+  align-self: start;
+}
+
+@media (max-width: 840px) {
+  .runtime-loading-state {
+    width: min(92vw, 520px);
+  }
+
+  .runtime-resource-row {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .runtime-resource-row .runtime-resource-next {
+    grid-column: 1 / 3;
+  }
+
+  .runtime-resource-row > svg { display: none; }
+  .runtime-resource-list { overflow: visible; }
+}
+
+@media (max-width: 520px) {
+  .runtime-loading-state {
+    grid-template-columns: 42px minmax(0, 1fr);
+    padding: 22px;
+  }
+
+  .runtime-loading-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .data-window-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .data-window-search { min-width: 0; }
+  .data-window-search input { width: 100%; }
+  .data-window-note { text-align: left; }
+  .data-window-pagination { padding-inline: 10px; }
+
+  .runtime-notice-actions {
+    width: 100%;
+    margin-left: 26px;
+  }
+
+  .runtime-notice-actions button { margin-left: 0; }
+
+  .task-board { min-height: 0; }
+  .task-board .table-wrap { overflow: visible; }
+  .task-board table { min-width: 0; display: block; }
+  .task-board thead { display: none; }
+  .task-board tbody { display: grid; gap: 9px; padding: 9px; }
+
+  .task-board tbody tr {
+    display: block;
+    overflow: hidden;
+    background: #ffffff;
+    border: 1px solid #dce4de;
+    border-radius: 5px;
+  }
+
+  .task-board tbody tr.selected-row {
+    background: #eef5f0;
+    border-color: #a9c6b2;
+    box-shadow: inset 3px 0 0 var(--green);
+  }
+
+  .task-board tbody td {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    align-items: center;
+    gap: 9px;
+    padding: 9px 11px;
+    border-bottom: 1px solid #edf0ee;
+    overflow-wrap: anywhere;
+  }
+
+  .task-board tbody td:last-child { border-bottom: 0; }
+
+  .task-board tbody td::before {
+    content: attr(data-label);
+    color: var(--quiet);
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  .task-board .runtime-state,
+  .task-board .lock-state { justify-self: start; white-space: normal; }
+  .table-hint { display: block; }
+
+  .runtime-resource-next strong,
+  .runtime-resource-next span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}

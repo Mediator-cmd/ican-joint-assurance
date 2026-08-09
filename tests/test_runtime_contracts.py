@@ -16,6 +16,7 @@ from backend.app.runtime_models import (
     ResourceRuntimeProjection,
     ResourceRuntimeStatus,
     RuntimeClockSnapshot,
+    RuntimeCollectionSummary,
     RuntimeEventStatus,
     RuntimeGuidance,
     RuntimePosition,
@@ -276,6 +277,7 @@ def test_snapshot_freezes_candidate_clock_and_safety_invariants() -> None:
     assert awaiting.status_label == "等待确认新方案"
     assert awaiting.safety_notice == SAFETY_NOTICE
     assert awaiting.model_dump(mode="json")["storage_scope"] == "sqlite"
+    assert awaiting.collection_summary.task_total == 0
 
     with pytest.raises(ValidationError):
         _snapshot(status=RuntimeStatus.AWAITING_CONFIRMATION)
@@ -283,6 +285,102 @@ def test_snapshot_freezes_candidate_clock_and_safety_invariants() -> None:
         _snapshot(status=RuntimeStatus.PAUSED, candidate_plan_id="PLAN-CANDIDATE")
     with pytest.raises(ValidationError):
         _snapshot(status=RuntimeStatus.RUNNING, clock=_clock(advancing=False))
+
+
+def test_snapshot_exposes_backend_authoritative_collection_summary() -> None:
+    tasks = [
+        TaskRuntimeProjection(
+            task_id="TASK-PENDING",
+            status="pending",
+            assignment_id="ASG-PENDING",
+            resource_id="WC-01",
+        ),
+        TaskRuntimeProjection(
+            task_id="TASK-ACTIVE",
+            status="en_route",
+            assignment_id="ASG-ACTIVE",
+            resource_id="WC-01",
+        ),
+        TaskRuntimeProjection(
+            task_id="TASK-AFFECTED",
+            status="affected",
+            assignment_id="ASG-AFFECTED",
+            resource_id="WC-02",
+            affected_by_event_ids=["EVT-OPEN"],
+        ),
+        TaskRuntimeProjection(
+            task_id="TASK-COMPLETED",
+            status="completed",
+            assignment_id="ASG-COMPLETED",
+            resource_id="WC-02",
+        ),
+    ]
+    resources = [
+        ResourceRuntimeProjection(
+            resource_id="WC-01",
+            status="serving",
+            position=RuntimePosition(from_zone_id="ZONE-01"),
+            current_task_id="TASK-ACTIVE",
+        ),
+        ResourceRuntimeProjection(
+            resource_id="WC-02",
+            status="idle",
+            position=RuntimePosition(from_zone_id="ZONE-02"),
+        ),
+    ]
+    events = [
+        _event_projection(event_id="EVT-OPEN", status="pending"),
+        _event_projection(
+            event_id="EVT-RESOLVED",
+            status="resolved",
+            applied_at=BASE_TIME,
+            scenario_version_after=2,
+        ),
+    ]
+    flights = [
+        FlightRuntimeProjection(
+            flight_id="FL-SIM102",
+            status="scheduled",
+            estimated_departure=BASE_TIME + timedelta(hours=1),
+            gate_id="ZONE-01",
+        )
+    ]
+    snapshot = _snapshot(
+        tasks=tasks,
+        resources=resources,
+        events=events,
+        flights=flights,
+    )
+
+    assert snapshot.collection_summary == RuntimeCollectionSummary(
+        task_total=4,
+        task_active=1,
+        task_attention=1,
+        task_completed=1,
+        task_locked=2,
+        resource_total=2,
+        resource_active=1,
+        event_total=2,
+        event_open=1,
+        event_pending=1,
+        flight_total=1,
+    )
+    assert snapshot.model_dump(mode="json")["collection_summary"]["task_total"] == 4
+
+    with pytest.raises(ValidationError, match="task_total"):
+        RuntimeCollectionSummary(
+            task_total=1,
+            task_active=2,
+            task_attention=0,
+            task_completed=0,
+            task_locked=0,
+            resource_total=0,
+            resource_active=0,
+            event_total=0,
+            event_open=0,
+            event_pending=0,
+            flight_total=0,
+        )
 
 
 def test_snapshot_rejects_duplicate_projection_ids() -> None:
@@ -394,6 +492,7 @@ def test_runtime_snapshot_schema_contains_frontend_contract_fields() -> None:
         "events",
         "guidance",
         "status_label",
+        "collection_summary",
         "safety_notice",
     } <= set(properties)
 

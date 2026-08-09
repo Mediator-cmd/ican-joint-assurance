@@ -52,6 +52,19 @@ const runtimeSnapshot = {
   resources: [],
   flights: [],
   events: [],
+  collection_summary: {
+    task_total: 0,
+    task_active: 0,
+    task_attention: 0,
+    task_completed: 0,
+    task_locked: 0,
+    resource_total: 0,
+    resource_active: 0,
+    event_total: 0,
+    event_open: 0,
+    event_pending: 0,
+    flight_total: 0,
+  },
 } as unknown as RuntimeSessionSnapshot;
 
 const eventDraft = {
@@ -323,6 +336,23 @@ describe("runtime API errors", () => {
       status: 409,
       code: "runtime_revision_conflict",
     });
+  });
+
+  it("rejects a runtime snapshot with a non-integer collection summary", async () => {
+    const fetcher = vi.fn<Fetcher>(async () => jsonResponse({
+      ...runtimeSnapshot,
+      collection_summary: {
+        ...runtimeSnapshot.collection_summary,
+        task_total: 0.5,
+      },
+    }));
+
+    await expect(postRuntimeAction(
+      "RUN-DEMO",
+      "pause",
+      { expected_revision: 3 },
+      { fetcher },
+    )).rejects.toMatchObject({ code: "invalid_response" });
   });
 });
 

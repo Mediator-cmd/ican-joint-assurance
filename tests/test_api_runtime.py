@@ -121,6 +121,26 @@ def test_runtime_api_controls_authoritative_clock_and_persists_boundaries(tmp_pa
     assert len(created["resources"]) == 5
     assert len(created["flights"]) == 3
     assert len(created["events"]) == 6
+    assert created["collection_summary"] == {
+        "task_total": 10,
+        "task_active": 0,
+        "task_attention": sum(
+            task["status"] in {"affected", "unassigned"}
+            for task in created["tasks"]
+        ),
+        "task_completed": 0,
+        "task_locked": 0,
+        "resource_total": 5,
+        "resource_active": 0,
+        "event_total": 6,
+        "event_open": sum(
+            event["status"] != "resolved" for event in created["events"]
+        ),
+        "event_pending": sum(
+            event["status"] == "pending" for event in created["events"]
+        ),
+        "flight_total": 3,
+    }
     assert created["active_plan_detail"]["plan_id"] == created["active_plan_id"]
     assert created["candidate_plan_detail"] is None
     first_event = next(item for item in created["events"] if item["event_id"] == "EVT-SIM102-DELAY")

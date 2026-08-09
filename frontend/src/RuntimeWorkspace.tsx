@@ -20,8 +20,9 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import PaginationControls from "./PaginationControls";
+import { includesNormalizedQuery, pageForIndex, paginateItems } from "./pagination";
 import { resolveSelectedId } from "./selection";
-import { runtimeStatusCounts } from "./runtime";
 import RuntimePlanDetails, {
   runtimePlanAlgorithmLabel,
   runtimePlanFacts,
@@ -41,6 +42,13 @@ import { useRuntimeSession } from "./useRuntimeSession";
 
 type PageKey = "overview" | "tasks" | "events" | "resources" | "evidence";
 type RuntimeTaskFilter = "all" | "active" | "attention";
+
+const TASK_PAGE_SIZE = 50;
+const RESOURCE_PAGE_SIZE = 40;
+const EVENT_PAGE_SIZE = 20;
+const FLIGHT_PAGE_SIZE = 24;
+const ZONE_PAGE_SIZE = 20;
+const AFFECTED_TASK_PAGE_SIZE = 30;
 
 const taskTypeLabels: Record<string, string> = {
   wheelchair_transfer: "轮椅转运",
@@ -165,9 +173,17 @@ function eventTone(status: EventRuntimeProjection["status"]): string {
 
 function RuntimeLoadingState() {
   return (
-    <main className="state-screen" aria-live="polite">
+    <main className="state-screen runtime-loading-state" aria-live="polite" aria-busy="true">
       <CircleGauge className="state-icon spin" />
-      <p>正在恢复最近一次运行会话</p>
+      <div>
+        <strong>正在恢复权威运行工作台</strong>
+        <p>初始化期间不会在浏览器内推导或补造业务状态。</p>
+      </div>
+      <ol className="runtime-loading-steps">
+        <li><span>01</span>载入匿名教学场景</li>
+        <li><span>02</span>恢复 SQLite 运行会话</li>
+        <li><span>03</span>建立权威状态流</li>
+      </ol>
     </main>
   );
 }
@@ -194,12 +210,12 @@ function RuntimeTaskRow({
       onKeyDown={(event) => event.key === "Enter" && onSelect()}
       tabIndex={0}
     >
-      <td><div className="task-cell"><strong>{task.task_id}</strong><span>{taskName}</span></div></td>
-      <td><span className={`runtime-state ${taskTone(task.status)}`}>{task.status_label}</span></td>
-      <td><strong>{resourceName}</strong><span className="cell-subtext">{task.assignment_id ?? "暂无安排"}</span></td>
-      <td><strong>{zoneName}</strong><span className="cell-subtext">后端投影位置</span></td>
-      <td className="tabular">{formatTime(task.next_transition_at)}</td>
-      <td>
+      <td data-label="保障任务"><div className="task-cell"><strong>{task.task_id}</strong><span>{taskName}</span></div></td>
+      <td data-label="实时状态"><span className={`runtime-state ${taskTone(task.status)}`}>{task.status_label}</span></td>
+      <td data-label="执行资源"><strong>{resourceName}</strong><span className="cell-subtext">{task.assignment_id ?? "暂无安排"}</span></td>
+      <td data-label="当前位置"><strong>{zoneName}</strong><span className="cell-subtext">后端投影位置</span></td>
+      <td data-label="下一边界" className="tabular">{formatTime(task.next_transition_at)}</td>
+      <td data-label="执行保护">
         <span className={`lock-state${task.is_locked ? " locked" : ""}`}>
           {task.is_locked ? "执行事实已锁定" : "未来任务可调整"}
         </span>
@@ -246,6 +262,17 @@ export default function RuntimeWorkspace({
   const runtime = useRuntimeSession({ payload, onInitialUnavailable });
   const [activePage, setActivePage] = useState<PageKey>("overview");
   const [taskFilter, setTaskFilter] = useState<RuntimeTaskFilter>("all");
+  const [taskQuery, setTaskQuery] = useState("");
+  const [taskPage, setTaskPage] = useState(1);
+  const [resourceQuery, setResourceQuery] = useState("");
+  const [resourcePage, setResourcePage] = useState(1);
+  const [eventQuery, setEventQuery] = useState("");
+  const [eventPage, setEventPage] = useState(1);
+  const [flightQuery, setFlightQuery] = useState("");
+  const [flightPage, setFlightPage] = useState(1);
+  const [zoneQuery, setZoneQuery] = useState("");
+  const [zonePage, setZonePage] = useState(1);
+  const [affectedTaskPage, setAffectedTaskPage] = useState(1);
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [selectedResourceId, setSelectedResourceId] = useState("");
   const [selectedEventId, setSelectedEventId] = useState("");
@@ -271,25 +298,108 @@ export default function RuntimeWorkspace({
   const visibleTasks = useMemo(() => {
     if (!snapshot) return [];
     return snapshot.tasks.filter((task) => {
-      if (taskFilter === "active") {
-        return ["en_route", "waiting", "in_service"].includes(task.status);
-      }
-      if (taskFilter === "attention") {
-        return task.status === "affected" || task.status === "unassigned";
-      }
-      return true;
+      const matchesFilter = taskFilter === "all"
+        || (taskFilter === "active" && ["en_route", "waiting", "in_service"].includes(task.status))
+        || (taskFilter === "attention" && (task.status === "affected" || task.status === "unassigned"));
+      if (!matchesFilter) return false;
+      const meta = taskMeta.get(task.task_id);
+      const flight = flightMeta.get(meta?.flight_id ?? "");
+      return includesNormalizedQuery(taskQuery, [
+        task.task_id,
+        task.status_label,
+        task.resource_id,
+        task.assignment_id,
+        taskTypeLabels[meta?.task_type ?? ""],
+        flight?.display_code,
+      ]);
     });
-  }, [snapshot, taskFilter]);
+  }, [flightMeta, snapshot, taskFilter, taskMeta, taskQuery]);
 
-  const visibleTaskIds = useMemo(() => visibleTasks.map((task) => task.task_id), [visibleTasks]);
-  const resourceIds = useMemo(
-    () => snapshot?.resources.map((resource) => resource.resource_id) ?? [],
+  const taskWindow = useMemo(
+    () => paginateItems(visibleTasks, taskPage, TASK_PAGE_SIZE),
+    [taskPage, visibleTasks],
+  );
+  const visibleResources = useMemo(() => {
+    if (!snapshot) return [];
+    return snapshot.resources.filter((resource) => {
+      const meta = resourceMeta.get(resource.resource_id);
+      return includesNormalizedQuery(resourceQuery, [
+        resource.resource_id,
+        resource.status_label,
+        resource.current_task_id,
+        resource.next_task_id,
+        resourceTypeLabels[meta?.resource_type ?? ""],
+      ]);
+    });
+  }, [resourceMeta, resourceQuery, snapshot]);
+  const resourceWindow = useMemo(
+    () => paginateItems(visibleResources, resourcePage, RESOURCE_PAGE_SIZE),
+    [resourcePage, visibleResources],
+  );
+  const visibleEvents = useMemo(() => {
+    if (!snapshot) return [];
+    return snapshot.events.filter((event) => {
+      const flight = flightMeta.get(event.flight_id);
+      return includesNormalizedQuery(eventQuery, [
+        event.event_id,
+        event.detail,
+        event.status_label,
+        flight?.display_code,
+        eventTypeLabel(event),
+      ]);
+    });
+  }, [eventQuery, flightMeta, snapshot]);
+  const eventWindow = useMemo(
+    () => paginateItems(visibleEvents, eventPage, EVENT_PAGE_SIZE),
+    [eventPage, visibleEvents],
+  );
+  const visibleFlights = useMemo(() => {
+    if (!snapshot) return [];
+    return snapshot.flights.filter((flight) => includesNormalizedQuery(flightQuery, [
+      flight.flight_id,
+      flightMeta.get(flight.flight_id)?.display_code,
+      flight.gate_id,
+      flightStatusLabels[flight.status],
+      flight.last_event_id,
+    ]));
+  }, [flightMeta, flightQuery, snapshot]);
+  const flightWindow = useMemo(
+    () => paginateItems(visibleFlights, flightPage, FLIGHT_PAGE_SIZE),
+    [flightPage, visibleFlights],
+  );
+  const visibleZones = useMemo(
+    () => scenario.zones.filter((zone) => includesNormalizedQuery(zoneQuery, [zone.zone_id, zone.name])),
+    [scenario.zones, zoneQuery],
+  );
+  const zoneWindow = useMemo(
+    () => paginateItems(visibleZones, zonePage, ZONE_PAGE_SIZE),
+    [visibleZones, zonePage],
+  );
+  const affectedTasks = useMemo(
+    () => snapshot?.tasks.filter((task) => task.affected_by_event_ids.length > 0) ?? [],
     [snapshot],
+  );
+  const affectedTaskWindow = useMemo(
+    () => paginateItems(affectedTasks, affectedTaskPage, AFFECTED_TASK_PAGE_SIZE),
+    [affectedTaskPage, affectedTasks],
+  );
+
+  const visibleTaskIds = useMemo(() => taskWindow.items.map((task) => task.task_id), [taskWindow.items]);
+  const resourceIds = useMemo(
+    () => resourceWindow.items.map((resource) => resource.resource_id),
+    [resourceWindow.items],
   );
   const eventIds = useMemo(
-    () => snapshot?.events.map((event) => event.event_id) ?? [],
-    [snapshot],
+    () => eventWindow.items.map((event) => event.event_id),
+    [eventWindow.items],
   );
+
+  useEffect(() => setTaskPage(taskWindow.page), [taskWindow.page]);
+  useEffect(() => setResourcePage(resourceWindow.page), [resourceWindow.page]);
+  useEffect(() => setEventPage(eventWindow.page), [eventWindow.page]);
+  useEffect(() => setFlightPage(flightWindow.page), [flightWindow.page]);
+  useEffect(() => setZonePage(zoneWindow.page), [zoneWindow.page]);
+  useEffect(() => setAffectedTaskPage(affectedTaskWindow.page), [affectedTaskWindow.page]);
 
   useEffect(() => {
     setSelectedTaskId((current) => resolveSelectedId(current, visibleTaskIds));
@@ -303,25 +413,23 @@ export default function RuntimeWorkspace({
 
   if (runtime.initializing || !snapshot) return <RuntimeLoadingState />;
 
-  const counts = runtimeStatusCounts(snapshot);
-  const activeTaskCount = (counts.en_route ?? 0) + (counts.waiting ?? 0) + (counts.in_service ?? 0);
-  const attentionTaskCount = (counts.affected ?? 0) + (counts.unassigned ?? 0);
-  const activeResourceCount = snapshot.resources.filter((resource) =>
-    ["moving", "waiting", "serving"].includes(resource.status)).length;
-  const selectedTask = snapshot.tasks.find((task) => task.task_id === selectedTaskId) ?? snapshot.tasks[0];
+  const summary = snapshot.collection_summary;
+  const activeTaskCount = summary.task_active;
+  const attentionTaskCount = summary.task_attention;
+  const activeResourceCount = summary.resource_active;
+  const selectedTask = taskWindow.items.find((task) => task.task_id === selectedTaskId) ?? taskWindow.items[0];
   const selectedTaskMeta = selectedTask ? taskMeta.get(selectedTask.task_id) : undefined;
-  const selectedResource = snapshot.resources.find((resource) => resource.resource_id === selectedResourceId)
-    ?? snapshot.resources[0];
+  const selectedResource = resourceWindow.items.find((resource) => resource.resource_id === selectedResourceId)
+    ?? resourceWindow.items[0];
   const selectedResourceMeta = selectedResource ? resourceMeta.get(selectedResource.resource_id) : undefined;
-  const selectedEvent = snapshot.events.find((event) => event.event_id === selectedEventId)
-    ?? snapshot.events[0];
-  const affectedTasks = snapshot.tasks.filter((task) => task.affected_by_event_ids.length > 0);
+  const selectedEvent = eventWindow.items.find((event) => event.event_id === selectedEventId)
+    ?? eventWindow.items[0];
   const candidateEventDetails = snapshot.candidate_plan_id
     ? snapshot.events
       .filter((event) => event.candidate_plan_id === snapshot.candidate_plan_id)
       .map((event) => event.detail)
     : [];
-  const frozenTaskCount = snapshot.tasks.filter((task) => task.is_locked).length;
+  const frozenTaskCount = summary.task_locked;
   const activePlanTitle = snapshot.active_plan_detail
     ? runtimePlanAlgorithmLabel(snapshot.active_plan_detail.algorithm)
     : "方案明细尚未同步";
@@ -346,6 +454,23 @@ export default function RuntimeWorkspace({
     }
   };
 
+  const openTask = (taskId: string) => {
+    const index = snapshot.tasks.findIndex((task) => task.task_id === taskId);
+    setTaskQuery("");
+    setTaskFilter("all");
+    setTaskPage(pageForIndex(index, TASK_PAGE_SIZE));
+    setSelectedTaskId(taskId);
+    setActivePage("tasks");
+  };
+
+  const openResource = (resourceId: string) => {
+    const index = snapshot.resources.findIndex((resource) => resource.resource_id === resourceId);
+    setResourceQuery("");
+    setResourcePage(pageForIndex(index, RESOURCE_PAGE_SIZE));
+    setSelectedResourceId(resourceId);
+    setActivePage("resources");
+  };
+
   return (
     <div className="app-shell runtime-shell">
       <aside className="sidebar">
@@ -360,7 +485,7 @@ export default function RuntimeWorkspace({
             const badge = item.key === "tasks"
               ? attentionTaskCount
               : item.key === "events"
-                ? snapshot.events.filter((event) => event.status !== "resolved").length
+                ? summary.event_open
                 : item.key === "resources"
                   ? activeResourceCount
                   : item.key === "evidence" && snapshot.candidate_plan_id
@@ -457,7 +582,10 @@ export default function RuntimeWorkspace({
           {runtime.notice && (
             <div className="runtime-notice" role="status">
               <AlertTriangle size={17} /><span>{runtime.notice}</span>
-              <button onClick={onReload}>重新连接</button>
+              <div className="runtime-notice-actions">
+                <button onClick={() => void runtime.refresh()}>读取权威快照</button>
+                <button onClick={onReload}>重新连接</button>
+              </div>
             </div>
           )}
 
@@ -486,7 +614,7 @@ export default function RuntimeWorkspace({
 
                 <section className="kpi-grid" aria-label="实时状态摘要">
                   <article className="kpi-card tone-blue"><span className="kpi-label">仿真时间</span><div className="kpi-value runtime-time-value">{formatTime(snapshot.clock.simulation_time)}</div><span className="kpi-note">后端权威 · {snapshot.clock.speed}x</span></article>
-                  <article className="kpi-card tone-green"><span className="kpi-label">已完成任务</span><div className="kpi-value">{counts.completed ?? 0}<small>项</small></div><span className="kpi-note">完成事实不会回退</span></article>
+                  <article className="kpi-card tone-green"><span className="kpi-label">已完成任务</span><div className="kpi-value">{summary.task_completed}<small>项</small></div><span className="kpi-note">完成事实不会回退</span></article>
                   <article className="kpi-card tone-orange"><span className="kpi-label">待协调任务</span><div className="kpi-value">{attentionTaskCount}<small>项</small></div><span className="kpi-note">受扰动或尚未分配</span></article>
                   <article className="kpi-card"><span className="kpi-label">场景版本</span><div className="kpi-value">V{snapshot.current_scenario_version}</div><span className="kpi-note">修订 R{snapshot.revision}</span></article>
                 </section>
@@ -499,14 +627,14 @@ export default function RuntimeWorkspace({
                         .filter((task) => ["en_route", "waiting", "in_service", "affected"].includes(task.status))
                         .slice(0, 5)
                         .map((task) => (
-                          <button key={task.task_id} onClick={() => { setSelectedTaskId(task.task_id); setActivePage("tasks"); }}>
+                          <button key={task.task_id} onClick={() => openTask(task.task_id)}>
                             <span className={`runtime-state ${taskTone(task.status)}`}>{task.status_label}</span>
                             <div><strong>{task.task_id}</strong><small>{task.resource_id ?? "待协调资源"}</small></div>
                             <time>{formatTime(task.next_transition_at)}</time>
                             <ArrowRight size={16} />
                           </button>
                         ))}
-                      {activeTaskCount + (counts.affected ?? 0) === 0 && (
+                      {activeTaskCount + attentionTaskCount === 0 && (
                         <div className="empty-state compact"><CheckCircle2 size={26} /><strong>当前没有执行中的任务</strong><span>开始或继续运行后，任务会按后端边界自动变化。</span></div>
                       )}
                     </div>
@@ -515,7 +643,7 @@ export default function RuntimeWorkspace({
                   <section className="workspace-section next-action-section">
                     <div className="section-heading"><div><p className="eyebrow">下一步</p><h2>运行关注事项</h2></div></div>
                     <div className="runtime-brief-list">
-                      <button onClick={() => setActivePage("events")}><Plane size={19} /><span><strong>{snapshot.events.filter((event) => event.status === "pending").length} 项事件等待发生</strong><small>下一边界 {formatTime(snapshot.clock.next_boundary_at)}</small></span><ArrowRight size={16} /></button>
+                      <button onClick={() => setActivePage("events")}><Plane size={19} /><span><strong>{summary.event_pending} 项事件等待发生</strong><small>下一边界 {formatTime(snapshot.clock.next_boundary_at)}</small></span><ArrowRight size={16} /></button>
                       <button onClick={() => setActivePage("resources")}><BusFront size={19} /><span><strong>{activeResourceCount} 项资源正在执行</strong><small>查看移动进度和下一可用时间</small></span><ArrowRight size={16} /></button>
                       <button onClick={() => setActivePage("evidence")}><ShieldCheck size={19} /><span><strong>{snapshot.candidate_plan_id ? "候选方案等待确认" : "当前方案继续执行"}</strong><small>{snapshot.guidance.recommended_action}</small></span><ArrowRight size={16} /></button>
                     </div>
@@ -531,21 +659,33 @@ export default function RuntimeWorkspace({
                     <div><p className="eyebrow">实时执行清单</p><h2>保障任务状态</h2></div>
                     <div className="filter-switch" role="group" aria-label="任务状态筛选">
                       {([
-                        ["all", `全部 ${snapshot.tasks.length}`],
+                        ["all", `全部 ${summary.task_total}`],
                         ["active", `执行中 ${activeTaskCount}`],
                         ["attention", `需协调 ${attentionTaskCount}`],
                       ] as Array<[RuntimeTaskFilter, string]>).map(([filter, label]) => (
-                        <button key={filter} className={taskFilter === filter ? "active" : undefined} onClick={() => setTaskFilter(filter)}>{label}</button>
+                        <button key={filter} className={taskFilter === filter ? "active" : undefined} onClick={() => { setTaskFilter(filter); setTaskPage(1); }}>{label}</button>
                       ))}
                     </div>
                     <span className="plan-state"><ShieldCheck size={15} />权威投影</span>
                   </div>
+                  <div className="data-window-toolbar">
+                    <label className="data-window-search">
+                      <span>检索任务</span>
+                      <input
+                        type="search"
+                        value={taskQuery}
+                        placeholder="任务、航班、资源或状态"
+                        onChange={(event) => { setTaskQuery(event.target.value); setTaskPage(1); }}
+                      />
+                    </label>
+                    <p className="data-window-note">仅筛选当前权威快照，不改变运行修订或触发重规划。</p>
+                  </div>
                   <div className="table-wrap">
-                    {visibleTasks.length ? (
+                    {taskWindow.items.length ? (
                       <table>
                         <thead><tr><th>保障任务</th><th>实时状态</th><th>执行资源</th><th>当前位置</th><th>下一边界</th><th>执行保护</th></tr></thead>
                         <tbody>
-                          {visibleTasks.map((task) => {
+                          {taskWindow.items.map((task) => {
                             const meta = taskMeta.get(task.task_id);
                             return (
                               <RuntimeTaskRow
@@ -565,7 +705,8 @@ export default function RuntimeWorkspace({
                       <div className="empty-state"><ListChecks size={28} /><strong>当前筛选下没有任务</strong><span>切换筛选不会影响仿真运行或触发重规划。</span></div>
                     )}
                   </div>
-                  <p className="table-hint">移动端可横向查看完整状态和执行保护信息。</p>
+                  <PaginationControls label="保障任务" total={visibleTasks.length} page={taskWindow.page} pageSize={TASK_PAGE_SIZE} onPageChange={setTaskPage} />
+                  <p className="table-hint">移动端按任务卡片展示完整状态和执行保护信息。</p>
                 </section>
 
                 <aside className="workspace-section task-detail">
@@ -589,7 +730,7 @@ export default function RuntimeWorkspace({
                         <div className="manual-note"><AlertTriangle size={18} /><div><strong>任务受到运行扰动影响</strong><p>{selectedTask.affected_by_event_ids.join("、")}</p></div></div>
                       )}
                       {selectedTask.resource_id && (
-                        <button className="secondary-action" onClick={() => { setSelectedResourceId(selectedTask.resource_id ?? ""); setActivePage("resources"); }}>查看执行资源<ArrowRight size={16} /></button>
+                        <button className="secondary-action" onClick={() => openResource(selectedTask.resource_id ?? "")}>查看执行资源<ArrowRight size={16} /></button>
                       )}
                     </>
                   ) : <div className="empty-state compact"><ListChecks size={26} /><strong>选择任务查看详情</strong></div>}
@@ -607,18 +748,31 @@ export default function RuntimeWorkspace({
                 />
                 <div className="runtime-events-overview">
                 <section className="workspace-section event-catalog">
-                  <div className="section-heading"><div><p className="eyebrow">处理时间流</p><h2>{snapshot.events.length} 项运行扰动</h2></div><span className="section-note">事件只应用一次</span></div>
+                  <div className="section-heading"><div><p className="eyebrow">处理时间流</p><h2>{summary.event_total} 项运行扰动</h2></div><span className="section-note">事件只应用一次</span></div>
+                  <div className="data-window-toolbar compact">
+                    <label className="data-window-search">
+                      <span>检索事件</span>
+                      <input
+                        type="search"
+                        value={eventQuery}
+                        placeholder="事件、航班、状态或内容"
+                        onChange={(event) => { setEventQuery(event.target.value); setEventPage(1); }}
+                      />
+                    </label>
+                  </div>
                   <div className="event-selector runtime-event-selector">
-                    {snapshot.events.map((event, index) => {
+                    {eventWindow.items.map((event, index) => {
                       return (
                         <button key={event.event_id} className={selectedEvent?.event_id === event.event_id ? "active" : undefined} onClick={() => setSelectedEventId(event.event_id)}>
-                          <span className="event-index">{String(index + 1).padStart(2, "0")}</span>
+                          <span className="event-index">{String(eventWindow.startIndex + index + 1).padStart(2, "0")}</span>
                           <div><strong>{eventTypeLabel(event)}</strong><span>{formatTime(event.occurred_at)} · {event.detail}</span></div>
                           <span className={`runtime-state ${eventTone(event.status)}`}>{event.status_label}</span>
                         </button>
                       );
                     })}
+                    {!eventWindow.items.length && <div className="empty-state compact"><Plane size={25} /><strong>没有匹配的运行事件</strong></div>}
                   </div>
+                  <PaginationControls label="运行事件" total={visibleEvents.length} page={eventWindow.page} pageSize={EVENT_PAGE_SIZE} onPageChange={setEventPage} />
                 </section>
 
                 <section className="workspace-section event-analysis">
@@ -638,8 +792,19 @@ export default function RuntimeWorkspace({
 
                 <section className="workspace-section flight-runtime-panel">
                   <div className="section-heading"><div><p className="eyebrow">航班动态</p><h2>当前预计与登机口</h2></div><span className="section-note">来自权威运行投影</span></div>
+                  <div className="data-window-toolbar compact">
+                    <label className="data-window-search">
+                      <span>检索航班</span>
+                      <input
+                        type="search"
+                        value={flightQuery}
+                        placeholder="航班、登机口或状态"
+                        onChange={(event) => { setFlightQuery(event.target.value); setFlightPage(1); }}
+                      />
+                    </label>
+                  </div>
                   <div className="flight-runtime-list">
-                    {snapshot.flights.map((flight) => (
+                    {flightWindow.items.map((flight) => (
                       <article key={flight.flight_id}>
                         <Plane size={20} />
                         <div><strong>{flightMeta.get(flight.flight_id)?.display_code ?? flight.flight_id}</strong><span>{flight.gate_id} · {flightStatusLabels[flight.status]}</span></div>
@@ -647,7 +812,9 @@ export default function RuntimeWorkspace({
                         <small>{flight.last_event_id ? `最近事件 ${flight.last_event_id}` : "暂无变化"}</small>
                       </article>
                     ))}
+                    {!flightWindow.items.length && <div className="empty-state compact"><Plane size={25} /><strong>没有匹配的航班投影</strong></div>}
                   </div>
+                  <PaginationControls label="航班投影" total={visibleFlights.length} page={flightWindow.page} pageSize={FLIGHT_PAGE_SIZE} onPageChange={setFlightPage} />
                 </section>
                 </div>
               </div>
@@ -656,9 +823,20 @@ export default function RuntimeWorkspace({
             {activePage === "resources" && (
               <div className="resources-layout runtime-resources-layout">
                 <section className="workspace-section resource-catalog">
-                  <div className="section-heading"><div><p className="eyebrow">资源清单</p><h2>实时资源状态</h2></div><span className="section-note">{activeResourceCount} 项正在执行</span></div>
+                  <div className="section-heading"><div><p className="eyebrow">资源清单</p><h2>实时资源状态</h2></div><span className="section-note">{activeResourceCount} / {summary.resource_total} 项正在执行</span></div>
+                  <div className="data-window-toolbar compact">
+                    <label className="data-window-search">
+                      <span>检索资源</span>
+                      <input
+                        type="search"
+                        value={resourceQuery}
+                        placeholder="资源、任务、类型或状态"
+                        onChange={(event) => { setResourceQuery(event.target.value); setResourcePage(1); }}
+                      />
+                    </label>
+                  </div>
                   <div className="runtime-resource-list">
-                    {snapshot.resources.map((resource) => (
+                    {resourceWindow.items.map((resource) => (
                       <ResourceRuntimeRow
                         key={resource.resource_id}
                         resource={resource}
@@ -667,7 +845,9 @@ export default function RuntimeWorkspace({
                         onSelect={() => setSelectedResourceId(resource.resource_id)}
                       />
                     ))}
+                    {!resourceWindow.items.length && <div className="empty-state compact"><BusFront size={25} /><strong>没有匹配的资源投影</strong></div>}
                   </div>
+                  <PaginationControls label="保障资源" total={visibleResources.length} page={resourceWindow.page} pageSize={RESOURCE_PAGE_SIZE} onPageChange={setResourcePage} />
                 </section>
 
                 <section className="workspace-section resource-detail">
@@ -700,7 +880,7 @@ export default function RuntimeWorkspace({
                   <div className="section-heading"><div><p className="eyebrow">当前与下一项</p><h2>执行衔接</h2></div></div>
                   <div className="resource-task-sequence">
                     {[selectedResource?.current_task_id, selectedResource?.next_task_id].map((taskId, index) => taskId && (
-                      <button key={taskId} onClick={() => { setSelectedTaskId(taskId); setActivePage("tasks"); }}>
+                      <button key={taskId} onClick={() => openTask(taskId)}>
                         <span>{index === 0 ? "当前" : "下一"}</span><div><strong>{taskId}</strong><small>{taskTypeLabels[taskMeta.get(taskId)?.task_type ?? ""] ?? "保障任务"}</small></div><ArrowRight size={16} />
                       </button>
                     ))}
@@ -710,11 +890,24 @@ export default function RuntimeWorkspace({
 
                 <section className="workspace-section zone-overview">
                   <div className="section-heading"><div><p className="eyebrow">区域事实</p><h2>保障区域</h2></div></div>
+                  <div className="data-window-toolbar compact">
+                    <label className="data-window-search">
+                      <span>检索区域</span>
+                      <input
+                        type="search"
+                        value={zoneQuery}
+                        placeholder="区域编号或名称"
+                        onChange={(event) => { setZoneQuery(event.target.value); setZonePage(1); }}
+                      />
+                    </label>
+                  </div>
                   <div className="zone-list">
-                    {scenario.zones.map((zone) => (
+                    {zoneWindow.items.map((zone) => (
                       <article key={zone.zone_id} className={selectedResource?.position.from_zone_id === zone.zone_id ? "active" : undefined}><MapPinned size={18} /><div><strong>{zone.name}</strong><span>{selectedResource?.position.from_zone_id === zone.zone_id ? "资源当前区域" : zone.zone_id}</span></div></article>
                     ))}
+                    {!zoneWindow.items.length && <div className="empty-state compact"><MapPinned size={25} /><strong>没有匹配的保障区域</strong></div>}
                   </div>
+                  <PaginationControls label="保障区域" total={visibleZones.length} page={zoneWindow.page} pageSize={ZONE_PAGE_SIZE} onPageChange={setZonePage} />
                 </section>
               </div>
             )}
@@ -765,11 +958,12 @@ export default function RuntimeWorkspace({
                 <section className="workspace-section affected-task-panel">
                   <div className="section-heading"><div><p className="eyebrow">变化范围</p><h2>受影响任务</h2></div><span className="section-note">{affectedTasks.length} 项</span></div>
                   <div className="affected-task-list">
-                    {affectedTasks.map((task) => (
-                      <button key={task.task_id} onClick={() => { setSelectedTaskId(task.task_id); setActivePage("tasks"); }}><span className={`runtime-state ${taskTone(task.status)}`}>{task.status_label}</span><div><strong>{task.task_id}</strong><small>{task.affected_by_event_ids.join("、")}</small></div><ArrowRight size={16} /></button>
+                    {affectedTaskWindow.items.map((task) => (
+                      <button key={task.task_id} onClick={() => openTask(task.task_id)}><span className={`runtime-state ${taskTone(task.status)}`}>{task.status_label}</span><div><strong>{task.task_id}</strong><small>{task.affected_by_event_ids.join("、")}</small></div><ArrowRight size={16} /></button>
                     ))}
                     {!affectedTasks.length && <div className="empty-state compact"><CheckCircle2 size={25} /><strong>当前没有受扰动待确认任务</strong></div>}
                   </div>
+                  {affectedTasks.length > 0 && <PaginationControls label="受影响任务" total={affectedTasks.length} page={affectedTaskWindow.page} pageSize={AFFECTED_TASK_PAGE_SIZE} onPageChange={setAffectedTaskPage} />}
                 </section>
 
                 <section className="workspace-section basis-panel runtime-basis-panel">

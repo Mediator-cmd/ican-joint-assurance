@@ -205,6 +205,7 @@ pending -> triggered -> applied -> replanning
 - 会话状态、中文状态标签和持久化 `revision`。
 - `RuntimeClockSnapshot`。
 - 任务、资源、航班和事件投影。
+- `RuntimeCollectionSummary`：从同一快照严格派生的任务总数/活动/需关注/完成/锁定数、资源总数/活动数、事件总数/开放/待发生数和航班总数。它随 REST 与 SSE 完整快照传输，不是独立状态源。
 - 面向普通用户的 `RuntimeGuidance`：现在发生什么、是否需要操作、建议下一步。
 - 仅在 `failed` 状态出现的安全错误摘要。
 - 创建/更新时间、`storage_scope: sqlite` 和完整安全声明。
@@ -216,6 +217,8 @@ pending -> triggered -> applied -> replanning
 3. 只有 `failed` 可以携带会话 failure。
 4. 同一快照内任务、资源、航班和事件 ID 各自唯一。
 5. 当前场景版本不能小于初始版本。
+6. 集合摘要的所有字段均为非负整数，各子计数不得超过对应总数，`event_pending <= event_open <= event_total`。
+7. 集合摘要只能由快照内权威投影派生；前端搜索、分页和选择不得修改摘要、revision、业务时间或方案。
 
 ## 10. SSE 消息契约
 

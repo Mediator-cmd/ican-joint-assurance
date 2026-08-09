@@ -231,7 +231,36 @@ function isRuntimeSnapshot(value: unknown): value is RuntimeSessionSnapshot {
     && Array.isArray(value.tasks)
     && Array.isArray(value.resources)
     && Array.isArray(value.flights)
-    && Array.isArray(value.events);
+    && Array.isArray(value.events)
+    && isRuntimeCollectionSummary(value.collection_summary);
+}
+
+function isRuntimeCollectionSummary(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const fields = [
+    "task_total",
+    "task_active",
+    "task_attention",
+    "task_completed",
+    "task_locked",
+    "resource_total",
+    "resource_active",
+    "event_total",
+    "event_open",
+    "event_pending",
+    "flight_total",
+  ];
+  if (!fields.every((field) => Number.isInteger(value[field]) && Number(value[field]) >= 0)) {
+    return false;
+  }
+  const summary = value as Record<string, number>;
+  return summary.task_active <= summary.task_total
+    && summary.task_attention <= summary.task_total
+    && summary.task_completed <= summary.task_total
+    && summary.task_locked <= summary.task_total
+    && summary.resource_active <= summary.resource_total
+    && summary.event_pending <= summary.event_open
+    && summary.event_open <= summary.event_total;
 }
 
 function requireRuntimeSnapshot(value: RuntimeSessionSnapshot): RuntimeSessionSnapshot {

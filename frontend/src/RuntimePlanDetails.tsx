@@ -6,10 +6,20 @@ import {
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
+import { useState } from "react";
 
+import PaginationControls from "./PaginationControls";
+import { paginateItems } from "./pagination";
 import { compareRuntimePlans } from "./runtime";
 import type { RuntimePlanChangeField } from "./runtime";
 import type { Assignment, Plan, Scenario } from "./types";
+
+const PLAN_TASK_PAGE_SIZE = 25;
+const PLAN_CHANGE_PAGE_SIZE = 20;
+
+type PlanTaskEntry =
+  | { kind: "assignment"; assignment: Assignment }
+  | { kind: "unassigned"; task: Plan["unassigned_tasks"][number] };
 
 const taskTypeLabels: Record<string, string> = {
   wheelchair_transfer: "轮椅转运",
@@ -68,14 +78,24 @@ export function runtimePlanFacts(plan: Plan): string {
   ].join(" · ");
 }
 
-function AssignmentList({ plan, scenario }: { plan: Plan; scenario: Scenario }) {
+function AssignmentList({ entries, scenario }: { entries: PlanTaskEntry[]; scenario: Scenario }) {
   const taskMeta = new Map(scenario.tasks.map((task) => [task.task_id, task]));
   const flightMeta = new Map(scenario.flights.map((flight) => [flight.flight_id, flight]));
   const zoneNames = new Map(scenario.zones.map((zone) => [zone.zone_id, zone.name]));
 
   return (
     <div className="plan-assignment-list">
-      {plan.assignments.map((assignment) => {
+      {entries.map((entry) => {
+        if (entry.kind === "unassigned") {
+          const task = entry.task;
+          return (
+            <article className="plan-assignment-row unassigned" key={`unassigned-${task.task_id}`}>
+              <div className="plan-task-identity"><strong>{task.task_id}</strong><span>转人工协调</span></div>
+              <div className="plan-unassigned-copy"><span>{unassignedReasonLabels[task.reason] ?? "暂不可安排"}</span><strong>{task.detail}</strong></div>
+            </article>
+          );
+        }
+        const assignment = entry.assignment;
         const task = taskMeta.get(assignment.task_id);
         const flight = flightMeta.get(task?.flight_id ?? "");
         return (
@@ -90,12 +110,6 @@ function AssignmentList({ plan, scenario }: { plan: Plan; scenario: Scenario }) 
           </article>
         );
       })}
-      {plan.unassigned_tasks.map((task) => (
-        <article className="plan-assignment-row unassigned" key={task.task_id}>
-          <div className="plan-task-identity"><strong>{task.task_id}</strong><span>转人工协调</span></div>
-          <div className="plan-unassigned-copy"><span>{unassignedReasonLabels[task.reason] ?? "暂不可安排"}</span><strong>{task.detail}</strong></div>
-        </article>
-      ))}
     </div>
   );
 }
@@ -113,6 +127,13 @@ function PlanColumn({
   purpose: string;
   candidate?: boolean;
 }) {
+  const [taskPage, setTaskPage] = useState(1);
+  const entries: PlanTaskEntry[] = [
+    ...plan.assignments.map((assignment): PlanTaskEntry => ({ kind: "assignment", assignment })),
+    ...plan.unassigned_tasks.map((task): PlanTaskEntry => ({ kind: "unassigned", task })),
+  ];
+  const taskWindow = paginateItems(entries, taskPage, PLAN_TASK_PAGE_SIZE);
+
   return (
     <section className={`plan-detail-column${candidate ? " candidate" : ""}`}>
       <header>
@@ -128,7 +149,14 @@ function PlanColumn({
         <div><CheckCircle2 size={17} /><span>关键任务</span><strong>{plan.metrics.critical_task_completion_rate_pct.toFixed(0)}%</strong></div>
       </div>
       <div className="plan-list-heading"><strong>具体执行内容</strong><span>{plan.assignments.length} 项执行 · {plan.unassigned_tasks.length} 项协调</span></div>
-      <AssignmentList plan={plan} scenario={scenario} />
+      <AssignmentList entries={taskWindow.items} scenario={scenario} />
+      <PaginationControls
+        label={`${label}任务书`}
+        total={entries.length}
+        page={taskWindow.page}
+        pageSize={PLAN_TASK_PAGE_SIZE}
+        onPageChange={setTaskPage}
+      />
     </section>
   );
 }
@@ -151,6 +179,7 @@ export default function RuntimePlanDetails({
   eventDetails: string[];
   frozenTaskCount: number;
 }) {
+  const [changePage, setChangePage] = useState(1);
   if (!activePlan) {
     return (
       <div className="plan-detail-unavailable">
@@ -161,6 +190,11 @@ export default function RuntimePlanDetails({
   }
 
   const comparison = candidatePlan ? compareRuntimePlans(activePlan, candidatePlan) : null;
+  const changeWindow = paginateItems(
+    comparison?.changes ?? [],
+    changePage,
+    PLAN_CHANGE_PAGE_SIZE,
+  );
   const responseTarget = eventDetails.length > 0
     ? `响应 ${eventDetails.join("；")}`
     : "响应人工重新计算请求";
@@ -189,7 +223,7 @@ export default function RuntimePlanDetails({
         <section className="plan-difference-section">
           <div className="plan-list-heading"><strong>候选相对当前方案的具体变化</strong><span>{comparison.changes.length} 项调整 · {comparison.unchangedTaskIds.length} 项保持不变</span></div>
           <div className="plan-difference-list">
-            {comparison.changes.map((change) => (
+            {changeWindow.items.map((change) => (
               <article key={change.taskId}>
                 <div><strong>{change.taskId}</strong><span>{change.changedFields.map((field) => changeFieldLabels[field]).join("、")}</span></div>
                 <p><span>当前</span>{assignmentSummary(change.activeAssignment)}</p>
@@ -201,6 +235,15 @@ export default function RuntimePlanDetails({
               <div className="plan-no-change"><CheckCircle2 size={20} /><span>本次复核未改变任务安排，候选仍经过独立约束检查并等待人工确认。</span></div>
             )}
           </div>
+          {comparison.changes.length > 0 && (
+            <PaginationControls
+              label="候选方案变化"
+              total={comparison.changes.length}
+              page={changeWindow.page}
+              pageSize={PLAN_CHANGE_PAGE_SIZE}
+              onPageChange={setChangePage}
+            />
+          )}
         </section>
       )}
     </>

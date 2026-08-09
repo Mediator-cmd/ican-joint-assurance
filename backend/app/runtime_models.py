@@ -339,6 +339,36 @@ class RuntimeGuidance(ModelBase):
     recommended_action: str = Field(min_length=1, max_length=160)
 
 
+class RuntimeCollectionSummary(ModelBase):
+    task_total: int = Field(ge=0)
+    task_active: int = Field(ge=0)
+    task_attention: int = Field(ge=0)
+    task_completed: int = Field(ge=0)
+    task_locked: int = Field(ge=0)
+    resource_total: int = Field(ge=0)
+    resource_active: int = Field(ge=0)
+    event_total: int = Field(ge=0)
+    event_open: int = Field(ge=0)
+    event_pending: int = Field(ge=0)
+    flight_total: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_subtotals(self) -> RuntimeCollectionSummary:
+        task_subtotals = (
+            self.task_active,
+            self.task_attention,
+            self.task_completed,
+            self.task_locked,
+        )
+        if any(value > self.task_total for value in task_subtotals):
+            raise ValueError("runtime task summary cannot exceed task_total")
+        if self.resource_active > self.resource_total:
+            raise ValueError("runtime resource summary cannot exceed resource_total")
+        if self.event_pending > self.event_open or self.event_open > self.event_total:
+            raise ValueError("runtime event summary must form valid subtotals")
+        return self
+
+
 class RuntimeSessionSnapshot(ModelBase):
     session_id: str = Field(pattern=SESSION_ID_PATTERN)
     scenario_id: str = Field(min_length=1)
@@ -415,6 +445,48 @@ class RuntimeSessionSnapshot(ModelBase):
     @property
     def status_label(self) -> str:
         return RUNTIME_STATUS_LABELS[self.status]
+
+    @computed_field(return_type=RuntimeCollectionSummary)
+    @property
+    def collection_summary(self) -> RuntimeCollectionSummary:
+        active_task_statuses = {
+            TaskRuntimeStatus.EN_ROUTE,
+            TaskRuntimeStatus.WAITING,
+            TaskRuntimeStatus.IN_SERVICE,
+        }
+        attention_task_statuses = {
+            TaskRuntimeStatus.AFFECTED,
+            TaskRuntimeStatus.UNASSIGNED,
+        }
+        active_resource_statuses = {
+            ResourceRuntimeStatus.MOVING,
+            ResourceRuntimeStatus.WAITING,
+            ResourceRuntimeStatus.SERVING,
+        }
+        return RuntimeCollectionSummary(
+            task_total=len(self.tasks),
+            task_active=sum(task.status in active_task_statuses for task in self.tasks),
+            task_attention=sum(
+                task.status in attention_task_statuses for task in self.tasks
+            ),
+            task_completed=sum(
+                task.status is TaskRuntimeStatus.COMPLETED for task in self.tasks
+            ),
+            task_locked=sum(task.is_locked for task in self.tasks),
+            resource_total=len(self.resources),
+            resource_active=sum(
+                resource.status in active_resource_statuses
+                for resource in self.resources
+            ),
+            event_total=len(self.events),
+            event_open=sum(
+                event.status is not RuntimeEventStatus.RESOLVED for event in self.events
+            ),
+            event_pending=sum(
+                event.status is RuntimeEventStatus.PENDING for event in self.events
+            ),
+            flight_total=len(self.flights),
+        )
 
 
 class RuntimeSessionSummary(ModelBase):

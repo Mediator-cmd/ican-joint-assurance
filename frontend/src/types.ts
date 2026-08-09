@@ -399,6 +399,20 @@ export interface RuntimeFailure {
   recoverable: boolean;
 }
 
+export interface RuntimeCollectionSummary {
+  task_total: number;
+  task_active: number;
+  task_attention: number;
+  task_completed: number;
+  task_locked: number;
+  resource_total: number;
+  resource_active: number;
+  event_total: number;
+  event_open: number;
+  event_pending: number;
+  flight_total: number;
+}
+
 export interface RuntimeSessionSnapshot {
   session_id: string;
   scenario_id: string;
@@ -418,6 +432,7 @@ export interface RuntimeSessionSnapshot {
   resources: ResourceRuntimeProjection[];
   flights: FlightRuntimeProjection[];
   events: EventRuntimeProjection[];
+  collection_summary: RuntimeCollectionSummary;
   guidance: RuntimeGuidance;
   failure: RuntimeFailure | null;
   created_at: string;
