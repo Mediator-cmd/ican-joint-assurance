@@ -154,5 +154,11 @@ def test_scale_artifact_rejects_content_tampering_and_unknown_tiers() -> None:
 
     with pytest.raises(ValidationError, match="fingerprint does not match"):
         ScaleScenarioArtifact.model_validate(payload)
+
+    payload["fingerprint_sha256"] = compute_scale_scenario_fingerprint(
+        Scenario.model_validate(payload["scenario"])
+    )
+    with pytest.raises(ValidationError, match="not canonical"):
+        ScaleScenarioArtifact.model_validate(payload)
     with pytest.raises(ValueError):
         build_scale_scenario("production")

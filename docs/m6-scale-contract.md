@@ -53,3 +53,15 @@ M6-1 使用固定 `2026-08-01` 教学日期、`simulation` 模式、`synthetic` 
 | `large_aggregate` | `a5e0bae31aa7a91b70568df58326fe93a850ce26d3701234a39e14e620c9c70e` |
 
 摘要只证明输入内容可复现，不是性能签名或生产数据证明。任何有意修改生成规律都必须同步更新专项测试、审查记录和摘要版本；不得静默改变基准输入。
+
+## 7. M6-2 有界规划契约
+
+规模规划入口固定先计算 `ScaleModelEstimate`，不得在 guard 之后才构造超限 CP-SAT 模型。当前限制为 500 项任务、1,250,000 个旧全量排序对和每项任务最多 3 个有界候选资源。
+
+- `small` 和 `medium` 的规范估算不触发 guard，只允许 `execution_path=cp_sat` 和 `bounded_scale_cp_sat_v1`，不得回退。
+- `large_aggregate` 在建模前触发 guard，只允许公开 `execution_path=deterministic_fallback`、`fallback_reason=model_size_guard` 和 `deterministic_scale_fallback_v1`。
+- `time_limit` 只表示未触发 guard 的大型求解器返回 `UNKNOWN`；模型无效、不可行、代码错误或硬约束失败不得标记为超时。
+- 每个结果必须绑定规范档位、M6-1 冻结指纹、规范场景 ID/version、实际执行路径、有限回退原因和完整 `Plan`，并固定需要人工确认和安全声明。
+- 返回结果必须覆盖全部任务，`PlanStatus.INVALID`、非零硬约束违规、指标/列表不一致、场景身份错配或静默回退一律拒绝。
+
+本契约仍不是性能结论。M6-3 必须从独立计时样本证明实际时间目标，不能把 M6-2 的功能测试时间当作 p50/p95/最大值。

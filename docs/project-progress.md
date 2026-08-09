@@ -757,3 +757,16 @@ M3 已关闭，M4-0 契约冻结、M4-1 运行会话、M4-2 确定性状态投�
 - 全量验证：后端 `232 passed in 10.86s`；前端 3 个测试文件、`24 passed`；类型检查、Vite 生产构建、`compileall`、`pip check`、PowerShell 语法、新代码纯 ASCII、`git diff --check` 和仅计数的 key-like 扫描通过。
 - 范围：未调用或修改 FIFO、CP-SAT、`validate_plan()`、公开 API、前端、SQLite 或 AI 链路，不生成基准样本、性能报告或回退结果，不接真实机场生产流或部署公网。
 - 详细审查：[m6-01-review.md](m6-01-review.md)。下一唯一入口为 M6-2 有界可扩展规划与显式安全回退；M6-3 前不得发布性能结论。
+
+### 2026-08-08 / M6-2 有界规模规划与安全回退
+
+- 完成：新增 `backend/app/scale_planner.py` 和严格 `ScalePlanningResult`。小型/中型规范场景走 `bounded_scale_cp_sat_v1`；大型在创建 CP-SAT 模型前走 `deterministic_scale_fallback_v1`，公开 `model_size_guard`。
+- 模型估算：三档兼容对为 750/9,375/150,000，有界候选对为 300/1,500/6,000，旧全量排序对为 15,250/971,875/62,425,000；固定 guard 为 500 项任务、1,250,000 排序对和每任务最多 3 个候选资源。
+- 有界求解：小/中使用可选区间与 `AddNoOverlap` 代替同资源任务对两两先后变量，预留全场最大行程缓冲；确定性安全起始解只作为 CP-SAT hint，最终任务书读取求解器结果并按真实最短路重建。
+- 安全结果：三档功能验证均为 `executable`，完整分配 100/500/2000 项任务，独立 `validate_plan()` 违规为 0。小/中超时直接失败、不调用回退；大型 guard 测试证明建模函数零调用。
+- 契约修正：只把求解器 `UNKNOWN` 识别为 `time_limit`；`INFEASIBLE`、`MODEL_INVALID`、代码错误和复核失败不能伪装成回退。结果严格绑定冻结指纹、规范场景 ID/version、列表/指标、路径/原因、人工确认和安全声明。
+- 指纹加固：M6-1 工件现在不仅校验内容摘要一致，还必须等于该档位冻结摘要；篡改后重新计算新摘要仍被拒绝，不能静默替换 M6-3 基准输入。
+- 专项验证：M6-0 至 M6-2 聚焦 `28 passed in 6.43s`。该时间包含场景生成、多次功能求解和断言，不是正式规划样本，未产生 2/5/15 秒、p50/p95 或最大值结论。
+- 全量验证：后端 `242 passed in 16.56s`；前端 3 个测试文件、`24 passed`；类型检查、Vite 生产构建、`compileall`、`pip check`、PowerShell 语法、新代码纯 ASCII、`git diff --check` 和仅计数的 key-like 扫描通过。
+- 范围：未修改现有业务优化器、公开 API、实时 session/revision、SQLite、SSE、前端或 AI；不接真实机场生产流、不创建 GitHub 远程或部署公网。
+- 详细审查：[m6-02-review.md](m6-02-review.md)。下一唯一入口为 M6-3 离线基准运行器、FIFO/有界规划对比和从实际样本生成的严格性能报告。
