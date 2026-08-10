@@ -7,7 +7,7 @@ import {
   Quote,
   Sparkles,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ApiRequestError, createRuntimePlanExplanation } from "./api";
 import type {
@@ -34,6 +34,7 @@ const fallbackLabels: Record<string, string> = {
   model_timeout: "模型超时 · 已回退规则解释",
   provider_error: "模型服务异常 · 已回退规则解释",
   invalid_model_output: "模型结果校验失败 · 已回退规则解释",
+  question_not_grounded: "当前事实不足 · 未调用模型猜测",
 };
 
 function sourceLabel(explanation: PlanExplanationResponse): string {
@@ -80,6 +81,92 @@ function ExplanationClaimBlock({
   );
 }
 
+function ExplanationSection({
+  title,
+  responsibility,
+  claims,
+  evidence,
+  emphasized,
+}: {
+  title: string;
+  responsibility: string;
+  claims: ExplanationClaim[];
+  evidence: Map<string, ExplanationEvidence>;
+  emphasized: boolean;
+}) {
+  return (
+    <section className={`explanation-section${emphasized ? " emphasized" : ""}`}>
+      <header>
+        <h3>{title}</h3>
+        <p>{responsibility}</p>
+        {emphasized && <span>当前重点</span>}
+      </header>
+      {claims.map((claim, index) => (
+        <ExplanationClaimBlock
+          key={`${claim.statement}-${index}`}
+          label={claims.length > 1 ? `${title} ${index + 1}` : title}
+          claim={claim}
+          evidence={evidence}
+        />
+      ))}
+    </section>
+  );
+}
+
+export function PlanExplanationResult({
+  explanation,
+  stale = false,
+}: {
+  explanation: PlanExplanationResponse;
+  stale?: boolean;
+}) {
+  const evidence = new Map(
+    explanation.evidence.map((item) => [item.evidence_id, item]),
+  );
+  return (
+    <div className={`plan-explanation-result${stale ? " stale" : ""}`}>
+      <div className="assistant-result-title">
+        <span>{explanation.explanation_id} · {explanation.context.plan_id}</span>
+        <strong>{sourceLabel(explanation)}</strong>
+      </div>
+      <section className={`question-answer-card ${explanation.question_answer.status}`} aria-label="针对你的问题">
+        <header>
+          <span>针对你的问题</span>
+          <strong>{explanation.question_answer.status === "answered" ? "已按权威事实回答" : explanation.question_answer.status === "insufficient_evidence" ? "权威事实不足" : "未提出补充问题"}</strong>
+        </header>
+        {explanation.question && <blockquote>{explanation.question}</blockquote>}
+        <p>{explanation.question_answer.statement}</p>
+        {explanation.question_answer.matched_entity_ids.length > 0 && (
+          <div className="matched-entities">
+            <span>已匹配对象</span>
+            {explanation.question_answer.matched_entity_ids.map((entityId) => <code key={entityId}>{entityId}</code>)}
+          </div>
+        )}
+        {explanation.question_answer.evidence_ids.length > 0 && (
+          <div className="claim-evidence">
+            {explanation.question_answer.evidence_ids.map((evidenceId) => (
+              <div key={evidenceId}><code>{evidenceId}</code><span>{evidence.get(evidenceId)?.statement ?? "引用事实未同步"}</span></div>
+            ))}
+          </div>
+        )}
+      </section>
+      <div className="explanation-section-grid">
+        <ExplanationSection title="方案摘要" responsibility="回答整体状态，以及它与本次问题的关系。" claims={[explanation.summary]} evidence={evidence} emphasized={explanation.focus === "summary"} />
+        <ExplanationSection title="方案取舍" responsibility="解释目标、收益、代价和量化指标。" claims={explanation.tradeoffs} evidence={evidence} emphasized={explanation.focus === "tradeoffs"} />
+        <ExplanationSection title="任务变化" responsibility="列明任务、资源、服务时间、路线及基线差异。" claims={explanation.task_changes} evidence={evidence} emphasized={explanation.focus === "task_changes"} />
+        <ExplanationSection title="人工处理" responsibility="明确人员需要核对、协调或作出的决定。" claims={explanation.manual_handling} evidence={evidence} emphasized={explanation.focus === "manual_handling"} />
+      </div>
+      <ExplanationClaimBlock label="建议下一步" claim={explanation.recommended_next_step} evidence={evidence} emphasized />
+      {explanation.unresolved_questions.length > 0 && (
+        <div className="unresolved-questions">
+          <Quote size={18} />
+          <div><strong>仍需人工确认</strong>{explanation.unresolved_questions.map((item) => <p key={item}>{item}</p>)}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface RuntimePlanExplanationProps {
   snapshot: RuntimeSessionSnapshot;
   connectionStatus: RuntimeConnectionStatus;
@@ -122,11 +209,6 @@ export default function RuntimePlanExplanation({
     || explanation.context.baseline_plan_id !== baselinePlanId
     || requestSignature !== currentSignature
   );
-  const evidence = useMemo(
-    () => new Map(explanation?.evidence.map((item) => [item.evidence_id, item]) ?? []),
-    [explanation],
-  );
-
   const requestExplanation = async () => {
     if (!planId || busy || connectionStatus === "offline_readonly") return;
     const signature = currentSignature;
@@ -180,9 +262,10 @@ export default function RuntimePlanExplanation({
             <button type="button" key={option.value} className={focus === option.value ? "active" : undefined} aria-pressed={focus === option.value} onClick={() => setFocus(option.value)}>{option.label}</button>
           ))}
         </div>
+        <p className="explanation-focus-note">四部分都会返回；所选重点决定哪一部分必须直接结合你的问题展开。</p>
         <label className="explanation-question">
-          <span>匿名补充问题（可选）</span>
-          <input value={question} maxLength={500} placeholder="例如：哪些任务需要人工协调？" onChange={(event) => setQuestion(event.target.value)} />
+          <span>向 AI 提问（可选）</span>
+          <textarea value={question} maxLength={500} placeholder="例如：任务 TASK-… 由哪个资源执行，服务时间和路线是什么？" onChange={(event) => setQuestion(event.target.value)} />
         </label>
         <button type="button" className="assistant-primary-action" disabled={!planId || busy || connectionStatus === "offline_readonly"} onClick={() => void requestExplanation()}>
           {busy ? <LoaderCircle className="spin" size={18} /> : <Bot size={18} />}
@@ -194,25 +277,7 @@ export default function RuntimePlanExplanation({
       {error && <div className="assistant-alert" role="alert"><AlertTriangle size={18} /><span>{error}</span></div>}
       {stale && <div className="assistant-alert" role="status"><AlertTriangle size={18} /><span>运行 revision、方案或解释条件已经变化，以下旧解释仅供追溯，请重新生成。</span></div>}
 
-      {explanation && (
-        <div className={`plan-explanation-result${stale ? " stale" : ""}`}>
-          <div className="assistant-result-title">
-            <span>{explanation.explanation_id} · {explanation.context.plan_id}</span>
-            <strong>{sourceLabel(explanation)}</strong>
-          </div>
-          <ExplanationClaimBlock label="核心摘要" claim={explanation.summary} evidence={evidence} emphasized />
-          {explanation.tradeoffs.map((claim, index) => (
-            <ExplanationClaimBlock key={`${claim.statement}-${index}`} label={`方案取舍 ${index + 1}`} claim={claim} evidence={evidence} />
-          ))}
-          <ExplanationClaimBlock label="建议下一步" claim={explanation.recommended_next_step} evidence={evidence} emphasized />
-          {explanation.unresolved_questions.length > 0 && (
-            <div className="unresolved-questions">
-              <Quote size={18} />
-              <div><strong>仍需人工确认</strong>{explanation.unresolved_questions.map((item) => <p key={item}>{item}</p>)}</div>
-            </div>
-          )}
-        </div>
-      )}
+      {explanation && <PlanExplanationResult explanation={explanation} stale={stale} />}
     </section>
   );
 }

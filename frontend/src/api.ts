@@ -10,6 +10,7 @@ import type {
   PlanExplanationResponse,
   PlanningObjectiveProfile,
   PlanRecord,
+  QuestionAnswer,
   RuntimeSessionListResponse,
   RuntimeSessionSnapshot,
   SimulationSpeed,
@@ -322,6 +323,15 @@ function isExplanationClaim(value: unknown): boolean {
     && value.evidence_ids.length > 0;
 }
 
+function isQuestionAnswer(value: unknown): value is QuestionAnswer {
+  return isRecord(value)
+    && ["not_asked", "answered", "insufficient_evidence"].includes(String(value.status))
+    && typeof value.statement === "string"
+    && isStringArray(value.evidence_ids)
+    && isStringArray(value.matched_entity_ids)
+    && (value.status !== "answered" || value.evidence_ids.length > 0);
+}
+
 function isPlanExplanationResponse(value: unknown): value is PlanExplanationResponse {
   if (
     !isRecord(value)
@@ -334,9 +344,19 @@ function isPlanExplanationResponse(value: unknown): value is PlanExplanationResp
     || (value.context.baseline_plan_id !== null
       && typeof value.context.baseline_plan_id !== "string")
     || !isAssistanceTrace(value.trace)
+    || !["summary", "tradeoffs", "task_changes", "manual_handling"].includes(String(value.focus))
+    || (value.question !== null && typeof value.question !== "string")
+    || !isQuestionAnswer(value.question_answer)
     || !isExplanationClaim(value.summary)
     || !Array.isArray(value.tradeoffs)
+    || value.tradeoffs.length === 0
     || !value.tradeoffs.every(isExplanationClaim)
+    || !Array.isArray(value.task_changes)
+    || value.task_changes.length === 0
+    || !value.task_changes.every(isExplanationClaim)
+    || !Array.isArray(value.manual_handling)
+    || value.manual_handling.length === 0
+    || !value.manual_handling.every(isExplanationClaim)
     || !isExplanationClaim(value.recommended_next_step)
     || !Array.isArray(value.evidence)
     || !isStringArray(value.unresolved_questions)
@@ -351,8 +371,15 @@ function isPlanExplanationResponse(value: unknown): value is PlanExplanationResp
     if (!isRecord(item) || typeof item.evidence_id !== "string") return false;
     evidenceIds.add(item.evidence_id);
   }
-  const claims = [value.summary, ...value.tradeoffs, value.recommended_next_step];
-  return claims.every((claim) => claim.evidence_ids.every((id: string) => evidenceIds.has(id)));
+  const claims = [
+    value.summary,
+    ...value.tradeoffs,
+    ...value.task_changes,
+    ...value.manual_handling,
+    value.recommended_next_step,
+  ];
+  return claims.every((claim) => claim.evidence_ids.every((id: string) => evidenceIds.has(id)))
+    && value.question_answer.evidence_ids.every((id: string) => evidenceIds.has(id));
 }
 
 function requireEventDraftResponse(value: unknown): EventDraftResponse {

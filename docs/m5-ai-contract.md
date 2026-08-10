@@ -78,13 +78,15 @@ M5 首轮事件字段限定为：事件类型、航班 ID、发生时间、延�
 
 基线与被解释方案不得相同。运行解释必须在读取时重新核对 revision 和方案 ID，避免页面对陈旧候选获取看似有效的说明。
 
-服务先从权威数据构造 `ExplanationEvidence`。摘要、每项取舍和下一步都是独立 `ExplanationClaim`，每条 claim 至少引用一个存在的 evidence ID；引用未知或重复 ID 时契约拒绝。证据类型限定为计划指标、任务分配、未安排任务、约束、事件、方案变化和目标配置。
+服务先从权威数据构造 `ExplanationEvidence`。响应回显实际处理的 `focus` 和规范化 `question`，并先返回独立 `question_answer`：`not_asked` 表示没有补充问题，`answered` 必须引用问题相关权威事实，`insufficient_evidence` 表示当前上下文不足。被点名的任务、资源、航班、事件和方案必须优先进入最多 100 条证据，不能因默认排序或截断漏掉。
+
+方案解释固定包含四个职责不同的分区：`summary` 只说明整体状态及其与问题的关系；`tradeoffs` 只说明目标、收益、代价和量化取舍；`task_changes` 只说明任务、资源、服务时间、路线或相对基线差异；`manual_handling` 只说明人员需要核对、协调或决定的事项。四个分区均必填且每条 claim 至少引用一个存在的 evidence ID；引用未知、重复或与问题无关的事实时契约拒绝模型结果并回退规则解释。证据类型限定为计划指标、任务分配、未安排任务、约束、事件、方案变化和目标配置。
 
 解释可以包含摘要、取舍、下一步和未解决问题，但固定不能修改计划，并继续要求人工确认。
 
 M5-4 实现说明：场景解释从请求指定的不可变场景版本和已保存方案读取；运行解释由 `RuntimeSessionService.get_explanation_context(session_id, expected_revision)` 一次性取得 revision 绑定的 `RuntimeSessionSnapshot` 与 `RuntimeProjectionSource` 深拷贝。请求中的方案 ID 必须属于该 revision 的当前方案或候选方案，旧 revision 返回 `assistant_revision_conflict`。解释服务不直接访问 SQLite 或从仓库猜测运行场景版本。
 
-无 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 时，确定性规则直接返回完整解释。配置模型后，服务只发送有限事实和解释重点；模型响应必须通过结构校验且所有 `evidence_ids` 都属于后端白名单，否则回退规则解释。成功的模型响应也不会改变 `modifies_plan=false`、`requires_human_confirmation=true` 或安全声明。
+无 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 时，确定性规则直接返回完整解释。配置模型后，服务只发送经过实体和主题裁剪的有限事实、问题 grounding 和解释重点；模型响应必须通过结构、实体、事实白名单和问题相关性校验，否则回退规则解释。空间位置、坐标、平面图和实时轨迹在 `SPATIAL-FACT-*` 契约落地前固定返回 `question_not_grounded`，不调用模型猜测。成功的模型响应也不会改变 `modifies_plan=false`、`requires_human_confirmation=true` 或安全声明。
 
 ## 8. 计划错误语义
 

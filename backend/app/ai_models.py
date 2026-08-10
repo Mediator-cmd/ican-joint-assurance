@@ -31,6 +31,7 @@ class AssistanceFallbackReason(str, Enum):
     MODEL_TIMEOUT = "model_timeout"
     PROVIDER_ERROR = "provider_error"
     INVALID_MODEL_OUTPUT = "invalid_model_output"
+    QUESTION_NOT_GROUNDED = "question_not_grounded"
 
 
 class AssistanceTrace(ModelBase):
@@ -299,6 +300,12 @@ class ExplanationFocus(str, Enum):
     MANUAL_HANDLING = "manual_handling"
 
 
+class QuestionAnswerStatus(str, Enum):
+    NOT_ASKED = "not_asked"
+    ANSWERED = "answered"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+
+
 class ScenarioPlanExplanationContext(ModelBase):
     scope: Literal["scenario_plan"] = "scenario_plan"
     scenario_id: str = Field(min_length=1)
@@ -384,12 +391,39 @@ class ExplanationClaim(ModelBase):
         return value
 
 
+class QuestionAnswer(ModelBase):
+    status: QuestionAnswerStatus
+    statement: str = Field(min_length=1, max_length=1200)
+    evidence_ids: list[str] = Field(default_factory=list, max_length=20)
+    matched_entity_ids: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("evidence_ids", "matched_entity_ids")
+    @classmethod
+    def validate_unique_ids(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("question answer IDs must be unique")
+        return value
+
+    @model_validator(mode="after")
+    def validate_answer_status(self) -> QuestionAnswer:
+        if self.status is QuestionAnswerStatus.ANSWERED and not self.evidence_ids:
+            raise ValueError("an answered question requires authoritative evidence")
+        if self.status is QuestionAnswerStatus.NOT_ASKED and self.matched_entity_ids:
+            raise ValueError("a missing question cannot match entities")
+        return self
+
+
 class PlanExplanationResponse(ModelBase):
     explanation_id: str = Field(pattern=r"^EXPL-[A-F0-9]{16}$")
     context: PlanExplanationContext
     trace: AssistanceTrace
+    focus: ExplanationFocus
+    question: str | None = Field(default=None, min_length=1, max_length=500)
+    question_answer: QuestionAnswer
     summary: ExplanationClaim
-    tradeoffs: list[ExplanationClaim] = Field(default_factory=list, max_length=20)
+    tradeoffs: list[ExplanationClaim] = Field(min_length=1, max_length=20)
+    task_changes: list[ExplanationClaim] = Field(min_length=1, max_length=20)
+    manual_handling: list[ExplanationClaim] = Field(min_length=1, max_length=20)
     recommended_next_step: ExplanationClaim
     evidence: list[ExplanationEvidence] = Field(min_length=1, max_length=100)
     unresolved_questions: list[ShortMessage] = Field(default_factory=list, max_length=20)
@@ -404,10 +438,17 @@ class PlanExplanationResponse(ModelBase):
         evidence_ids = [item.evidence_id for item in self.evidence]
         if len(evidence_ids) != len(set(evidence_ids)):
             raise ValueError("explanation evidence IDs must be unique")
-        claims = [self.summary, *self.tradeoffs, self.recommended_next_step]
+        claims = [
+            self.summary,
+            *self.tradeoffs,
+            *self.task_changes,
+            *self.manual_handling,
+            self.recommended_next_step,
+        ]
         cited_evidence_ids = {
             evidence_id for claim in claims for evidence_id in claim.evidence_ids
         }
+        cited_evidence_ids.update(self.question_answer.evidence_ids)
         if not cited_evidence_ids <= set(evidence_ids):
             raise ValueError("every claim evidence ID must exist in the evidence list")
         return self

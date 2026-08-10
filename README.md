@@ -64,6 +64,8 @@
 - M6-4 大数据工作台审查：[docs/m6-04-review.md](docs/m6-04-review.md)
 - M6-5 单 origin 部署计划：[docs/m6-05-plan.md](docs/m6-05-plan.md)
 - M6-5 单 origin 部署审查：[docs/m6-05-review.md](docs/m6-05-review.md)
+- M6-5 方案问答相关性修复计划：[docs/m6-05-ai-grounding-plan.md](docs/m6-05-ai-grounding-plan.md)
+- M6-5 方案问答相关性修复审查：[docs/m6-05-ai-grounding-review.md](docs/m6-05-ai-grounding-review.md)
 - 机场空间态势与路径可视化计划：[docs/airport-spatial-visualization-plan.md](docs/airport-spatial-visualization-plan.md)
 
 ## 目录结构
@@ -112,7 +114,7 @@ M5-2 已提供可替换的 OpenAI-compatible 结构化输出适配器。`POST /a
 
 M5-3 的确定性目标只允许 `balanced`、`critical_first`、`minimum_wait` 和 `minimum_change`。旧 CP-SAT 请求未显式选择目标时继续精确使用原 `balanced` 行为；`minimum_change` 只用于已有当前方案的运行滚动规划。所有目标仍由 CP-SAT 求解并经过独立硬约束复核，模型不能提供任意权重、自由排班或自动采用候选。
 
-M5-4 新增只读 `POST /api/v1/assistant/plan-explanations`。服务从场景版本或运行 revision 的后端权威事实生成确定性中文解释；摘要、取舍和建议下一步都带 `FACT-*` 来源。配置 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 后，OpenAI-compatible 模型只做表达增强，任何超时、错误或事实引用不合法都会回退规则解释。无 AI 配置时核心实时闭环和完整解释照常可用，密钥不会进入 GitHub、前端或响应。
+M5-4 新增只读 `POST /api/v1/assistant/plan-explanations`。服务从场景版本或运行 revision 的后端权威事实生成确定性中文解释；先直接回答问题，再分别返回方案摘要、方案取舍、任务变化、人工处理和建议下一步，全部带 `FACT-*` 来源。后端按问题匹配任务、资源、航班、事件、方案与主题，并优先保留被点名实体；模型引用合法但无关事实也会回退。配置 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 后，OpenAI-compatible 模型只做表达增强，任何超时、错误、实体越界或事实引用不合法都会回退规则解释。无 AI 配置时核心实时闭环和完整解释照常可用，密钥不会进入 GitHub、前端或响应。
 
 M5-5 已把上述能力接入现有五页共享运行工作台。“事件影响”页可输入匿名教学事件、查看缺失追问和逐字段来源，在确认事件字段及四选一确定性目标后提交；“方案依据”页可切换当前/候选方案、解释重点和匿名问题，并查看规则/模型来源、结论和 `FACT-*` 引用。输入、revision、方案或解释条件变化后旧结果立即标记过期；事件不会自动提交，候选不会自动采用。新板块按内容自然展开，不使用卡片内部滚动，前端不包含 API 密钥、提供方 URL 或硬编码模型名。
 
@@ -123,6 +125,8 @@ M6-0 已冻结三个匿名合成规模档位：100 任务/20 资源/5 区域、5
 M6-4 在现有 `RuntimeSessionSnapshot` 上增加后端权威集合摘要，并为任务、事件、航班、资源、区域、受影响任务、方案任务书和候选变化提供检索或有界分页。页面始终公开当前范围与总数，只渲染当前页；筛选、页码和选择只属于浏览器展示状态，不增加 revision、不推进业务时间、不触发规划。移动端任务表使用卡片、资源列表使用两列布局，方案内容继续自然展开且不在任务书内部滚动。大集合测试覆盖 2000 项分页、25 项任务书窗口和 20 项候选变化窗口；这些能力服务于合成数据和部署前体验，不表示已经接入真实机场生产数据。
 
 M6-5 已形成 provider-neutral 的单 origin 容器版本。一个非 root Uvicorn worker 同时提供 React 构建产物、`/api/v1`、SSE 和统一错误；SQLite 固定写入可挂载路径，API 请求体默认限制为 2 MiB，未知 API 不会被 SPA HTML 回退掩盖。多阶段镜像不包含 Node、pytest、本机 `.runtime`、DPAPI AI 配置或实际密钥。真实容器替换后能够从同一卷找回会话；无 AI 环境变量时仍使用确定性规则完成核心闭环。M6-5 不创建 GitHub 远程、不推送镜像、不选择托管商或取得公网地址，这些动作仍属于 M7。
+
+M6-5 完成后的方案问答专项修复新增 `question_answer` 的已回答/未提问/证据不足语义，并把方案摘要、方案取舍、任务变化和人工处理固定为四个职责不同的必填分区。点名任务时模型上下文会排除无关任务、航班和事件；平面图坐标等尚无权威空间事实的问题会明确返回证据不足且不调用模型猜测。真实 DeepSeek 与确定性规则共用同一事实白名单、version/revision、只读和人工确认边界。
 
 M6-5 完成后计划进入 M6-5A，在调度总览加入原创或明确授权的机场空间态势图：事件定位、资源权威进度、当前方案实线、候选方案虚线及处理过程都从同一运行快照派生。空间 AI 将绑定当前 session/revision 和地图选择，以 `SPATIAL-FACT-*` 回答问题位置、影响任务、活动资源、路线变化、处理阶段和下一步，并可聚焦经过后端校验的对象；它不能猜坐标、修改方案或自动执行。第一版采用本地 SVG 2D，不依赖地图 API key；可选 3D 只做渐进增强。未经授权的北京大兴机场平面图、内部运行图、真实坐标或限制区细节不会进入仓库，视觉真实感不改变匿名教学仿真的安全定位。
 
@@ -190,7 +194,7 @@ npm install
 npm run dev
 ```
 
-浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `267 passed`，前端回归基线为 `32 passed`，并应同时通过 `npm run typecheck` 和 `npm run build`。
+浏览器访问启动脚本输出的前端 URL。当前后端回归基线为 `273 passed`，前端回归基线为 6 个测试文件、`33 passed`，并应同时通过 `npm run typecheck` 和 `npm run build`。
 
 ### Provider-neutral 单 origin 容器
 

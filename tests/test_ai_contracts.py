@@ -392,6 +392,14 @@ def test_plan_explanation_must_cite_existing_authoritative_facts() -> None:
         explanation_id="EXPL-0123456789ABCDEF",
         context=_runtime_context(),
         trace=_rule_trace(),
+        focus="summary",
+        question="当前安排如何？",
+        question_answer={
+            "status": "answered",
+            "statement": "候选方案安排了全部任务。",
+            "evidence_ids": ["FACT-METRIC-ASSIGNED"],
+            "matched_entity_ids": [],
+        },
         summary={
             "statement": "候选方案安排了全部任务。",
             "evidence_ids": ["FACT-METRIC-ASSIGNED"],
@@ -399,6 +407,18 @@ def test_plan_explanation_must_cite_existing_authoritative_facts() -> None:
         tradeoffs=[
             {
                 "statement": "当前证据只覆盖任务安排数量。",
+                "evidence_ids": ["FACT-METRIC-ASSIGNED"],
+            }
+        ],
+        task_changes=[
+            {
+                "statement": "当前任务安排已记录，未提供基线差异。",
+                "evidence_ids": ["FACT-METRIC-ASSIGNED"],
+            }
+        ],
+        manual_handling=[
+            {
+                "statement": "人员仍需复核任务书。",
                 "evidence_ids": ["FACT-METRIC-ASSIGNED"],
             }
         ],
@@ -418,10 +438,35 @@ def test_plan_explanation_must_cite_existing_authoritative_facts() -> None:
             explanation_id="EXPL-0123456789ABCDEF",
             context=_runtime_context(),
             trace=_rule_trace(),
+            focus="summary",
+            question_answer={
+                "status": "not_asked",
+                "statement": "未提出问题。",
+                "evidence_ids": [],
+                "matched_entity_ids": [],
+            },
             summary={
                 "statement": "无依据说明",
                 "evidence_ids": ["FACT-NOT-PRESENT"],
             },
+            tradeoffs=[
+                {
+                    "statement": "当前证据只覆盖安排数量。",
+                    "evidence_ids": ["FACT-METRIC-ASSIGNED"],
+                }
+            ],
+            task_changes=[
+                {
+                    "statement": "没有基线，无法说明变化。",
+                    "evidence_ids": ["FACT-METRIC-ASSIGNED"],
+                }
+            ],
+            manual_handling=[
+                {
+                    "statement": "需要人工复核。",
+                    "evidence_ids": ["FACT-METRIC-ASSIGNED"],
+                }
+            ],
             recommended_next_step={
                 "statement": "人工复核。",
                 "evidence_ids": ["FACT-METRIC-ASSIGNED"],
@@ -474,9 +519,14 @@ def test_ai_contract_schema_exposes_safety_and_human_review_fields() -> None:
     assert {
         "context",
         "trace",
+        "focus",
+        "question",
+        "question_answer",
         "evidence",
         "summary",
         "tradeoffs",
+        "task_changes",
+        "manual_handling",
         "recommended_next_step",
         "requires_human_confirmation",
         "modifies_plan",

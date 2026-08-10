@@ -156,7 +156,8 @@ export type AssistanceFallbackReason =
   | "model_not_configured"
   | "model_timeout"
   | "provider_error"
-  | "invalid_model_output";
+  | "invalid_model_output"
+  | "question_not_grounded";
 
 export interface AssistanceTrace {
   source: AssistanceSource;
@@ -254,6 +255,15 @@ export interface ExplanationClaim {
   evidence_ids: string[];
 }
 
+export type QuestionAnswerStatus = "not_asked" | "answered" | "insufficient_evidence";
+
+export interface QuestionAnswer {
+  status: QuestionAnswerStatus;
+  statement: string;
+  evidence_ids: string[];
+  matched_entity_ids: string[];
+}
+
 export interface PlanExplanationResponse {
   explanation_id: string;
   context: {
@@ -264,8 +274,13 @@ export interface PlanExplanationResponse {
     baseline_plan_id: string | null;
   };
   trace: AssistanceTrace;
+  focus: ExplanationFocus;
+  question: string | null;
+  question_answer: QuestionAnswer;
   summary: ExplanationClaim;
   tradeoffs: ExplanationClaim[];
+  task_changes: ExplanationClaim[];
+  manual_handling: ExplanationClaim[];
   recommended_next_step: ExplanationClaim;
   evidence: ExplanationEvidence[];
   unresolved_questions: string[];
