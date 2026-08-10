@@ -21,6 +21,7 @@
 - `PlanExplanationResponse` 回显实际 `focus` 和规范化 `question`，新增 `question_answer`。状态固定为 `not_asked`、`answered` 或 `insufficient_evidence`；已回答时必须包含权威证据 ID。
 - `summary`、`tradeoffs`、`task_changes` 和 `manual_handling` 均为必填分区。摘要说明整体状态，取舍说明目标与量化代价，任务变化说明任务/资源/时间/路线或基线差异，人工处理说明人员需要核对、协调或决定的事项。
 - 后端从当前场景版本或运行 revision 匹配方案、任务、资源、航班和事件 ID，并识别利用率、等待、路线、任务变化、事件、约束、目标取舍和人工协调等主题。具体主题优先于“方案”“任务”等泛化词。
+- 实体 grounding 接受当前权威证据中唯一可确定的简写：`TASK-004` 可写为 `task4`、`task-4`、`task 004`、`任务4` 或全角形式，资源 `WC-01` 可写为 `wc1`，航班 `FL-SIM218` 可写为 `sim218`。输入先做 Unicode NFKC、大小写、分隔符和数字补零规范化；ASCII 字母数字边界防止 `task4` 误命中 `TASK-040`，同一简写指向多个实体时不选择任意结果。
 - 被问题点名的实体事实优先进入最多 100 条权威证据；发送给模型的有限上下文会排除与点名任务无关的任务、航班和事件。
 - `question_answer` 与当前重点分区都必须引用问题相关证据。模型即使引用存在的 `FACT-*`，只要与问题无关，也会被判为 `invalid_model_output` 并回退确定性解释。
 - DeepSeek 把单项分区返回为对象而不是数组时会被安全规范化；未知字段、未知事实、实体边界不一致、可执行指令和安全字段覆盖仍被拒绝。
@@ -41,6 +42,8 @@
 - 真实 DeepSeek 利用率问题引用 `FACT-PRIMARY-UTILIZATION`；`TASK-010` 问题回答 `WC-01`、`08:55-09:01`、`TRANSFER-DESK -> GATE-W03`。
 - 实体裁剪后的 `TASK-010` 解释结果包含四个分区，结果文本包含 `TASK-010` 且不包含无关 `SIM218`。平面图坐标问题返回 `question_not_grounded`，没有调用模型。
 - 真实浏览器在 1440x900 和 390x844 下完成核验；移动端文档宽度为 `390/390`、解释结果宽度为 `340/340`、结果高度为 `2215/2215`，没有横向溢出或解释结果自身滚动。控制台 0 error、0 warning。
+- 简写兼容维护新增 11 项测试，覆盖六种 `TASK-004` 输入、`wc1`、`sim218`、`TASK-004`/`TASK-040` 边界、完整 ID 优先、歧义拒绝和截图原句端到端回答；后端全量更新为 `284 passed in 31.76s`，`compileall`、`pip check` 与 `git diff --check` 继续通过。
+- 最终服务重启后，真实页面输入 `task4的具体细节是什么` 返回 `language_model + deepseek-v4-flash`，匹配对象只有 `TASK-004`，直接答案包含 `FL-SIM218`、`WC-01`、`08:18-08:25` 与 `TRANSFER-DESK -> GATE-E01`，并引用 `FACT-PRIMARY-ASSIGNMENT-TASK-004`。1280px 页面和解释区均无横向溢出或内部滚动，控制台 0 error、0 warning。
 
 ## 6. 状态所有权与禁止事项
 

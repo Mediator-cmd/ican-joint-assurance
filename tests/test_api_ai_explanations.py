@@ -479,6 +479,164 @@ def test_different_questions_receive_grounded_answers_and_distinct_focus_content
         _assert_claims_are_fact_bound(payload)
 
 
+@pytest.mark.parametrize(
+    "question",
+    [
+        "task4的具体细节是什么",
+        "task-4的具体细节是什么",
+        "task 004的具体细节是什么",
+        "TASK004的具体细节是什么",
+        "任务4的具体细节是什么",
+        "ＴＡＳＫ４的具体细节是什么",
+    ],
+)
+def test_task_shorthand_aliases_match_one_authoritative_task(question: str) -> None:
+    evidence = [
+        ExplanationEvidence(
+            evidence_id="FACT-PRIMARY-ASSIGNMENT-TASK-004",
+            kind="assignment",
+            entity_ids=["PLAN-DEMO", "TASK-004", "WC-01", "FL-SIM218"],
+            field="assignment",
+            value="A-004",
+            statement="TASK-004 由 WC-01 执行。",
+        ),
+        ExplanationEvidence(
+            evidence_id="FACT-PRIMARY-ASSIGNMENT-TASK-040",
+            kind="assignment",
+            entity_ids=["PLAN-DEMO", "TASK-040", "WC-02", "FL-SIM330"],
+            field="assignment",
+            value="A-040",
+            statement="TASK-040 由 WC-02 执行。",
+        ),
+    ]
+
+    grounding = ground_explanation_question(question, evidence)
+
+    assert grounding.status.value == "answered"
+    assert grounding.matched_entity_ids == ("TASK-004",)
+    assert grounding.relevant_evidence_ids == (
+        "FACT-PRIMARY-ASSIGNMENT-TASK-004",
+    )
+
+
+@pytest.mark.parametrize(
+    ("question", "expected_entity_id"),
+    [
+        ("wc1现在负责什么任务？", "WC-01"),
+        ("sim218有哪些保障任务？", "FL-SIM218"),
+    ],
+)
+def test_resource_and_flight_shorthand_aliases_remain_fact_bound(
+    question: str,
+    expected_entity_id: str,
+) -> None:
+    evidence = [
+        ExplanationEvidence(
+            evidence_id="FACT-PRIMARY-ASSIGNMENT-TASK-004",
+            kind="assignment",
+            entity_ids=["PLAN-DEMO", "TASK-004", "WC-01", "FL-SIM218"],
+            field="assignment",
+            value="A-004",
+            statement="TASK-004 由 WC-01 执行。",
+        )
+    ]
+
+    grounding = ground_explanation_question(question, evidence)
+
+    assert grounding.status.value == "answered"
+    assert grounding.matched_entity_ids == (expected_entity_id,)
+    assert grounding.relevant_evidence_ids == (
+        "FACT-PRIMARY-ASSIGNMENT-TASK-004",
+    )
+
+
+def test_exact_entity_id_takes_precedence_over_shorter_numeric_alias() -> None:
+    evidence = [
+        ExplanationEvidence(
+            evidence_id="FACT-PADDED",
+            kind="assignment",
+            entity_ids=["TASK-004"],
+            field="assignment",
+            value="padded",
+            statement="TASK-004 使用补零规范 ID。",
+        ),
+        ExplanationEvidence(
+            evidence_id="FACT-UNPADDED",
+            kind="assignment",
+            entity_ids=["TASK-4"],
+            field="assignment",
+            value="unpadded",
+            statement="TASK-4 使用未补零 ID。",
+        ),
+    ]
+
+    grounding = ground_explanation_question("TASK-004的细节", evidence)
+
+    assert grounding.status.value == "answered"
+    assert grounding.matched_entity_ids == ("TASK-004",)
+    assert grounding.relevant_evidence_ids == ("FACT-PADDED",)
+
+
+def test_ambiguous_numeric_shorthand_is_not_guessed() -> None:
+    evidence = [
+        ExplanationEvidence(
+            evidence_id="FACT-WC-01",
+            kind="assignment",
+            entity_ids=["WC-01"],
+            field="assignment",
+            value="wc-01",
+            statement="WC-01 执行任务。",
+        ),
+        ExplanationEvidence(
+            evidence_id="FACT-WC-001",
+            kind="assignment",
+            entity_ids=["WC-001"],
+            field="assignment",
+            value="wc-001",
+            statement="WC-001 执行任务。",
+        ),
+    ]
+
+    grounding = ground_explanation_question("wc1现在负责什么？", evidence)
+
+    assert grounding.status.value == "insufficient_evidence"
+    assert grounding.matched_entity_ids == ()
+    assert grounding.relevant_evidence_ids == ()
+
+
+def test_task_shorthand_question_returns_assignment_details_end_to_end() -> None:
+    with TestClient(_app(session_id="RUN-M65-TASK-SHORTHAND")) as client:
+        _, optimized = _plans(client)
+        assert any(
+            item["task_id"] == "TASK-004"
+            for item in optimized["assignments"]
+        )
+        response = client.post(
+            "/api/v1/assistant/plan-explanations",
+            json={
+                "context": {
+                    "scope": "scenario_plan",
+                    "scenario_id": SCENARIO_ID,
+                    "scenario_version": 1,
+                    "plan_id": optimized["plan_id"],
+                },
+                "focus": "task_changes",
+                "question": "task4的具体细节是什么",
+                "assistance_mode": "deterministic_only",
+            },
+        )
+
+    assert response.status_code == 200
+    answer = response.json()["question_answer"]
+    assert answer["status"] == "answered"
+    assert answer["matched_entity_ids"] == ["TASK-004"]
+    assert answer["evidence_ids"] == [
+        "FACT-PRIMARY-ASSIGNMENT-TASK-004"
+    ]
+    assert "TASK-004" in answer["statement"]
+    assert "WC-01" in answer["statement"]
+
+
 def test_manual_question_explains_actual_tasks_requiring_coordination() -> None:
     with TestClient(_app(session_id="RUN-M65-MANUAL-ANSWER")) as client:
         _, optimized = _plans(client)

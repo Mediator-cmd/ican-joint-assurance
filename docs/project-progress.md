@@ -832,3 +832,12 @@ M3 已关闭，M4-0 契约冻结、M4-1 运行会话、M4-2 确定性状态投�
 - 自动验证：后端全量 `273 passed in 30.70s`；前端 6 个测试文件、`33 passed`；TypeScript 类型检查、Vite 生产构建、Python `compileall`、`pip check` 和 `git diff --check` 通过。key-like 扫描只命中测试专用占位值，`.runtime` 与浏览器截图保持 Git 忽略。
 - 安全与范围：AI 继续只读，不能修改方案、推进时钟、应用事件或替代人工决定；不提交密钥、内部提示词和提供方原始内容，不接真实机场生产数据、个人信息或外部控制系统。本专项没有提前实现 M6-5A。
 - 详细计划与审查：[m6-05-ai-grounding-plan.md](m6-05-ai-grounding-plan.md)、[m6-05-ai-grounding-review.md](m6-05-ai-grounding-review.md)。下一唯一入口仍为 M6-5A，先冻结原创匿名空间契约与 `SPATIAL-FACT-*`，再实现地图、路径、资源进度和同一权威状态下的空间问答。
+
+### 2026-08-10 / M6-5 方案问答实体简写兼容修复
+
+- 易用性修复：方案问答不再要求完整输入 `TASK-004`、`WC-01` 或 `FL-SIM218`；当前权威证据中唯一可确定时，可使用 `task4`、`task-4`、`task 004`、`任务4`、`wc1`、`sim218` 及对应大小写或全角形式。
+- 规范化与边界：后端统一执行 Unicode NFKC、大小写折叠、可选分隔符和数字补零归一；ASCII 字母数字边界确保 `task4` 不会误命中 `TASK-040`，一个简写关联多个权威实体时仍不猜测。
+- 端到端证据：截图原句“task4的具体细节是什么”现在匹配 `TASK-004`，确定性直接回答引用 `FACT-PRIMARY-ASSIGNMENT-TASK-004` 并包含权威资源 `WC-01`。最终服务重启后的真实页面返回 `language_model + deepseek-v4-flash`，同时给出 `FL-SIM218`、`08:18-08:25` 和 `TRANSFER-DESK -> GATE-E01`；1280px 页面及解释区无横向溢出或内部滚动，控制台 0 error、0 warning。
+- 自动验证：新增 11 项简写、优先级与歧义边界测试，方案解释文件 `25 passed`；后端全量 `284 passed in 31.76s`，Python `compileall`、`pip check` 和 `git diff --check` 通过。
+- 安全与范围：完整规范 ID 保持兼容，version/revision、`FACT-*` 引用、只读解释、人工确认和教学仿真安全声明未放松；本修复不增加空间坐标、真实机场数据或外部控制，也不提前进入 M6-5A。
+- 下一入口：仍为 M6-5A 机场空间态势、方案路径和 `SPATIAL-FACT-*` AI 进程问答。

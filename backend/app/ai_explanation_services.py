@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 import logging
+import re
 from typing import Callable
+import unicodedata
 from uuid import uuid4
 
 from pydantic import ValidationError
@@ -461,6 +463,123 @@ def build_explanation_evidence(
     return selected
 
 
+_ENTITY_ALIAS_SEPARATOR = r"[-_\s]*"
+
+
+def _normalize_grounding_text(value: str) -> str:
+    return unicodedata.normalize("NFKC", value).strip().casefold()
+
+
+def _entity_alias_spans(
+    normalized_question: str,
+    pattern: str,
+) -> tuple[tuple[int, int], ...]:
+    return tuple(
+        match.span()
+        for match in re.finditer(
+            rf"(?<![a-z0-9])(?:{pattern})(?![a-z0-9])",
+            normalized_question,
+        )
+    )
+
+
+def _entity_alias_patterns(normalized_entity_id: str) -> tuple[tuple[int, str], ...]:
+    parts = tuple(
+        part
+        for part in re.split(r"[-_\s]+", normalized_entity_id)
+        if part
+    )
+    if len(parts) < 2:
+        return ()
+
+    aliases: list[tuple[int, str]] = []
+    flexible_full_id = _ENTITY_ALIAS_SEPARATOR.join(
+        re.escape(part) for part in parts
+    )
+    aliases.append((1, flexible_full_id))
+
+    if parts[-1].isdigit():
+        numeric_value = str(int(parts[-1]))
+        number_pattern = (
+            r"0+" if numeric_value == "0" else rf"0*{re.escape(numeric_value)}"
+        )
+        prefix_pattern = _ENTITY_ALIAS_SEPARATOR.join(
+            re.escape(part) for part in parts[:-1]
+        )
+        aliases.append(
+            (
+                2,
+                f"{prefix_pattern}{_ENTITY_ALIAS_SEPARATOR}{number_pattern}",
+            )
+        )
+        if parts[:-1] == ("task",):
+            aliases.append(
+                (
+                    2,
+                    rf"任务{_ENTITY_ALIAS_SEPARATOR}{number_pattern}",
+                )
+            )
+
+    if parts[0] == "fl":
+        flight_suffix = _ENTITY_ALIAS_SEPARATOR.join(
+            re.escape(part) for part in parts[1:]
+        )
+        aliases.append((2, flight_suffix))
+
+    return tuple(aliases)
+
+
+def _match_question_entity_ids(
+    normalized_question: str,
+    evidence: list[ExplanationEvidence],
+) -> list[str]:
+    available_entity_ids = list(
+        dict.fromkeys(
+            entity_id
+            for fact in evidence
+            for entity_id in fact.entity_ids
+        )
+    )
+    exact_matches: set[str] = set()
+    exact_spans: set[tuple[int, int]] = set()
+    alias_matches: dict[tuple[int, int], dict[int, set[str]]] = {}
+
+    for entity_id in available_entity_ids:
+        normalized_entity_id = _normalize_grounding_text(entity_id)
+        entity_exact_spans = _entity_alias_spans(
+            normalized_question,
+            re.escape(normalized_entity_id),
+        )
+        if entity_exact_spans:
+            exact_matches.add(entity_id)
+            exact_spans.update(entity_exact_spans)
+
+    for entity_id in available_entity_ids:
+        normalized_entity_id = _normalize_grounding_text(entity_id)
+        for priority, pattern in _entity_alias_patterns(normalized_entity_id):
+            for span in _entity_alias_spans(normalized_question, pattern):
+                if any(
+                    exact_start <= span[0] and span[1] <= exact_end
+                    for exact_start, exact_end in exact_spans
+                ):
+                    continue
+                alias_matches.setdefault(span, {}).setdefault(
+                    priority,
+                    set(),
+                ).add(entity_id)
+
+    unambiguous_alias_matches: set[str] = set()
+    for priority_matches in alias_matches.values():
+        best_priority = min(priority_matches)
+        entity_ids = priority_matches[best_priority]
+        if len(entity_ids) == 1:
+            unambiguous_alias_matches.add(next(iter(entity_ids)))
+    return sorted(
+        exact_matches | unambiguous_alias_matches,
+        key=lambda item: (-len(item), item),
+    )[:20]
+
+
 _TOPIC_KEYWORDS: dict[str, tuple[str, ...]] = {
     "utilization": ("利用率", "利用情况", "负载", "忙闲", "占用率"),
     "time": ("等待", "时间", "几点", "何时", "多久", "服务时段", "开始时间", "结束时间"),
@@ -468,7 +587,7 @@ _TOPIC_KEYWORDS: dict[str, tuple[str, ...]] = {
     "changes": ("变化", "变更", "调整", "改变", "不同", "对比", "相比", "基线"),
     "manual": ("人工", "协调", "复核", "处理", "决定", "确认", "干预"),
     "resource": ("资源", "车辆", "设备", "谁执行", "哪个资源", "分配给"),
-    "task": ("任务", "作业"),
+    "task": ("任务", "作业", "task"),
     "event": ("事件", "延误", "登机口", "突发", "扰动", "航班"),
     "constraint": ("约束", "冲突", "违规", "可执行", "风险", "不可执行"),
     "tradeoff": ("取舍", "目标", "优点", "缺点", "代价", "收益", "效率", "为什么选择"),
@@ -495,7 +614,7 @@ def ground_explanation_question(
     question: str | None,
     evidence: list[ExplanationEvidence],
 ) -> _QuestionGrounding:
-    normalized = (question or "").strip().casefold()
+    normalized = _normalize_grounding_text(question or "")
     if not normalized:
         return _QuestionGrounding(status=QuestionAnswerStatus.NOT_ASKED)
 
@@ -519,12 +638,7 @@ def ground_explanation_question(
     unsupported_spatial = any(
         keyword.casefold() in normalized for keyword in _UNSUPPORTED_SPATIAL_KEYWORDS
     )
-    entity_ids: list[str] = []
-    for fact in evidence:
-        for entity_id in fact.entity_ids:
-            if entity_id.casefold() in normalized and entity_id not in entity_ids:
-                entity_ids.append(entity_id)
-    entity_ids = sorted(entity_ids, key=lambda item: (-len(item), item))[:20]
+    entity_ids = _match_question_entity_ids(normalized, evidence)
     entity_set = set(entity_ids)
     matched_facts = [
         fact
