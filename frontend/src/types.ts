@@ -456,6 +456,157 @@ export interface RuntimeSessionSnapshot {
   safety_notice: string;
 }
 
+export interface NormalizedPoint {
+  x: number;
+  y: number;
+}
+
+export interface SpatialCanvas {
+  width: number;
+  height: number;
+}
+
+export interface SpatialAsset {
+  kind: "svg";
+  source_class: "original_local";
+  public_path: string;
+  license_id: "project-original";
+  integrity_sha256: string;
+  safety_classification: "anonymous_training_simulation";
+}
+
+export interface SpatialZone {
+  zone_id: string;
+  label: string;
+  floor: string;
+  anchor: NormalizedPoint;
+  shape: NormalizedPoint[];
+}
+
+export interface SpatialPath {
+  path_id: string;
+  from_zone_id: string;
+  to_zone_id: string;
+  points: NormalizedPoint[];
+  direction: "bidirectional";
+  accessible: boolean;
+}
+
+export interface SpatialLayout {
+  layout_id: string;
+  layout_version: number;
+  scenario_id: string;
+  scenario_version: number;
+  projection: "normalized_cartesian";
+  canvas: SpatialCanvas;
+  asset: SpatialAsset;
+  zones: SpatialZone[];
+  paths: SpatialPath[];
+  safety_notice: string;
+}
+
+export type SpatialRouteKind = "active" | "candidate";
+export type SpatialAssignmentState = "assigned" | "unassigned";
+export type SpatialRouteChange =
+  | "current"
+  | "assignment_added"
+  | "assignment_removed"
+  | "resource_changed"
+  | "route_changed"
+  | "schedule_changed";
+
+export interface SpatialRouteLeg {
+  path_id: string;
+  from_zone_id: string;
+  to_zone_id: string;
+  traversal: "forward" | "reverse";
+}
+
+export interface SpatialTaskRoute {
+  route_id: string;
+  task_id: string;
+  route_kind: SpatialRouteKind;
+  plan_id: string;
+  task_status: TaskRuntimeStatus;
+  assignment_state: SpatialAssignmentState;
+  change_kind: SpatialRouteChange;
+  resource_id: string | null;
+  origin_zone_id: string;
+  destination_zone_id: string;
+  legs: SpatialRouteLeg[];
+  demand_only: boolean;
+}
+
+export interface SpatialResourceMarker {
+  resource_id: string;
+  status: ResourceRuntimeStatus;
+  current_task_id: string | null;
+  next_task_id: string | null;
+  from_zone_id: string;
+  to_zone_id: string | null;
+  progress_pct: number;
+  position: NormalizedPoint;
+  route_legs: SpatialRouteLeg[];
+}
+
+export interface SpatialEventMarker {
+  event_id: string;
+  event_type: "delay" | "gate_change";
+  flight_id: string;
+  status: RuntimeEventStatus;
+  detail: string;
+  primary_zone_id: string;
+  position: NormalizedPoint;
+  previous_zone_id: string | null;
+  new_zone_id: string | null;
+  route_legs: SpatialRouteLeg[];
+}
+
+export interface RuntimeSpatialOverlay {
+  session_id: string;
+  revision: number;
+  simulation_time: string;
+  layout_id: string;
+  task_routes: SpatialTaskRoute[];
+  resource_markers: SpatialResourceMarker[];
+  event_markers: SpatialEventMarker[];
+}
+
+export interface SpatialCoverage {
+  source_task_ids: string[];
+  projected_active_task_ids: string[];
+  changed_candidate_task_ids: string[];
+  projected_candidate_task_ids: string[];
+  source_resource_ids: string[];
+  projected_resource_ids: string[];
+  source_event_ids: string[];
+  projected_event_ids: string[];
+  complete: true;
+}
+
+export type SpatialFactCategory = "context" | "coverage" | "task" | "resource" | "event" | "plan";
+
+export interface SpatialFact {
+  fact_id: string;
+  category: SpatialFactCategory;
+  claim: string;
+  entity_ids: string[];
+}
+
+export interface RuntimeSpatialView {
+  scenario_id: string;
+  scenario_version: number;
+  layout: SpatialLayout;
+  overlay: RuntimeSpatialOverlay;
+  coverage: SpatialCoverage;
+  facts: SpatialFact[];
+  requires_human_confirmation: true;
+  modifies_runtime: false;
+  safety_notice: string;
+}
+
+export type RuntimeSpatialStatus = "loading" | "ready" | "unavailable" | "error";
+
 export interface RuntimeSessionSummary {
   session_id: string;
   scenario_id: string;

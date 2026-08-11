@@ -29,6 +29,7 @@ import RuntimePlanDetails, {
 } from "./RuntimePlanDetails";
 import RuntimeEventAssistant from "./RuntimeEventAssistant";
 import RuntimePlanExplanation from "./RuntimePlanExplanation";
+import RuntimeSpatialMap from "./RuntimeSpatialMap";
 import type {
   DemoPayload,
   EventRuntimeProjection,
@@ -39,6 +40,7 @@ import type {
   TaskRuntimeProjection,
 } from "./types";
 import { useRuntimeSession } from "./useRuntimeSession";
+import { useRuntimeSpatialView } from "./useRuntimeSpatialView";
 
 type PageKey = "overview" | "tasks" | "events" | "resources" | "evidence";
 type RuntimeTaskFilter = "all" | "active" | "attention";
@@ -260,6 +262,7 @@ export default function RuntimeWorkspace({
   onInitialUnavailable,
 }: RuntimeWorkspaceProps) {
   const runtime = useRuntimeSession({ payload, onInitialUnavailable });
+  const spatial = useRuntimeSpatialView(runtime.snapshot);
   const [activePage, setActivePage] = useState<PageKey>("overview");
   const [taskFilter, setTaskFilter] = useState<RuntimeTaskFilter>("all");
   const [taskQuery, setTaskQuery] = useState("");
@@ -471,6 +474,14 @@ export default function RuntimeWorkspace({
     setActivePage("resources");
   };
 
+  const openEvent = (eventId: string) => {
+    const index = snapshot.events.findIndex((event) => event.event_id === eventId);
+    setEventQuery("");
+    setEventPage(pageForIndex(index, EVENT_PAGE_SIZE));
+    setSelectedEventId(eventId);
+    setActivePage("events");
+  };
+
   return (
     <div className="app-shell runtime-shell">
       <aside className="sidebar">
@@ -611,6 +622,23 @@ export default function RuntimeWorkspace({
                     {snapshot.candidate_plan_id ? "处理候选方案" : "查看执行任务"}<ArrowRight size={16} />
                   </button>
                 </section>
+
+                <RuntimeSpatialMap
+                  view={spatial.view}
+                  status={spatial.status}
+                  error={spatial.error}
+                  expectedRevision={snapshot.revision}
+                  selectedTaskId={selectedTaskId}
+                  selectedResourceId={selectedResourceId}
+                  selectedEventId={selectedEventId}
+                  onSelectTask={setSelectedTaskId}
+                  onSelectResource={setSelectedResourceId}
+                  onSelectEvent={setSelectedEventId}
+                  onOpenTask={openTask}
+                  onOpenResource={openResource}
+                  onOpenEvent={openEvent}
+                  onRetry={spatial.refresh}
+                />
 
                 <section className="kpi-grid" aria-label="实时状态摘要">
                   <article className="kpi-card tone-blue"><span className="kpi-label">仿真时间</span><div className="kpi-value runtime-time-value">{formatTime(snapshot.clock.simulation_time)}</div><span className="kpi-note">后端权威 · {snapshot.clock.speed}x</span></article>

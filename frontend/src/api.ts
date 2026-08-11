@@ -13,6 +13,7 @@ import type {
   QuestionAnswer,
   RuntimeSessionListResponse,
   RuntimeSessionSnapshot,
+  RuntimeSpatialView,
   SimulationSpeed,
 } from "./types";
 
@@ -275,6 +276,124 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
+function hasSameIds(left: string[], right: string[]): boolean {
+  return left.length === right.length
+    && new Set(left).size === left.length
+    && left.every((value) => right.includes(value));
+}
+
+function isNormalizedPoint(value: unknown): boolean {
+  return isRecord(value)
+    && typeof value.x === "number"
+    && value.x >= 0
+    && value.x <= 1
+    && typeof value.y === "number"
+    && value.y >= 0
+    && value.y <= 1;
+}
+
+function isRuntimeSpatialView(value: unknown): value is RuntimeSpatialView {
+  if (
+    !isRecord(value)
+    || typeof value.scenario_id !== "string"
+    || !Number.isInteger(value.scenario_version)
+    || !isRecord(value.layout)
+    || !isRecord(value.overlay)
+    || !isRecord(value.coverage)
+    || !Array.isArray(value.facts)
+    || value.requires_human_confirmation !== true
+    || value.modifies_runtime !== false
+    || typeof value.safety_notice !== "string"
+  ) return false;
+
+  const { layout, overlay, coverage } = value;
+  if (
+    typeof layout.layout_id !== "string"
+    || layout.scenario_id !== value.scenario_id
+    || layout.scenario_version !== value.scenario_version
+    || !isRecord(layout.canvas)
+    || typeof layout.canvas.width !== "number"
+    || typeof layout.canvas.height !== "number"
+    || !isRecord(layout.asset)
+    || typeof layout.asset.public_path !== "string"
+    || !Array.isArray(layout.zones)
+    || !layout.zones.every((zone) => isRecord(zone)
+      && typeof zone.zone_id === "string"
+      && isNormalizedPoint(zone.anchor))
+    || !Array.isArray(layout.paths)
+    || !layout.paths.every((path) => isRecord(path)
+      && typeof path.path_id === "string"
+      && Array.isArray(path.points)
+      && path.points.every(isNormalizedPoint))
+    || typeof overlay.session_id !== "string"
+    || !Number.isInteger(overlay.revision)
+    || typeof overlay.simulation_time !== "string"
+    || overlay.layout_id !== layout.layout_id
+    || !Array.isArray(overlay.task_routes)
+    || !Array.isArray(overlay.resource_markers)
+    || !Array.isArray(overlay.event_markers)
+  ) return false;
+
+  const activeTaskIds: string[] = [];
+  const candidateTaskIds: string[] = [];
+  for (const route of overlay.task_routes) {
+    if (!isRecord(route)
+      || typeof route.task_id !== "string"
+      || !["active", "candidate"].includes(String(route.route_kind))
+      || !Array.isArray(route.legs)
+      || !route.legs.every((leg) => isRecord(leg)
+        && typeof leg.path_id === "string"
+        && typeof leg.from_zone_id === "string"
+        && typeof leg.to_zone_id === "string"
+        && ["forward", "reverse"].includes(String(leg.traversal)))) return false;
+    (route.route_kind === "active" ? activeTaskIds : candidateTaskIds).push(route.task_id);
+  }
+  const resourceIds = overlay.resource_markers.map((marker) => (
+    isRecord(marker)
+      && typeof marker.resource_id === "string"
+      && isNormalizedPoint(marker.position)
+      ? marker.resource_id
+      : null
+  ));
+  const eventIds = overlay.event_markers.map((marker) => (
+    isRecord(marker)
+      && typeof marker.event_id === "string"
+      && isNormalizedPoint(marker.position)
+      ? marker.event_id
+      : null
+  ));
+  if (resourceIds.includes(null) || eventIds.includes(null)) return false;
+
+  const coverageFields = [
+    "source_task_ids",
+    "projected_active_task_ids",
+    "changed_candidate_task_ids",
+    "projected_candidate_task_ids",
+    "source_resource_ids",
+    "projected_resource_ids",
+    "source_event_ids",
+    "projected_event_ids",
+  ];
+  if (coverage.complete !== true || !coverageFields.every((field) => isStringArray(coverage[field]))) {
+    return false;
+  }
+  return hasSameIds(coverage.source_task_ids as string[], activeTaskIds)
+    && hasSameIds(coverage.projected_active_task_ids as string[], activeTaskIds)
+    && hasSameIds(coverage.changed_candidate_task_ids as string[], candidateTaskIds)
+    && hasSameIds(coverage.projected_candidate_task_ids as string[], candidateTaskIds)
+    && hasSameIds(coverage.source_resource_ids as string[], resourceIds as string[])
+    && hasSameIds(coverage.projected_resource_ids as string[], resourceIds as string[])
+    && hasSameIds(coverage.source_event_ids as string[], eventIds as string[])
+    && hasSameIds(coverage.projected_event_ids as string[], eventIds as string[]);
+}
+
+function requireRuntimeSpatialView(value: unknown): RuntimeSpatialView {
+  if (!isRuntimeSpatialView(value)) {
+    throw new ApiRequestError(200, "invalid_response", "机场空间态势结构不完整，请稍后重试。");
+  }
+  return value;
+}
+
 function isAssistanceTrace(value: unknown): boolean {
   return isRecord(value)
     && ["language_model", "deterministic_rules"].includes(String(value.source))
@@ -452,6 +571,19 @@ export async function getRuntimeSession(
 ): Promise<RuntimeSessionSnapshot> {
   return requireRuntimeSnapshot(await requestJson<RuntimeSessionSnapshot>(
     `/api/v1/runtime-sessions/${encodeURIComponent(sessionId)}`,
+    options,
+  ));
+}
+
+export async function getRuntimeSpatialView(
+  sessionId: string,
+  expectedRevision: number,
+  options: RuntimeApiOptions = {},
+): Promise<RuntimeSpatialView> {
+  return requireRuntimeSpatialView(await requestJson<unknown>(
+    `/api/v1/runtime-sessions/${encodeURIComponent(sessionId)}/spatial?${query({
+      expected_revision: expectedRevision,
+    })}`,
     options,
   ));
 }

@@ -5,12 +5,18 @@ import {
   createRuntimePlanExplanation,
   DemoPayloadLoadError,
   findOrCreateRuntimeSession,
+  getRuntimeSpatialView,
   loadDemoPayload,
   postRuntimeAction,
   submitRuntimeEventDraft,
 } from "./api";
 import type { Fetcher } from "./api";
-import type { DemoPayload, EventDraftResponse, RuntimeSessionSnapshot } from "./types";
+import type {
+  DemoPayload,
+  EventDraftResponse,
+  RuntimeSessionSnapshot,
+  RuntimeSpatialView,
+} from "./types";
 
 const demoPayload = {
   project: {},
@@ -149,6 +155,44 @@ const planExplanation = {
   modifies_plan: false,
   safety_notice: "safe",
 };
+
+const spatialView = {
+  scenario_id: "SCN-DEMO",
+  scenario_version: 1,
+  layout: {
+    layout_id: "LAYOUT-DEMO",
+    scenario_id: "SCN-DEMO",
+    scenario_version: 1,
+    canvas: { width: 1000, height: 620 },
+    asset: { public_path: "/assets/anonymous-hub-layout.svg" },
+    zones: [{ zone_id: "ZONE-A", anchor: { x: 0.5, y: 0.5 } }],
+    paths: [],
+  },
+  overlay: {
+    session_id: "RUN-DEMO",
+    revision: 3,
+    simulation_time: "2026-08-01T08:00:00+08:00",
+    layout_id: "LAYOUT-DEMO",
+    task_routes: [],
+    resource_markers: [],
+    event_markers: [],
+  },
+  coverage: {
+    source_task_ids: [],
+    projected_active_task_ids: [],
+    changed_candidate_task_ids: [],
+    projected_candidate_task_ids: [],
+    source_resource_ids: [],
+    projected_resource_ids: [],
+    source_event_ids: [],
+    projected_event_ids: [],
+    complete: true,
+  },
+  facts: [],
+  requires_human_confirmation: true,
+  modifies_runtime: false,
+  safety_notice: "safe",
+} as unknown as RuntimeSpatialView;
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -327,6 +371,30 @@ describe("findOrCreateRuntimeSession", () => {
 });
 
 describe("runtime API errors", () => {
+  it("binds the spatial read to the expected runtime revision", async () => {
+    const fetcher = vi.fn<Fetcher>(async () => jsonResponse(spatialView));
+
+    const result = await getRuntimeSpatialView("RUN-DEMO", 3, { fetcher });
+
+    expect(result.overlay.revision).toBe(3);
+    expect(fetcher.mock.calls[0]?.[0]).toBe(
+      "/api/v1/runtime-sessions/RUN-DEMO/spatial?expected_revision=3",
+    );
+  });
+
+  it("rejects a spatial response whose one-to-one coverage is incomplete", async () => {
+    const fetcher = vi.fn<Fetcher>(async () => jsonResponse({
+      ...spatialView,
+      coverage: {
+        ...spatialView.coverage,
+        source_task_ids: ["TASK-MISSING"],
+      },
+    }));
+
+    await expect(getRuntimeSpatialView("RUN-DEMO", 3, { fetcher }))
+      .rejects.toMatchObject({ code: "invalid_response" });
+  });
+
   it("returns the safe structured 409 error needed for refresh-before-retry", async () => {
     const fetcher = vi.fn<Fetcher>(async () => jsonResponse({
       error: {
