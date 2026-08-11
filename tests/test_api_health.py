@@ -42,6 +42,7 @@ def test_openapi_document_contains_health_route() -> None:
         "audit",
         "runtime",
         "assistant",
+        "spatial",
     }
     assert "/api/v1/health" in document["paths"]
     assert "/api/v1/assistant/event-drafts" in document["paths"]

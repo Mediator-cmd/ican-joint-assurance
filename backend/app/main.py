@@ -37,6 +37,7 @@ from .runtime_services import RuntimeSessionService
 from .runtime_stream import RuntimeStreamBroker
 from .scenario_loader import load_scenario
 from .services import ScenarioService
+from .spatial_services import RuntimeSpatialService
 
 
 logger = logging.getLogger(__name__)
@@ -86,6 +87,10 @@ OPENAPI_TAGS = [
     {
         "name": "assistant",
         "description": "生成绑定场景版本或运行修订的事件草稿、人工提交，以及引用权威事实的只读方案解释。",
+    },
+    {
+        "name": "spatial",
+        "description": "返回绑定运行修订的匿名机场空间态势、路线、资源位置与空间事实。",
     },
 ]
 
@@ -234,6 +239,7 @@ def create_app(
     application.state.scenario_service = ScenarioService(scenario_repository)
     application.state.runtime_repository = durable_runtime_repository
     application.state.runtime_service = runtime_service
+    application.state.runtime_spatial_service = RuntimeSpatialService(runtime_service)
     application.state.runtime_stream_broker = stream_broker
     application.state.event_assistant_service = EventAssistantService(
         scenario_repository,

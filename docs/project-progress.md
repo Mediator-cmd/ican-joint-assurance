@@ -841,3 +841,14 @@ M3 已关闭，M4-0 契约冻结、M4-1 运行会话、M4-2 确定性状态投�
 - 自动验证：新增 11 项简写、优先级与歧义边界测试，方案解释文件 `25 passed`；后端全量 `284 passed in 31.76s`，Python `compileall`、`pip check` 和 `git diff --check` 通过。
 - 安全与范围：完整规范 ID 保持兼容，version/revision、`FACT-*` 引用、只读解释、人工确认和教学仿真安全声明未放松；本修复不增加空间坐标、真实机场数据或外部控制，也不提前进入 M6-5A。
 - 下一入口：仍为 M6-5A 机场空间态势、方案路径和 `SPATIAL-FACT-*` AI 进程问答。
+
+### 2026-08-11 / M6-5A-0 空间契约与后端权威投影
+
+- 原创布局：新增本地匿名枢纽 SVG 与严格 `SpatialLayout`，只登记中转服务台、东西两个匿名登机口及两条可双向遍历路径；资产绑定 `project-original`、安全分类和 SHA-256，不导入北京大兴机场图片、真实坐标、商业地图或内部运行图。
+- 修订绑定：新增只读 `GET /api/v1/runtime-sessions/{session_id}/spatial?expected_revision=N`，复用 `get_explanation_context()` 从同一 revision 的快照和投影源即时派生，不新增 SQLite 状态、时钟、规划器或候选所有权。旧 revision 返回 409；未知布局明确返回 `spatial_layout_not_available`。
+- 一一对应：默认场景每个修订严格投影 10 条当前任务路线、5 个资源位置和 6 个一次性事件标记；未分配任务作为待协调需求保留。覆盖 ID、路线种类、区域、路径方向和连续性由后端模型交叉校验，缺失、重复或非法引用不能返回。
+- 当前与候选：当前方案始终保留 `active` 路线；候选只显示分配、资源、路线或时序真实发生变化的任务。首个无实际差异的候选不伪造虚线，第二个登机口变更会生成与变化任务集合完全相等的候选路线。
+- 资源与事件：资源位置只按权威 `from/to/progress_pct` 沿登记几何插值；延误定位到权威航班当前登机口，登机口变更连接前后区域。几何不反推 `travel_minutes`，暂停/断线时前端没有自行推进数据。
+- AI 基础：响应生成会话、覆盖、任务、资源、事件和候选的 `SPATIAL-FACT-*`，固定 `requires_human_confirmation=true`、`modifies_runtime=false` 与完整安全声明；本子阶段尚未实现空间 AI 对话。
+- 自动验证：空间专项 `6 passed in 1.01s`，后端全量 `290 passed in 34.34s`；前端 6 个测试文件、`33 passed`，类型检查和 Vite 构建通过；`compileall`、`pip check` 和 `git diff --check` 通过。
+- 详细计划与审查：[m6-05a-spatial-plan.md](m6-05a-spatial-plan.md)、[m6-05a0-review.md](m6-05a0-review.md)。下一入口为 M6-5A-1 实时二维平面图、图层和共享选择联动；不得在浏览器建立第二状态机或随机动画。

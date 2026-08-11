@@ -89,6 +89,9 @@ from .runtime_services import (
 )
 from .runtime_planning import RuntimePlanningError
 from .runtime_stream import RuntimeStreamBroker, encode_sse_event
+from .spatial_layout import SpatialLayoutNotAvailableError
+from .spatial_models import RuntimeSpatialView
+from .spatial_services import RuntimeSpatialService
 from .services import (
     PlanningObjectiveNotSupportedError,
     ScenarioNotReadyForPlanningError,
@@ -139,6 +142,10 @@ def get_runtime_service(request: Request) -> RuntimeSessionService:
 
 def get_runtime_stream_broker(request: Request) -> RuntimeStreamBroker:
     return request.app.state.runtime_stream_broker
+
+
+def get_runtime_spatial_service(request: Request) -> RuntimeSpatialService:
+    return request.app.state.runtime_spatial_service
 
 
 def get_event_assistant_service(request: Request) -> EventAssistantService:
@@ -468,6 +475,22 @@ def _raise_domain_error(error: Exception) -> Never:
                 )
             ],
         ) from error
+    if isinstance(error, SpatialLayoutNotAvailableError):
+        raise ApiError(
+            404,
+            "spatial_layout_not_available",
+            "当前场景没有受支持的匿名空间布局，不能猜测或随机生成地图位置",
+            [
+                ApiErrorDetail(
+                    location=["path", "session_id"],
+                    message=(
+                        f"场景 {error.scenario_id} 版本 {error.scenario_version} "
+                        "尚未登记空间布局"
+                    ),
+                    type="missing_spatial_layout",
+                )
+            ],
+        ) from error
     if isinstance(error, RuntimeInvalidTransitionError):
         raise ApiError(
             409,
@@ -707,6 +730,29 @@ def get_runtime_session(
     try:
         return service.get_session(session_id)
     except (RuntimeSessionNotFoundError, RuntimePersistenceError) as error:
+        _raise_domain_error(error)
+
+
+@router.get(
+    "/runtime-sessions/{session_id}/spatial",
+    response_model=RuntimeSpatialView,
+    tags=["spatial"],
+    summary="查询与权威运行修订一一对应的机场空间态势",
+)
+def get_runtime_spatial_view(
+    session_id: str,
+    service: Annotated[RuntimeSpatialService, Depends(get_runtime_spatial_service)],
+    expected_revision: Annotated[int, Query(ge=1)],
+) -> RuntimeSpatialView:
+    try:
+        return service.get_view(session_id, expected_revision)
+    except (
+        RuntimeSessionNotFoundError,
+        RuntimeRevisionConflictError,
+        RuntimePersistenceError,
+        RuntimePlanningError,
+        SpatialLayoutNotAvailableError,
+    ) as error:
         _raise_domain_error(error)
 
 
