@@ -607,6 +607,48 @@ export interface RuntimeSpatialView {
 
 export type RuntimeSpatialStatus = "loading" | "ready" | "unavailable" | "error";
 
+export interface SpatialQuestionSelection {
+  task_id: string | null;
+  resource_id: string | null;
+  event_id: string | null;
+}
+
+export interface SpatialQuestionBasis {
+  session_id: string;
+  revision: number;
+  simulation_time: string;
+  layout_id: string;
+}
+
+export interface SpatialMapFocus {
+  task_ids: string[];
+  resource_ids: string[];
+  event_ids: string[];
+  zone_ids: string[];
+}
+
+export interface SpatialQuestionAnswer {
+  status: "answered" | "insufficient_evidence";
+  statement: string;
+  fact_ids: string[];
+  matched_entity_ids: string[];
+}
+
+export interface SpatialQuestionResponse {
+  question_id: string;
+  basis: SpatialQuestionBasis;
+  question: string;
+  selection: SpatialQuestionSelection;
+  trace: AssistanceTrace;
+  answer: SpatialQuestionAnswer;
+  focus: SpatialMapFocus;
+  facts: SpatialFact[];
+  unresolved_questions: string[];
+  requires_human_confirmation: true;
+  modifies_runtime: false;
+  safety_notice: string;
+}
+
 export interface RuntimeSessionSummary {
   session_id: string;
   scenario_id: string;

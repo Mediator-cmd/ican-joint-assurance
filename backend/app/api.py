@@ -19,6 +19,11 @@ from .ai_models import (
     PlanExplanationResponse,
 )
 from .ai_explanation_services import PlanExplanationService
+from .ai_spatial_models import SpatialQuestionRequest, SpatialQuestionResponse
+from .ai_spatial_services import (
+    AssistantSpatialSelectionMismatchError,
+    SpatialQuestionService,
+)
 from .ai_services import (
     AssistantContextNotFoundError,
     AssistantPlanContextMismatchError,
@@ -156,6 +161,10 @@ def get_plan_explanation_service(request: Request) -> PlanExplanationService:
     return request.app.state.plan_explanation_service
 
 
+def get_spatial_question_service(request: Request) -> SpatialQuestionService:
+    return request.app.state.spatial_question_service
+
+
 def _raise_domain_error(error: Exception) -> Never:
     if isinstance(error, AssistantContextNotFoundError):
         raise ApiError(
@@ -212,6 +221,19 @@ def _raise_domain_error(error: Exception) -> Never:
                     location=["body", "context", "plan_id"],
                     message=f"方案 {error.plan_id} 不在指定场景版本或运行修订中",
                     type="assistant_plan_context_mismatch",
+                )
+            ],
+        ) from error
+    if isinstance(error, AssistantSpatialSelectionMismatchError):
+        raise ApiError(
+            409,
+            "assistant_spatial_selection_mismatch",
+            "地图选择已不属于当前运行修订，请刷新空间态势后重试",
+            [
+                ApiErrorDetail(
+                    location=["body", "selection"],
+                    message=f"对象 {error.entity_id} 不在当前空间 overlay 中",
+                    type="assistant_spatial_selection_mismatch",
                 )
             ],
         ) from error
@@ -662,6 +684,32 @@ def create_plan_explanation(
         AssistantPlanContextMismatchError,
         RuntimePersistenceError,
         RuntimePlanningError,
+    ) as error:
+        _raise_domain_error(error)
+
+
+@router.post(
+    "/assistant/spatial-questions",
+    response_model=SpatialQuestionResponse,
+    tags=["assistant", "spatial"],
+    summary="基于当前空间事实回答问题并返回经校验的地图聚焦对象",
+)
+def create_spatial_question_answer(
+    payload: SpatialQuestionRequest,
+    service: Annotated[
+        SpatialQuestionService,
+        Depends(get_spatial_question_service),
+    ],
+) -> SpatialQuestionResponse:
+    try:
+        return service.answer_question(payload)
+    except (
+        AssistantContextNotFoundError,
+        AssistantRevisionConflictError,
+        AssistantSpatialSelectionMismatchError,
+        RuntimePersistenceError,
+        RuntimePlanningError,
+        SpatialLayoutNotAvailableError,
     ) as error:
         _raise_domain_error(error)
 

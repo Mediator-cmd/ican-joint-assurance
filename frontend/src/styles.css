@@ -4639,6 +4639,299 @@ td > strong,
 .spatial-panel-empty p:not(.eyebrow) { margin: 5px 0 0; color: #607168; font-size: 13px; }
 .spatial-retry { padding: 0 11px; color: #285f4d; background: #ffffff; border-color: #9db6ab; font-weight: 800; }
 
+.spatial-zone-label.assistant-focus circle {
+  stroke: #6e4aa1;
+  stroke-width: 8;
+  filter: drop-shadow(0 0 5px rgb(110 74 161 / 52%));
+}
+
+.spatial-task-route.assistant-focus .route-line {
+  opacity: 1;
+  filter: drop-shadow(0 0 5px rgb(110 74 161 / 65%));
+}
+
+.spatial-resource-marker.assistant-focus rect,
+.spatial-event-marker.assistant-focus circle {
+  stroke: #b58be4;
+  stroke-width: 7;
+  filter: drop-shadow(0 0 6px rgb(96 57 139 / 62%));
+}
+
+.spatial-task-register-grid button.assistant-focus {
+  background: #f0e9f8;
+  border-color: #aa8bc7;
+  box-shadow: inset 3px 0 0 #754aa0;
+}
+
+.spatial-assistant-panel {
+  min-width: 0;
+  overflow: visible;
+  border-color: #c7bdd2;
+  background: #fbf9fd;
+}
+
+.spatial-assistant-heading {
+  padding: 14px 16px;
+  background:
+    linear-gradient(112deg, rgb(54 42 70 / 98%), rgb(75 53 95 / 96%)),
+    repeating-linear-gradient(90deg, transparent 0 42px, rgb(255 255 255 / 4%) 42px 43px);
+  border-radius: 5px 5px 0 0;
+}
+
+.spatial-assistant-heading .assistant-symbol {
+  color: #e5d7f3;
+  background: rgb(255 255 255 / 9%);
+  border-color: rgb(229 215 243 / 28%);
+}
+
+.spatial-assistant-heading .eyebrow { color: #cdb8e0; }
+.spatial-assistant-heading h2 { color: #ffffff; }
+.spatial-assistant-heading > div:nth-child(2) > p:last-child { color: #d7cde0; }
+
+.spatial-question-compose {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #ddd5e4;
+}
+
+.spatial-question-compose > label {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.spatial-question-compose > label > span {
+  color: #594c62;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.spatial-question-compose textarea {
+  width: 100%;
+  min-height: 82px;
+  resize: vertical;
+  padding: 10px 11px;
+  color: #2f2934;
+  background: #ffffff;
+  border: 1px solid #cfc4d8;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.spatial-question-compose textarea:focus {
+  outline: 2px solid rgb(117 74 160 / 24%);
+  border-color: #8b68aa;
+}
+
+.spatial-question-compose > .assistant-primary-action {
+  align-self: end;
+  min-height: 42px;
+  margin: 0;
+  background: #654487;
+}
+
+.spatial-question-presets {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.spatial-question-presets button {
+  min-height: 28px;
+  padding: 4px 8px;
+  color: #624b75;
+  background: #f3eef7;
+  border: 1px solid #d5c7df;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.spatial-answer-result {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.spatial-answer-result.insufficient_evidence {
+  background: #fbf7f0;
+}
+
+.spatial-answer-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #746d79;
+  font-size: 11px;
+}
+
+.spatial-answer-meta span { min-width: 0; overflow-wrap: anywhere; }
+.spatial-answer-meta strong { color: #64447e; text-align: right; }
+
+.spatial-answer-result > blockquote {
+  margin: 0;
+  padding: 9px 11px;
+  color: #5d5264;
+  background: #f2edf5;
+  border-left: 3px solid #9674b3;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.spatial-direct-answer {
+  padding: 12px 13px;
+  background: #ffffff;
+  border: 1px solid #d8cde0;
+  border-left: 4px solid #78519b;
+  border-radius: 4px;
+}
+
+.insufficient_evidence .spatial-direct-answer {
+  border-color: #dfcfb7;
+  border-left-color: #b07837;
+}
+
+.spatial-direct-answer > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #705086;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.spatial-direct-answer p {
+  margin: 7px 0 0;
+  color: #342d38;
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.spatial-answer-entities,
+.spatial-answer-focus {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.spatial-answer-entities > span {
+  color: #746c78;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.spatial-answer-entities code {
+  padding: 3px 6px;
+  color: #67427f;
+  background: #efe7f5;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+.spatial-answer-focus {
+  display: grid;
+  padding: 10px 11px;
+  background: #f1ebf6;
+  border: 1px solid #d4c4df;
+  border-radius: 4px;
+}
+
+.spatial-answer-focus > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.spatial-answer-focus > div:first-child { color: #65477d; }
+.spatial-answer-focus > div:first-child span { color: #7d7185; font-size: 10px; }
+.spatial-answer-focus button,
+.spatial-answer-focus > div:last-child > span {
+  min-height: 29px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  color: #4f365f;
+  background: #ffffff;
+  border: 1px solid #c8b5d6;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.spatial-answer-focus button { cursor: pointer; }
+.spatial-answer-focus small { color: #887693; font-size: 8px; }
+
+.spatial-answer-facts {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.spatial-answer-facts header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #554b5c;
+  font-size: 11px;
+}
+
+.spatial-answer-facts button {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(180px, .34fr) minmax(0, 1fr);
+  gap: 10px;
+  padding: 8px 10px;
+  color: #4b4350;
+  text-align: left;
+  background: #ffffff;
+  border: 1px solid #ddd5e2;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.spatial-answer-facts button:disabled { cursor: default; }
+.spatial-answer-facts code { color: #65447d; font-size: 10px; overflow-wrap: anywhere; }
+.spatial-answer-facts span { font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+
+.spatial-answer-unresolved {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 10px;
+  color: #765128;
+  background: #f8f1e7;
+  border: 1px solid #e3d3bc;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.spatial-answer-unresolved p { margin: 3px 0 0; line-height: 1.45; }
+
+.spatial-answer-result > footer {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: #776447;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
 @media (max-width: 1180px) {
   .spatial-panel-header { grid-template-columns: minmax(240px, 1fr) 40px; }
   .spatial-coverage { grid-column: 1 / 3; grid-row: 2; justify-content: flex-start; flex-wrap: wrap; }
@@ -4650,6 +4943,8 @@ td > strong,
   .spatial-task-register,
   .spatial-process-key { grid-column: 1 / 4; }
   .spatial-task-register-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .spatial-question-compose { grid-template-columns: 1fr; }
+  .spatial-question-compose > .assistant-primary-action { justify-self: start; }
 }
 
 @media (max-width: 760px) {
@@ -4670,6 +4965,13 @@ td > strong,
   .spatial-process-key { grid-template-columns: 1fr; }
   .spatial-panel-footer { align-items: flex-start; flex-wrap: wrap; }
   .spatial-panel-footer strong { width: 100%; padding-left: 22px; white-space: normal; }
+  .spatial-assistant-heading { align-items: flex-start; flex-wrap: wrap; }
+  .spatial-assistant-heading .assistant-mode { width: 100%; margin-left: 0; }
+  .spatial-question-compose,
+  .spatial-answer-result { padding: 11px; }
+  .spatial-answer-meta { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .spatial-answer-meta strong { text-align: left; }
+  .spatial-answer-facts button { grid-template-columns: 1fr; gap: 4px; }
 }
 
 @media (max-width: 430px) {
@@ -4689,6 +4991,8 @@ td > strong,
   .spatial-panel-empty { grid-template-columns: 1fr; text-align: left; }
   .spatial-empty-symbol { width: 44px; height: 44px; }
   .spatial-retry { justify-self: start; }
+  .spatial-question-presets { display: grid; grid-template-columns: 1fr 1fr; }
+  .spatial-question-presets button { min-width: 0; }
 }
 
 @media (max-width: 520px) {

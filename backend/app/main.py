@@ -20,6 +20,11 @@ from .ai_explanation_provider import (
 from .ai_explanation_services import PlanExplanationService
 from .ai_provider import EventExtractionProvider, build_event_provider_from_environment
 from .ai_services import EventAssistantService
+from .ai_spatial_provider import (
+    SpatialQuestionProvider,
+    build_spatial_question_provider_from_environment,
+)
+from .ai_spatial_services import SpatialQuestionService
 from .api import APP_VERSION, router
 from .api_models import ApiErrorBody, ApiErrorDetail, ApiErrorResponse
 from .demo_export import DEMO_SCENARIO_PATH, SAFETY_NOTICE
@@ -204,6 +209,7 @@ def create_app(
     runtime_stream_broker: RuntimeStreamBroker | None = None,
     event_provider: EventExtractionProvider | None = None,
     plan_explanation_provider: PlanExplanationProvider | None = None,
+    spatial_question_provider: SpatialQuestionProvider | None = None,
     frontend_dist_path: str | Path | None = None,
     max_request_body_bytes: int = DEFAULT_MAX_REQUEST_BODY_BYTES,
 ) -> FastAPI:
@@ -239,7 +245,8 @@ def create_app(
     application.state.scenario_service = ScenarioService(scenario_repository)
     application.state.runtime_repository = durable_runtime_repository
     application.state.runtime_service = runtime_service
-    application.state.runtime_spatial_service = RuntimeSpatialService(runtime_service)
+    runtime_spatial_service = RuntimeSpatialService(runtime_service)
+    application.state.runtime_spatial_service = runtime_spatial_service
     application.state.runtime_stream_broker = stream_broker
     application.state.event_assistant_service = EventAssistantService(
         scenario_repository,
@@ -250,6 +257,10 @@ def create_app(
         scenario_repository,
         runtime_service,
         provider=plan_explanation_provider,
+    )
+    application.state.spatial_question_service = SpatialQuestionService(
+        runtime_spatial_service,
+        provider=spatial_question_provider,
     )
     application.state.max_request_body_bytes = max_request_body_bytes
     application.add_middleware(
@@ -276,6 +287,7 @@ app = create_app(
     runtime_database_path=_deployment_settings.runtime_database_path,
     event_provider=build_event_provider_from_environment(),
     plan_explanation_provider=build_plan_explanation_provider_from_environment(),
+    spatial_question_provider=build_spatial_question_provider_from_environment(),
     frontend_dist_path=_deployment_settings.frontend_dist_path,
     max_request_body_bytes=_deployment_settings.max_request_body_bytes,
 )

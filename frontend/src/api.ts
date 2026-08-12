@@ -13,6 +13,9 @@ import type {
   QuestionAnswer,
   RuntimeSessionListResponse,
   RuntimeSessionSnapshot,
+  SpatialMapFocus,
+  SpatialQuestionResponse,
+  SpatialQuestionSelection,
   RuntimeSpatialView,
   SimulationSpeed,
 } from "./types";
@@ -402,6 +405,74 @@ function isAssistanceTrace(value: unknown): boolean {
     && (value.fallback_reason === null || typeof value.fallback_reason === "string");
 }
 
+function isSpatialQuestionSelection(value: unknown): value is SpatialQuestionSelection {
+  return isRecord(value)
+    && (value.task_id === null || typeof value.task_id === "string")
+    && (value.resource_id === null || typeof value.resource_id === "string")
+    && (value.event_id === null || typeof value.event_id === "string");
+}
+
+function isSpatialMapFocus(value: unknown): value is SpatialMapFocus {
+  return isRecord(value)
+    && isStringArray(value.task_ids)
+    && isStringArray(value.resource_ids)
+    && isStringArray(value.event_ids)
+    && isStringArray(value.zone_ids)
+    && [value.task_ids, value.resource_ids, value.event_ids, value.zone_ids]
+      .every((ids) => new Set(ids).size === ids.length);
+}
+
+function isSpatialQuestionResponse(value: unknown): value is SpatialQuestionResponse {
+  if (
+    !isRecord(value)
+    || typeof value.question_id !== "string"
+    || !isRecord(value.basis)
+    || typeof value.basis.session_id !== "string"
+    || !Number.isInteger(value.basis.revision)
+    || typeof value.basis.simulation_time !== "string"
+    || typeof value.basis.layout_id !== "string"
+    || typeof value.question !== "string"
+    || !isSpatialQuestionSelection(value.selection)
+    || !isAssistanceTrace(value.trace)
+    || !isRecord(value.answer)
+    || !["answered", "insufficient_evidence"].includes(String(value.answer.status))
+    || typeof value.answer.statement !== "string"
+    || !isStringArray(value.answer.fact_ids)
+    || !isStringArray(value.answer.matched_entity_ids)
+    || !isSpatialMapFocus(value.focus)
+    || !Array.isArray(value.facts)
+    || !isStringArray(value.unresolved_questions)
+    || value.requires_human_confirmation !== true
+    || value.modifies_runtime !== false
+    || typeof value.safety_notice !== "string"
+  ) return false;
+
+  const factById = new Map<string, Set<string>>();
+  for (const fact of value.facts) {
+    if (!isRecord(fact)
+      || typeof fact.fact_id !== "string"
+      || !fact.fact_id.startsWith("SPATIAL-FACT-")
+      || !["context", "coverage", "task", "resource", "event", "plan"].includes(String(fact.category))
+      || typeof fact.claim !== "string"
+      || !isStringArray(fact.entity_ids)
+      || factById.has(fact.fact_id)) return false;
+    factById.set(fact.fact_id, new Set(fact.entity_ids));
+  }
+  if (value.answer.status === "answered" && value.answer.fact_ids.length === 0) return false;
+  if (!value.answer.fact_ids.every((factId) => factById.has(factId))) return false;
+  const citedEntities = new Set(
+    value.answer.fact_ids.flatMap((factId) => [...(factById.get(factId) ?? [])]),
+  );
+  const focusedEntities = [
+    ...value.focus.task_ids,
+    ...value.focus.resource_ids,
+    ...value.focus.event_ids,
+    ...value.focus.zone_ids,
+  ];
+  return focusedEntities.every((entityId) => citedEntities.has(entityId))
+    && (value.answer.status !== "insufficient_evidence" || focusedEntities.length === 0);
+}
+
 function isEventDraftResponse(value: unknown): value is EventDraftResponse {
   if (
     !isRecord(value)
@@ -511,6 +582,13 @@ function requireEventDraftResponse(value: unknown): EventDraftResponse {
 function requirePlanExplanationResponse(value: unknown): PlanExplanationResponse {
   if (!isPlanExplanationResponse(value)) {
     throw new ApiRequestError(200, "invalid_response", "方案解释结构不完整，请稍后重试。");
+  }
+  return value;
+}
+
+function requireSpatialQuestionResponse(value: unknown): SpatialQuestionResponse {
+  if (!isSpatialQuestionResponse(value)) {
+    throw new ApiRequestError(200, "invalid_response", "空间问答结构不完整，请稍后重试。");
   }
   return value;
 }
@@ -702,6 +780,32 @@ export async function createRuntimePlanExplanation(
         },
         focus,
         ...(normalizedQuestion ? { question: normalizedQuestion } : {}),
+        assistance_mode: assistanceMode,
+      },
+    },
+  ));
+}
+
+export async function createRuntimeSpatialQuestion(
+  sessionId: string,
+  revision: number,
+  question: string,
+  selection: SpatialQuestionSelection,
+  assistanceMode: AssistanceMode,
+  options: RuntimeApiOptions = {},
+): Promise<SpatialQuestionResponse> {
+  return requireSpatialQuestionResponse(await requestJson<unknown>(
+    "/api/v1/assistant/spatial-questions",
+    {
+      ...options,
+      method: "POST",
+      body: {
+        context: {
+          session_id: sessionId,
+          revision,
+        },
+        question: question.trim(),
+        selection,
         assistance_mode: assistanceMode,
       },
     },

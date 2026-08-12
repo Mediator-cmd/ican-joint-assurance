@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createRuntimeEventDraft,
   createRuntimePlanExplanation,
+  createRuntimeSpatialQuestion,
   DemoPayloadLoadError,
   findOrCreateRuntimeSession,
   getRuntimeSpatialView,
@@ -15,6 +16,7 @@ import type {
   DemoPayload,
   EventDraftResponse,
   RuntimeSessionSnapshot,
+  SpatialQuestionResponse,
   RuntimeSpatialView,
 } from "./types";
 
@@ -193,6 +195,46 @@ const spatialView = {
   modifies_runtime: false,
   safety_notice: "safe",
 } as unknown as RuntimeSpatialView;
+
+const spatialQuestion = {
+  question_id: "SPATIAL-Q-0123456789ABCDEF",
+  basis: {
+    session_id: "RUN-DEMO",
+    revision: 3,
+    simulation_time: "2026-08-01T08:00:00+08:00",
+    layout_id: "LAYOUT-DEMO",
+  },
+  question: "task4在哪里？",
+  selection: { task_id: "TASK-004", resource_id: null, event_id: null },
+  trace: {
+    source: "deterministic_rules",
+    provider_attempted: false,
+    model_label: null,
+    fallback_reason: "model_not_configured",
+  },
+  answer: {
+    status: "answered",
+    statement: "任务 TASK-004 从 ZONE-A 前往 ZONE-B。",
+    fact_ids: ["SPATIAL-FACT-TASK-004-ACTIVE"],
+    matched_entity_ids: ["TASK-004"],
+  },
+  focus: {
+    task_ids: ["TASK-004"],
+    resource_ids: ["WC-01"],
+    event_ids: [],
+    zone_ids: ["ZONE-A", "ZONE-B"],
+  },
+  facts: [{
+    fact_id: "SPATIAL-FACT-TASK-004-ACTIVE",
+    category: "task",
+    claim: "任务 TASK-004 从 ZONE-A 前往 ZONE-B。",
+    entity_ids: ["TASK-004", "WC-01", "ZONE-A", "ZONE-B"],
+  }],
+  unresolved_questions: [],
+  requires_human_confirmation: true,
+  modifies_runtime: false,
+  safety_notice: "safe",
+} as unknown as SpatialQuestionResponse;
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -393,6 +435,44 @@ describe("runtime API errors", () => {
 
     await expect(getRuntimeSpatialView("RUN-DEMO", 3, { fetcher }))
       .rejects.toMatchObject({ code: "invalid_response" });
+  });
+
+  it("posts a revision-bound spatial question with the current map selection", async () => {
+    const fetcher = vi.fn<Fetcher>(async () => jsonResponse(spatialQuestion));
+
+    const result = await createRuntimeSpatialQuestion(
+      "RUN-DEMO",
+      3,
+      " task4在哪里？ ",
+      { task_id: "TASK-004", resource_id: null, event_id: null },
+      "auto",
+      { fetcher },
+    );
+
+    expect(result.focus.task_ids).toEqual(["TASK-004"]);
+    expect(fetcher.mock.calls[0]?.[0]).toBe("/api/v1/assistant/spatial-questions");
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toEqual({
+      context: { session_id: "RUN-DEMO", revision: 3 },
+      question: "task4在哪里？",
+      selection: { task_id: "TASK-004", resource_id: null, event_id: null },
+      assistance_mode: "auto",
+    });
+  });
+
+  it("rejects spatial AI focus that is not supported by a cited current fact", async () => {
+    const fetcher = vi.fn<Fetcher>(async () => jsonResponse({
+      ...spatialQuestion,
+      focus: { ...spatialQuestion.focus, task_ids: ["TASK-999"] },
+    }));
+
+    await expect(createRuntimeSpatialQuestion(
+      "RUN-DEMO",
+      3,
+      "task4在哪里？",
+      { task_id: "TASK-004", resource_id: null, event_id: null },
+      "auto",
+      { fetcher },
+    )).rejects.toMatchObject({ code: "invalid_response" });
   });
 
   it("returns the safe structured 409 error needed for refresh-before-retry", async () => {

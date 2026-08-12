@@ -371,6 +371,8 @@ def _build_spatial_facts(
     resource_markers: list[SpatialResourceMarker],
     event_markers: list[SpatialEventMarker],
 ) -> list[SpatialFact]:
+    task_projection_by_id = {task.task_id: task for task in snapshot.tasks}
+    runtime_event_by_id = {event.event_id: event for event in snapshot.events}
     facts = [
         SpatialFact(
             fact_id="SPATIAL-FACT-CONTEXT",
@@ -393,10 +395,16 @@ def _build_spatial_facts(
         ),
     ]
     for route in active_routes:
+        affecting_event_ids = task_projection_by_id[route.task_id].affected_by_event_ids
         assignment = (
             f"由资源 {route.resource_id} 执行"
             if route.resource_id is not None
             else "当前未分配资源，作为待协调需求保留"
+        )
+        impact = (
+            f"，受事件 {', '.join(affecting_event_ids)} 影响"
+            if affecting_event_ids
+            else ""
         )
         facts.append(
             SpatialFact(
@@ -405,7 +413,7 @@ def _build_spatial_facts(
                 claim=(
                     f"任务 {route.task_id} 当前路线从 {route.origin_zone_id} 到 "
                     f"{route.destination_zone_id}，{assignment}，运行状态为 "
-                    f"{route.task_status.value}。"
+                    f"{route.task_status.value}{impact}。"
                 ),
                 entity_ids=[
                     route.task_id,
@@ -413,10 +421,12 @@ def _build_spatial_facts(
                     *([route.resource_id] if route.resource_id else []),
                     route.origin_zone_id,
                     route.destination_zone_id,
+                    *affecting_event_ids,
                 ],
             )
         )
     for route in candidate_routes:
+        affecting_event_ids = task_projection_by_id[route.task_id].affected_by_event_ids
         facts.append(
             SpatialFact(
                 fact_id=f"SPATIAL-FACT-{route.task_id}-CANDIDATE",
@@ -426,7 +436,12 @@ def _build_spatial_facts(
                     f"{route.change_kind.value}，候选路线从 {route.origin_zone_id} 到 "
                     f"{route.destination_zone_id}；采用前不替换当前路线。"
                 ),
-                entity_ids=[route.task_id, route.plan_id, *([route.resource_id] if route.resource_id else [])],
+                entity_ids=[
+                    route.task_id,
+                    route.plan_id,
+                    *([route.resource_id] if route.resource_id else []),
+                    *affecting_event_ids,
+                ],
             )
         )
     for marker in resource_markers:
@@ -450,15 +465,37 @@ def _build_spatial_facts(
             )
         )
     for marker in event_markers:
+        runtime_event = runtime_event_by_id[marker.event_id]
+        affected_task_ids = sorted(
+            task.task_id
+            for task in snapshot.tasks
+            if marker.event_id in task.affected_by_event_ids
+        )
+        impact = (
+            f"，当前关联任务为 {', '.join(affected_task_ids)}"
+            if affected_task_ids
+            else "，当前没有被标记为受影响的任务"
+        )
+        candidate = (
+            f"，关联待确认候选 {runtime_event.candidate_plan_id}"
+            if runtime_event.candidate_plan_id is not None
+            else ""
+        )
         facts.append(
             SpatialFact(
                 fact_id=f"SPATIAL-FACT-{marker.event_id}",
                 category=SpatialFactCategory.EVENT,
                 claim=(
                     f"事件 {marker.event_id} 定位于 {marker.primary_zone_id}，"
-                    f"状态为 {marker.status.value}：{marker.detail}。"
+                    f"状态为 {marker.status.value}{impact}{candidate}：{marker.detail}。"
                 ),
-                entity_ids=[marker.event_id, marker.flight_id, marker.primary_zone_id],
+                entity_ids=[
+                    marker.event_id,
+                    marker.flight_id,
+                    marker.primary_zone_id,
+                    *affected_task_ids,
+                    *([runtime_event.candidate_plan_id] if runtime_event.candidate_plan_id else []),
+                ],
             )
         )
     return facts

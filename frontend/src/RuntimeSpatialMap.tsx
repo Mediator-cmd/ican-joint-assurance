@@ -16,6 +16,7 @@ import type {
   NormalizedPoint,
   RuntimeSpatialStatus,
   RuntimeSpatialView,
+  SpatialMapFocus,
   SpatialLayout,
   SpatialTaskRoute,
 } from "./types";
@@ -38,6 +39,7 @@ interface RuntimeSpatialMapProps {
   onOpenResource: (resourceId: string) => void;
   onOpenEvent: (eventId: string) => void;
   onRetry: () => void;
+  assistantFocus?: SpatialMapFocus | null;
 }
 
 const taskStatusLabels: Record<string, string> = {
@@ -154,6 +156,7 @@ export default function RuntimeSpatialMap({
   onOpenResource,
   onOpenEvent,
   onRetry,
+  assistantFocus = null,
 }: RuntimeSpatialMapProps) {
   const [expanded, setExpanded] = useState(false);
   const [layers, setLayers] = useState<Record<SpatialLayer, boolean>>({
@@ -274,8 +277,9 @@ export default function RuntimeSpatialMap({
 
             {layers.zones && layout.zones.map((zone) => {
               const [x, y] = toCanvas(zone.anchor, layout);
+              const aiFocused = assistantFocus?.zone_ids.includes(zone.zone_id) ?? false;
               return (
-                <g key={zone.zone_id} className="spatial-zone-label">
+                <g key={zone.zone_id} className={`spatial-zone-label${aiFocused ? " assistant-focus" : ""}`} data-ai-focus={aiFocused || undefined}>
                   <circle cx={x} cy={y} r={7} />
                   <text x={x} y={y + 72}>{zone.label}</text>
                   <text className="zone-id" x={x} y={y + 90}>{zone.zone_id}</text>
@@ -286,12 +290,14 @@ export default function RuntimeSpatialMap({
             {layers.tasks && activeRoutes.map((route) => {
               if (!layers.active) return null;
               const points = spatialRoutePolylinePoints(layout, route.legs);
+              const aiFocused = assistantFocus?.task_ids.includes(route.task_id) ?? false;
               return (
                 <g
                   key={route.route_id}
                   role="button"
                   tabIndex={0}
-                  className={`spatial-task-route active ${taskRouteTone(route)}${route.task_id === selectedTaskId ? " selected" : ""}`}
+                  className={`spatial-task-route active ${taskRouteTone(route)}${route.task_id === selectedTaskId ? " selected" : ""}${aiFocused ? " assistant-focus" : ""}`}
+                  data-ai-focus={aiFocused || undefined}
                   aria-label={`当前任务 ${route.task_id}，${taskStatusLabels[route.task_status] ?? route.task_status}`}
                   data-route-id={route.route_id}
                   data-task-id={route.task_id}
@@ -307,12 +313,14 @@ export default function RuntimeSpatialMap({
 
             {layers.tasks && layers.candidate && candidateRoutes.map((route) => {
               const points = spatialRoutePolylinePoints(layout, route.legs);
+              const aiFocused = assistantFocus?.task_ids.includes(route.task_id) ?? false;
               return (
                 <g
                   key={route.route_id}
                   role="button"
                   tabIndex={0}
-                  className={`spatial-task-route candidate${route.task_id === selectedTaskId ? " selected" : ""}`}
+                  className={`spatial-task-route candidate${route.task_id === selectedTaskId ? " selected" : ""}${aiFocused ? " assistant-focus" : ""}`}
+                  data-ai-focus={aiFocused || undefined}
                   aria-label={`候选任务 ${route.task_id}，采用前不替换当前路线`}
                   data-route-id={route.route_id}
                   data-task-id={route.task_id}
@@ -331,12 +339,14 @@ export default function RuntimeSpatialMap({
               const [offsetX, offsetY] = markerOffsets.get(`resource:${marker.resource_id}`) ?? [0, 0];
               const x = anchorX + offsetX;
               const y = anchorY + offsetY;
+              const aiFocused = assistantFocus?.resource_ids.includes(marker.resource_id) ?? false;
               return (
                 <g
                   key={marker.resource_id}
                   role="button"
                   tabIndex={0}
-                  className={`spatial-resource-marker ${marker.status}${marker.resource_id === selectedResourceId ? " selected" : ""}`}
+                  className={`spatial-resource-marker ${marker.status}${marker.resource_id === selectedResourceId ? " selected" : ""}${aiFocused ? " assistant-focus" : ""}`}
+                  data-ai-focus={aiFocused || undefined}
                   aria-label={`资源 ${marker.resource_id}，${resourceStatusLabels[marker.status] ?? marker.status}，进度 ${marker.progress_pct}%`}
                   data-resource-id={marker.resource_id}
                   data-authoritative-x={anchorX.toFixed(2)}
@@ -358,12 +368,14 @@ export default function RuntimeSpatialMap({
               const [offsetX, offsetY] = markerOffsets.get(`event:${marker.event_id}`) ?? [0, 0];
               const x = anchorX + offsetX;
               const y = anchorY + offsetY;
+              const aiFocused = assistantFocus?.event_ids.includes(marker.event_id) ?? false;
               return (
                 <g
                   key={marker.event_id}
                   role="button"
                   tabIndex={0}
-                  className={`spatial-event-marker ${marker.status}${marker.event_id === selectedEventId ? " selected" : ""}`}
+                  className={`spatial-event-marker ${marker.status}${marker.event_id === selectedEventId ? " selected" : ""}${aiFocused ? " assistant-focus" : ""}`}
+                  data-ai-focus={aiFocused || undefined}
                   aria-label={`事件 ${marker.event_id}，${eventStatusLabels[marker.status] ?? marker.status}，${marker.detail}`}
                   data-event-id={marker.event_id}
                   data-authoritative-x={anchorX.toFixed(2)}
@@ -401,7 +413,7 @@ export default function RuntimeSpatialMap({
               {activeRoutes.map((route) => (
                 <button
                   key={route.route_id}
-                  className={`${taskRouteTone(route)}${route.task_id === selectedTaskId ? " selected" : ""}`}
+                  className={`${taskRouteTone(route)}${route.task_id === selectedTaskId ? " selected" : ""}${assistantFocus?.task_ids.includes(route.task_id) ? " assistant-focus" : ""}`}
                   aria-pressed={route.task_id === selectedTaskId}
                   onClick={() => onSelectTask(route.task_id)}
                   onDoubleClick={() => onOpenTask(route.task_id)}

@@ -178,4 +178,39 @@ describe("RuntimeSpatialMap", () => {
     expect(markup).toContain("正在绑定权威空间事实");
     expect(markup).not.toContain("data-route-id");
   });
+
+  it("adds static AI focus without replacing current or candidate route semantics", () => {
+    const markup = renderToStaticMarkup(
+      <RuntimeSpatialMap
+        view={view}
+        status="ready"
+        error={null}
+        expectedRevision={4}
+        selectedTaskId=""
+        selectedResourceId=""
+        selectedEventId=""
+        onSelectTask={vi.fn()}
+        onSelectResource={vi.fn()}
+        onSelectEvent={vi.fn()}
+        onOpenTask={vi.fn()}
+        onOpenResource={vi.fn()}
+        onOpenEvent={vi.fn()}
+        onRetry={vi.fn()}
+        assistantFocus={{
+          task_ids: ["TASK-001"],
+          resource_ids: ["WC-01"],
+          event_ids: ["EVT-001"],
+          zone_ids: ["B"],
+        }}
+      />,
+    );
+
+    expect(markup).toContain("spatial-task-route active attention assistant-focus");
+    expect(markup).toContain("spatial-task-route candidate assistant-focus");
+    expect(markup).toContain("spatial-resource-marker moving assistant-focus");
+    expect(markup).toContain("spatial-event-marker awaiting_confirmation assistant-focus");
+    expect(markup).toContain("spatial-zone-label assistant-focus");
+    expect(markup).toContain("当前方案始终为实线");
+    expect(markup).toContain("采用前不替换当前路线");
+  });
 });

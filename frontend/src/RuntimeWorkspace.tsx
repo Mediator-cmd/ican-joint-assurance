@@ -29,6 +29,7 @@ import RuntimePlanDetails, {
 } from "./RuntimePlanDetails";
 import RuntimeEventAssistant from "./RuntimeEventAssistant";
 import RuntimePlanExplanation from "./RuntimePlanExplanation";
+import RuntimeSpatialAssistant from "./RuntimeSpatialAssistant";
 import RuntimeSpatialMap from "./RuntimeSpatialMap";
 import type {
   DemoPayload,
@@ -37,6 +38,7 @@ import type {
   RuntimeConnectionStatus,
   RuntimeSessionSnapshot,
   SimulationSpeed,
+  SpatialQuestionResponse,
   TaskRuntimeProjection,
 } from "./types";
 import { useRuntimeSession } from "./useRuntimeSession";
@@ -279,6 +281,7 @@ export default function RuntimeWorkspace({
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [selectedResourceId, setSelectedResourceId] = useState("");
   const [selectedEventId, setSelectedEventId] = useState("");
+  const [spatialAnswer, setSpatialAnswer] = useState<SpatialQuestionResponse | null>(null);
 
   const snapshot = runtime.snapshot;
   const scenario = payload.views.baseline.scenario;
@@ -413,6 +416,17 @@ export default function RuntimeWorkspace({
   useEffect(() => {
     setSelectedEventId((current) => resolveSelectedId(current, eventIds));
   }, [eventIds]);
+  useEffect(() => {
+    setSpatialAnswer((current) => (
+      current
+      && spatial.view
+      && current.basis.session_id === snapshot?.session_id
+      && current.basis.revision === snapshot.revision
+      && current.basis.layout_id === spatial.view.layout.layout_id
+        ? current
+        : null
+    ));
+  }, [snapshot?.revision, snapshot?.session_id, spatial.view]);
 
   if (runtime.initializing || !snapshot) return <RuntimeLoadingState />;
 
@@ -638,7 +652,27 @@ export default function RuntimeWorkspace({
                   onOpenResource={openResource}
                   onOpenEvent={openEvent}
                   onRetry={spatial.refresh}
+                  assistantFocus={spatial.view
+                    && spatialAnswer?.basis.session_id === snapshot.session_id
+                    && spatialAnswer.basis.revision === snapshot.revision
+                    && spatialAnswer.basis.layout_id === spatial.view.layout.layout_id
+                    ? spatialAnswer.focus
+                    : null}
                 />
+
+                {spatial.view && (
+                  <RuntimeSpatialAssistant
+                    view={spatial.view}
+                    connectionStatus={runtime.connectionStatus}
+                    selectedTaskId={selectedTaskId}
+                    selectedResourceId={selectedResourceId}
+                    selectedEventId={selectedEventId}
+                    onSelectTask={setSelectedTaskId}
+                    onSelectResource={setSelectedResourceId}
+                    onSelectEvent={setSelectedEventId}
+                    onAnswerChange={setSpatialAnswer}
+                  />
+                )}
 
                 <section className="kpi-grid" aria-label="实时状态摘要">
                   <article className="kpi-card tone-blue"><span className="kpi-label">仿真时间</span><div className="kpi-value runtime-time-value">{formatTime(snapshot.clock.simulation_time)}</div><span className="kpi-note">后端权威 · {snapshot.clock.speed}x</span></article>
