@@ -9,7 +9,7 @@
 - 参赛方向：2026 年 iCAN AI 应用创新挑战赛，软件赛道，交通出行方向
 - 当前日期：2026-08-13
 - 官方作品提交截止：2026-09-30
-- 当前阶段：M6 规模测试、体验收敛与部署准备已收口（M6-0 至 M6-6 已完成；下一单元 M7，需单独授权）
+- 当前阶段：M7 比赛材料与最终发布准备（M7-0 本地发布契约已完成；外部发布动作待确认）
 - 文档状态：持续更新
 - 主要规划：[project-plan.md](project-plan.md)
 - 本文档维护原则：只记录已确认事实；候选方案必须标注“候选”；问题解决后保留原因和验证证据。
@@ -907,3 +907,12 @@ M3 已关闭，M4-0 契约冻结、M4-1 运行会话、M4-2 确定性状态投�
 - 部署边界：Dockerfile、`.dockerignore`、单 origin、非 root、SQLite 持久化、健康检查和秘密隔离契约通过；本轮 Docker Desktop daemon 未运行，未伪造新的真实容器启动证据，沿用 M6-5 已验证容器证据并记录该环境限制。
 - 安全与下一步：不接真实机场生产数据、真实坐标、内部机场图或外部控制系统；不创建 GitHub 远程、不推送、不发布公网地址。M6 已收口，下一唯一入口为 M7，必须等待用户单独授权。
 - 详细计划与审查：[m6-06-plan.md](m6-06-plan.md)、[m6-06-review.md](m6-06-review.md)。
+
+### 2026-08-13 / M7-0 发布准备启动
+
+- 范围：M7 负责比赛材料、GitHub 交付和稳定公网地址；本单元先完成不依赖外部选择的发布契约，不创建远程、不推送、不部署公网。
+- 只读核验：当前分支 `main`，M6 收口提交为 `503eabd chore: close M6 acceptance baseline`；核验当时工作区无未提交改动；GitHub CLI 账号为 `Mediator-cmd`（用户 ID `247509064`）；仓库没有 `origin` 远程；环境中未发现代理变量输出。
+- 新增：`docs/m7-release-plan.md` 冻结单实例/单 worker/SQLite 卷/Secret Manager/健康检查/回滚边界及待确认决策；`docs/m7-release-materials.md` 冻结 PDF、视频、源代码、运行说明、开发日志、原创证明和风险声明清单；`docs/originality-and-assets.md`、`docs/risk-and-safety.md` 和 `SECURITY.md` 明确资产来源、安全边界与报告规则；`.github/workflows/ci.yml` 提供后端和前端自动验证。
+- 安全：CI 不读取 AI 密钥；发布文档不包含真实 key、`.runtime`、SQLite、日志、真实机场数据或未经授权底图。许可证、仓库名、可见性、托管平台和公网地址均未猜测。
+- 验证：后端全量 `306 passed in 33.72s`；前端 `42 passed`；TypeScript 类型检查、1797 模块生产构建、Python `compileall`、PowerShell 三个脚本语法、`git diff --check` 和 tracked-file key-like 扫描通过。CI YAML 已复核，构建产物仍由 `.gitignore` 忽略。
+- 下一步：等待项目负责人确认 GitHub 仓库名、公开/私有、托管平台和项目许可证，再进入 M7-1；在确认前不运行 `gh repo create`、`git remote add`、`git push` 或公网部署命令。

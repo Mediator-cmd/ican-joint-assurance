@@ -18,8 +18,7 @@
 
 ## 当前状态
 
-- 阶段：M6 规模测试、体验收敛与部署准备已收口（M6-0 至 M6-6 已完成）。
-- 下一单元：M7 GitHub 发布准备与公网地址规划（需单独授权）。
+- 阶段：M7 比赛材料与最终发布准备（M7-0 本地发布契约已完成；外部发布动作待确认）。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
@@ -54,6 +53,10 @@
 - M5-6 AI 辅助总验收审查：[docs/m5-06-review.md](docs/m5-06-review.md)
 - M6-6 总验收计划：[docs/m6-06-plan.md](docs/m6-06-plan.md)
 - M6-6 总验收审查：[docs/m6-06-review.md](docs/m6-06-review.md)
+- M7 发布计划：[docs/m7-release-plan.md](docs/m7-release-plan.md)
+- M7 比赛材料清单：[docs/m7-release-materials.md](docs/m7-release-materials.md)
+- 原创与资产说明：[docs/originality-and-assets.md](docs/originality-and-assets.md)
+- 风险与安全声明：[docs/risk-and-safety.md](docs/risk-and-safety.md)
 - M6 规模与部署准备计划：[docs/m6-scale-deployment-plan.md](docs/m6-scale-deployment-plan.md)
 - M6-0 规模与基准契约：[docs/m6-scale-contract.md](docs/m6-scale-contract.md)
 - M6-0 契约审查：[docs/m6-00-review.md](docs/m6-00-review.md)
@@ -127,6 +130,8 @@ M6-0 已冻结三个匿名合成规模档位：100 任务/20 资源/5 区域、5
 M6-4 在现有 `RuntimeSessionSnapshot` 上增加后端权威集合摘要，并为任务、事件、航班、资源、区域、受影响任务、方案任务书和候选变化提供检索或有界分页。页面始终公开当前范围与总数，只渲染当前页；筛选、页码和选择只属于浏览器展示状态，不增加 revision、不推进业务时间、不触发规划。移动端任务表使用卡片、资源列表使用两列布局，方案内容继续自然展开且不在任务书内部滚动。大集合测试覆盖 2000 项分页、25 项任务书窗口和 20 项候选变化窗口；这些能力服务于合成数据和部署前体验，不表示已经接入真实机场生产数据。
 
 M6-5 已形成 provider-neutral 的单 origin 容器版本。一个非 root Uvicorn worker 同时提供 React 构建产物、`/api/v1`、SSE 和统一错误；SQLite 固定写入可挂载路径，API 请求体默认限制为 2 MiB，未知 API 不会被 SPA HTML 回退掩盖。多阶段镜像不包含 Node、pytest、本机 `.runtime`、DPAPI AI 配置或实际密钥。真实容器替换后能够从同一卷找回会话；无 AI 环境变量时仍使用确定性规则完成核心闭环。M6-5 不创建 GitHub 远程、不推送镜像、不选择托管商或取得公网地址，这些动作仍属于 M7。
+
+M7-0 已建立发布决策契约、比赛材料清单、原创/资产说明、风险/安全声明和 GitHub Actions。当前 GitHub CLI 账号为 `Mediator-cmd`，但仓库没有远程；仓库名、公开/私有、托管平台和公网地址仍待项目负责人确认。在这些选择确认前，不运行 `gh repo create`、`git remote add`、`git push` 或公网部署命令。
 
 M6-5 完成后的方案问答专项修复新增 `question_answer` 的已回答/未提问/证据不足语义，并把方案摘要、方案取舍、任务变化和人工处理固定为四个职责不同的必填分区。点名任务时模型上下文会排除无关任务、航班和事件；平面图坐标等尚无权威空间事实的问题会明确返回证据不足且不调用模型猜测。真实 DeepSeek 与确定性规则共用同一事实白名单、version/revision、只读和人工确认边界。
 
@@ -214,6 +219,8 @@ docker run --name ican-joint-assurance --publish 8000:8000 --volume ican-joint-a
 - AI 变量 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL`、`AI_TIMEOUT_SECONDS` 只能通过平台 Secret Manager 或后端进程环境注入。不要把真实值写进 Dockerfile、镜像层、仓库、浏览器环境或构建参数。
 - 健康检查固定为 `/api/v1/health`。平台未配置 AI 时仍可启动并使用确定性规则；模型成功调用时仍以 `trace.source=language_model` 验证。
 - M7 才负责创建 GitHub 远程、选择托管平台、配置线上卷与秘密并取得公网地址。
+
+M7 发布准备文档：[docs/m7-release-plan.md](docs/m7-release-plan.md)。CI 会在 GitHub Actions 中执行后端回归、Python 编译、前端测试、类型检查和生产构建；CI 不读取或上传 AI 密钥。
 
 停止并删除本地容器不会删除命名卷；确认不再需要其中的仿真会话后，再单独删除该卷。
 
