@@ -18,8 +18,8 @@
 
 ## 当前状态
 
-- 阶段：M6 规模测试、体验收敛与部署准备（M6-0 至 M6-5 已完成）。
-- 下一单元：M6-5A 机场空间态势、方案路径与 AI 进程问答。
+- 阶段：M6 规模测试、体验收敛与部署准备已收口（M6-0 至 M6-6 已完成）。
+- 下一单元：M7 GitHub 发布准备与公网地址规划（需单独授权）。
 - 规范文档：[docs/project-plan.md](docs/project-plan.md)
 - 持续交接文档：[docs/project-progress.md](docs/project-progress.md)
 - 最终展示蓝图：[docs/demo-blueprint.md](docs/demo-blueprint.md)
@@ -52,6 +52,8 @@
 - M5-5 前端辅助交互审查：[docs/m5-05-review.md](docs/m5-05-review.md)
 - M5-6 AI 辅助总验收计划：[docs/m5-06-plan.md](docs/m5-06-plan.md)
 - M5-6 AI 辅助总验收审查：[docs/m5-06-review.md](docs/m5-06-review.md)
+- M6-6 总验收计划：[docs/m6-06-plan.md](docs/m6-06-plan.md)
+- M6-6 总验收审查：[docs/m6-06-review.md](docs/m6-06-review.md)
 - M6 规模与部署准备计划：[docs/m6-scale-deployment-plan.md](docs/m6-scale-deployment-plan.md)
 - M6-0 规模与基准契约：[docs/m6-scale-contract.md](docs/m6-scale-contract.md)
 - M6-0 契约审查：[docs/m6-00-review.md](docs/m6-00-review.md)
@@ -128,7 +130,7 @@ M6-5 已形成 provider-neutral 的单 origin 容器版本。一个非 root Uvic
 
 M6-5 完成后的方案问答专项修复新增 `question_answer` 的已回答/未提问/证据不足语义，并把方案摘要、方案取舍、任务变化和人工处理固定为四个职责不同的必填分区。点名任务时模型上下文会排除无关任务、航班和事件；平面图坐标等尚无权威空间事实的问题会明确返回证据不足且不调用模型猜测。真实 DeepSeek 与确定性规则共用同一事实白名单、version/revision、只读和人工确认边界。
 
-M6-5 完成后计划进入 M6-5A，在调度总览加入原创或明确授权的机场空间态势图：事件定位、资源权威进度、当前方案实线、候选方案虚线及处理过程都从同一运行快照派生。空间 AI 将绑定当前 session/revision 和地图选择，以 `SPATIAL-FACT-*` 回答问题位置、影响任务、活动资源、路线变化、处理阶段和下一步，并可聚焦经过后端校验的对象；它不能猜坐标、修改方案或自动执行。第一版采用本地 SVG 2D，不依赖地图 API key；可选 3D 只做渐进增强。未经授权的北京大兴机场平面图、内部运行图、真实坐标或限制区细节不会进入仓库，视觉真实感不改变匿名教学仿真的安全定位。
+M6-5A 已在调度总览加入原创、匿名的机场空间态势图：事件定位、资源权威进度、当前方案实线、候选方案虚线及处理过程都从同一运行快照派生。空间 AI 绑定当前 session/revision 和地图选择，以 `SPATIAL-FACT-*` 回答问题位置、影响任务、活动资源、路线变化、处理阶段和下一步，并只聚焦经过后端校验的对象；它不能猜坐标、修改方案或自动执行。第一版采用本地 SVG 2D，不依赖地图 API key；可选 3D 只做渐进增强且不阻塞 M6-6 或首次公开发布。未经授权的北京大兴机场平面图、内部运行图、真实坐标或限制区细节不会进入仓库，视觉真实感不改变匿名教学仿真的安全定位。
 
 前端不自行推进时钟、推导业务状态或运行规划器。SSE 连续失败后，每 2 秒读取一次 REST 权威快照，流恢复后停止轮询；所有修改命令携带当前 revision，冲突时只刷新最新状态，不自动重放旧命令。只有运行 API 不可用时才显示原有三套静态快照，并明确标为“离线只读，时间不会推进”，所有运行控制禁用。
 
