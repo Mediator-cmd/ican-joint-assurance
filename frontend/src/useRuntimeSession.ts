@@ -156,16 +156,19 @@ export function useRuntimeSession({
       });
       source.onopen = () => {
         if (!active) return;
-        setConnectionStatus(cursor === null ? "connecting" : "recovering");
+        if (pollingTimer === null) {
+          setConnectionStatus(cursor === null ? "connecting" : "recovering");
+        }
       };
       source.onerror = () => {
         if (!active) return;
         sseLive = false;
         sseFailures += 1;
-        setConnectionStatus("recovering");
-        setNotice("实时连接暂时中断，系统正在自动恢复。");
         if (sseFailures >= SSE_FAILURES_BEFORE_POLLING) {
           startPolling(initial.session_id);
+        } else if (pollingTimer === null) {
+          setConnectionStatus("recovering");
+          setNotice("实时连接暂时中断，系统正在自动恢复。");
         }
       };
     };
