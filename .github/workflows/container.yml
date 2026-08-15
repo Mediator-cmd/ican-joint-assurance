@@ -24,10 +24,17 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/login-action@v3
+        with:
+          registry: crpi-hv15il2f9akxr63b.cn-hangzhou.personal.cr.aliyuncs.com
+          username: nick4021154231
+          password: ${{ secrets.ACR_REGISTRY_PASSWORD }}
       - id: metadata
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/mediator-cmd/ican-joint-assurance
+          images: |
+            ghcr.io/mediator-cmd/ican-joint-assurance
+            crpi-hv15il2f9akxr63b.cn-hangzhou.personal.cr.aliyuncs.com/lzflyg/ican-joint-assurance-runtime
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-
