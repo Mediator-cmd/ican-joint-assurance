@@ -28,7 +28,7 @@ jobs:
         with:
           registry: crpi-hv15il2f9akxr63b.cn-hangzhou.personal.cr.aliyuncs.com
           username: nick4021154231
-          password: ${{ secrets.ACR_REGISTRY_PASSWORD }}
+          password: ${{ secrets.ACR_REGISTRY_PASSWORD_V2 }}
       - id: metadata
         uses: docker/metadata-action@v5
         with:
@@ -44,5 +44,7 @@ jobs:
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
+          provenance: false
+          sbom: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
