@@ -131,7 +131,7 @@ M6-4 在现有 `RuntimeSessionSnapshot` 上增加后端权威集合摘要，并�
 
 M6-5 已形成 provider-neutral 的单 origin 容器版本。一个非 root Uvicorn worker 同时提供 React 构建产物、`/api/v1`、SSE 和统一错误；SQLite 固定写入可挂载路径，API 请求体默认限制为 2 MiB，未知 API 不会被 SPA HTML 回退掩盖。多阶段镜像不包含 Node、pytest、本机 `.runtime`、DPAPI AI 配置或实际密钥。真实容器替换后能够从同一卷找回会话；无 AI 环境变量时仍使用确定性规则完成核心闭环。M6-5 不创建 GitHub 远程、不推送镜像、不选择托管商或取得公网地址，这些动作仍属于 M7。
 
-M7-0 已建立发布决策契约、比赛材料清单、原创/资产说明、风险/安全声明和 GitHub Actions。当前 GitHub CLI 账号为 `Mediator-cmd`，但仓库没有远程；仓库名、公开/私有、托管平台和公网地址仍待项目负责人确认。在这些选择确认前，不运行 `gh repo create`、`git remote add`、`git push` 或公网部署命令。
+M7 已进入公开发布：源代码仓库为公开的 [Mediator-cmd/ican-joint-assurance](https://github.com/Mediator-cmd/ican-joint-assurance)，GitHub Actions 在 `main` 更新后验证并向阿里云 ACR 发布单 origin 运行镜像。当前公网实例位于阿里云轻量应用服务器，使用单容器、单 Uvicorn worker、SQLite 持久化卷和真实 DeepSeek 只读辅助；公网地址、部署证据与剩余发布工作见下方和 [M7 发布计划](docs/m7-release-plan.md)。
 
 M6-5 完成后的方案问答专项修复新增 `question_answer` 的已回答/未提问/证据不足语义，并把方案摘要、方案取舍、任务变化和人工处理固定为四个职责不同的必填分区。点名任务时模型上下文会排除无关任务、航班和事件；平面图坐标等尚无权威空间事实的问题会明确返回证据不足且不调用模型猜测。真实 DeepSeek 与确定性规则共用同一事实白名单、version/revision、只读和人工确认边界。
 
@@ -218,7 +218,18 @@ docker run --name ican-joint-assurance --publish 8000:8000 --volume ican-joint-a
 - 平台可覆盖 `PORT`、`APP_RUNTIME_DATABASE_PATH`、`APP_FRONTEND_DIST_PATH` 和 `APP_MAX_REQUEST_BODY_BYTES`。请求体默认 2097152 字节，配置范围为 65536 至 16777216 字节。
 - AI 变量 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL`、`AI_TIMEOUT_SECONDS` 只能通过平台 Secret Manager 或后端进程环境注入。不要把真实值写进 Dockerfile、镜像层、仓库、浏览器环境或构建参数。
 - 健康检查固定为 `/api/v1/health`。平台未配置 AI 时仍可启动并使用确定性规则；模型成功调用时仍以 `trace.source=language_model` 验证。
-- M7 才负责创建 GitHub 远程、选择托管平台、配置线上卷与秘密并取得公网地址。
+
+### 当前公网部署
+
+- 公网入口：[http://39.107.97.67/](http://39.107.97.67/)
+- 健康检查：[http://39.107.97.67/api/v1/health](http://39.107.97.67/api/v1/health)
+- GitHub：[https://github.com/Mediator-cmd/ican-joint-assurance](https://github.com/Mediator-cmd/ican-joint-assurance)
+- Gitee 镜像：[https://gitee.com/lzflyg/ican-joint-assurance](https://gitee.com/lzflyg/ican-joint-assurance)
+- ACR 运行镜像：`crpi-hv15il2f9akxr63b.cn-hangzhou.personal.cr.aliyuncs.com/lzflyg/ican-joint-assurance-runtime:latest`
+- 部署边界：阿里云北京轻量应用服务器，单实例、单容器、一个 Uvicorn worker；命名卷持久化 `/data/runtime-sessions.sqlite3`。当前试用实例到期时间为 `2026-09-16 23:59:59`，续费或迁移前不能把该 IP 描述为永久地址。
+- 秘密隔离：DeepSeek key 只保存在服务器端 `600 root:root` 配置文件并通过容器环境注入，不进入仓库、镜像、前端或响应。真实空间问答已验证 `trace.source=language_model`，同时请求前后权威快照一致。
+- 自动更新：`main` 推送通过 GitHub Actions 后发布 ACR `latest`；服务器定时器每 5 分钟检测镜像 ID，仅在镜像变化时重建容器。新容器必须通过健康检查，否则自动恢复上一容器；SQLite 命名卷不随容器替换删除。
+- 当前入口为公网 HTTP IP。自有域名、备案和 HTTPS 尚未完成，因此不要把它标注为 HTTPS 地址。
 
 M7 发布准备文档：[docs/m7-release-plan.md](docs/m7-release-plan.md)。CI 会在 GitHub Actions 中执行后端回归、Python 编译、前端测试、类型检查和生产构建；CI 不读取或上传 AI 密钥。
 

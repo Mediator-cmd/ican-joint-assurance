@@ -916,3 +916,17 @@ M3 已关闭，M4-0 契约冻结、M4-1 运行会话、M4-2 确定性状态投�
 - 安全：CI 不读取 AI 密钥；发布文档不包含真实 key、`.runtime`、SQLite、日志、真实机场数据或未经授权底图。许可证、仓库名、可见性、托管平台和公网地址均未猜测。
 - 验证：后端全量 `306 passed in 33.72s`；前端 `42 passed`；TypeScript 类型检查、1797 模块生产构建、Python `compileall`、PowerShell 三个脚本语法、`git diff --check` 和 tracked-file key-like 扫描通过。CI YAML 已复核，构建产物仍由 `.gitignore` 忽略。
 - 下一步：等待项目负责人确认 GitHub 仓库名、公开/私有、托管平台和项目许可证，再进入 M7-1；在确认前不运行 `gh repo create`、`git remote add`、`git push` 或公网部署命令。
+
+### 2026-08-16 / M7-1 至 M7-3 公网发布与真实 AI 首轮验收
+
+- 代码与镜像：公开 GitHub 仓库为 `Mediator-cmd/ican-joint-assurance`；GitHub Actions `Publish container` 成功运行 `31895897100`，向杭州阿里云 ACR 发布 `ican-joint-assurance-runtime:latest`。当前验收镜像摘要为 `sha256:6ddc45c0c8e736ada32ef5bc2e0bfa8aeca32e6e8499588c5bee92c6618718aa`。
+- 国内镜像：Gitee 项目为 `lzflyg/ican-joint-assurance`；发布提交必须同时同步 GitHub 与 Gitee，不把任何云密码、AI key 或服务器环境文件加入远程。
+- 服务器：开通北京阿里云轻量应用服务器 `bd98b7cc1ecc40f7965bcad5aebc019b`，Ubuntu 24.04、2 vCPU、1 GiB、30 GiB，固定公网 IPv4 `39.107.97.67`；试用实例到期时间为 `2026-09-16 23:59:59`，当前订单实付 `0.00` 元。
+- 容器：服务器安装 Docker Engine `29.1.3` 并启用 Docker/containerd 开机自启；单容器使用 `80:8000`、`--restart unless-stopped` 和命名卷 `ican-joint-assurance-data:/data`，容器健康状态为 `healthy`。公网首页和 `/api/v1/health` 均返回 HTTP 200，健康正文为 `status=ok`。
+- 真实 AI：DeepSeek 配置仅写入服务器端 `600 root:root` 环境文件，通过 `--env-file` 注入容器；密钥未打印、未加入镜像、仓库、前端或响应。公网空间问答“task4 现在在哪里、由哪个资源执行、下一段路线是什么”返回 `trace.source=language_model`、`model_label=deepseek-v4-flash`，并绑定 `TASK-004 / WC-01 / TRANSFER-DESK -> GATE-W03`。
+- 只读证据：真实模型调用前后运行 revision 均为 `1`；排除易变 `clock.server_time` 后完整运行快照一致，响应明确 `modifies_runtime=false`。AI 未应用事件、推进时间、采用候选或控制资源。
+- 公网浏览器：页面标题、五个工作区、10/10 任务、5/5 资源、6/6 事件、空间图和完整安全声明正常加载；SSE 显示“权威状态流正常”。点击开始后首个事件生成待确认候选，地图保持 10 条当前实线并新增 3 条真实变化虚线；网页内同一问题显示“模型辅助回答 · deepseek-v4-flash”和当前 revision 的 `SPATIAL-FACT-TASK-004-ACTIVE` 引用。验收会话随后重置到 `ready / V1 / 08:00`。
+- 自动更新：服务器安装 `/usr/local/sbin/ican-deploy` 与 `ican-update.timer`，每 5 分钟从 ACR 检查镜像 ID；镜像未变化时实测输出 `already uses the latest image` 且不重启。镜像变化时保留上一容器，新容器通过健康检查后才删除旧容器；失败则恢复上一容器，SQLite 命名卷始终保留。
+- 当前地址：[http://39.107.97.67/](http://39.107.97.67/)。当前仅为公网 HTTP IP；自有域名、备案和 HTTPS 尚未完成，不能描述成永久域名或 HTTPS 服务。
+- 清理与边界：本轮传输部署脚本使用的本地临时文件已删除，工作区在文档更新前保持干净；继续只使用匿名合成教学数据和原创空间示意图，不接真实机场生产流、真实坐标、内部地图、个人信息或外部控制系统。
+- 剩余入口：M7-3 仍需连续三次完整公网演示和一次受控回滚演练；M7-4 仍需应用方案 PDF、5 分钟视频、开发日志、原创证明和风险声明定稿。试用到期前还需确认续费、迁移或自有域名方案。
