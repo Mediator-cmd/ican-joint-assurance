@@ -175,6 +175,107 @@ def test_spatial_question_rule_fallback_grounds_shorthand_and_changes_no_state(t
     assert after == before
 
 
+def test_task_questions_render_distinct_answers_for_each_requested_fact(tmp_path) -> None:
+    app = _app(tmp_path, session_id="RUN-SPATIAL-AI-TOPICS")
+    with TestClient(app) as client:
+        created = _create_runtime(client)
+        questions = (
+            "task4现在在哪里？",
+            "task4由哪个资源执行？",
+            "task4当前是什么状态？",
+            "task4当前路线是什么？",
+        )
+        responses = [
+            client.post(
+                "/api/v1/assistant/spatial-questions",
+                json=_request(
+                    created,
+                    question,
+                    assistance_mode="deterministic_only",
+                ),
+            )
+            for question in questions
+        ]
+
+    assert all(response.status_code == 200 for response in responses)
+    answers = [response.json()["answer"] for response in responses]
+    assert all(answer["fact_ids"] == ["SPATIAL-FACT-TASK-004-ACTIVE"] for answer in answers)
+    assert "空间范围" in answers[0]["statement"]
+    assert "由资源" in answers[1]["statement"]
+    assert "运行状态" in answers[2]["statement"]
+    assert "当前路线" in answers[3]["statement"]
+    assert len({answer["statement"] for answer in answers}) == len(answers)
+
+
+def test_model_selected_task_fact_is_rendered_for_each_question_intent(tmp_path) -> None:
+    provider = FakeSpatialProvider(
+        ModelSpatialAnswer(
+            status="answered",
+            statement="模型重复返回的固定回答。",
+            fact_ids=["SPATIAL-FACT-TASK-004-ACTIVE"],
+            focus={"task_ids": ["TASK-004"]},
+        )
+    )
+    app = _app(tmp_path, provider, "RUN-SPATIAL-AI-MODEL-TOPICS")
+    with TestClient(app) as client:
+        created = _create_runtime(client)
+        location = client.post(
+            "/api/v1/assistant/spatial-questions",
+            json=_request(created, "task4现在在哪里？"),
+        )
+        status = client.post(
+            "/api/v1/assistant/spatial-questions",
+            json=_request(created, "task4当前是什么状态？"),
+        )
+
+    assert location.status_code == status.status_code == 200
+    location_payload = location.json()
+    status_payload = status.json()
+    assert location_payload["trace"]["source"] == "language_model"
+    assert status_payload["trace"]["source"] == "language_model"
+    assert "空间范围" in location_payload["answer"]["statement"]
+    assert "运行状态" in status_payload["answer"]["statement"]
+    assert (
+        location_payload["answer"]["statement"]
+        != status_payload["answer"]["statement"]
+    )
+    assert "模型重复返回" not in location_payload["answer"]["statement"]
+    assert provider.calls == 2
+
+
+def test_resource_and_event_questions_render_only_the_requested_topic(tmp_path) -> None:
+    app = _app(tmp_path, session_id="RUN-SPATIAL-AI-ENTITY-TOPICS")
+    with TestClient(app) as client:
+        created = _create_runtime(client)
+        questions = (
+            "wc1现在在哪里？",
+            "wc1现在是什么状态？",
+            "事件2发生在哪里？",
+            "事件2现在是什么状态？",
+            "事件2影响哪些任务？",
+        )
+        responses = [
+            client.post(
+                "/api/v1/assistant/spatial-questions",
+                json=_request(
+                    created,
+                    question,
+                    assistance_mode="deterministic_only",
+                ),
+            )
+            for question in questions
+        ]
+
+    assert all(response.status_code == 200 for response in responses)
+    statements = [response.json()["answer"]["statement"] for response in responses]
+    assert "当前位于" in statements[0]
+    assert "当前状态" in statements[1]
+    assert "当前定位" in statements[2]
+    assert "事件状态" in statements[3]
+    assert "关联任务" in statements[4]
+    assert len(set(statements)) == len(statements)
+
+
 def test_spatial_question_recognizes_visible_event_number_alias(tmp_path) -> None:
     app = _app(tmp_path, session_id="RUN-SPATIAL-AI-EVENT")
     with TestClient(app) as client:

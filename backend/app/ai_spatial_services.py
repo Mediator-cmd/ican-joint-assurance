@@ -32,7 +32,12 @@ from .ai_spatial_models import (
     SpatialQuestionSelection,
 )
 from .ai_spatial_provider import ModelSpatialAnswer, SpatialQuestionProvider
-from .spatial_models import RuntimeSpatialView, SpatialFact, SpatialFactCategory
+from .spatial_models import (
+    RuntimeSpatialView,
+    SpatialFact,
+    SpatialFactCategory,
+    SpatialTaskRoute,
+)
 from .spatial_services import RuntimeSpatialService
 from .runtime_repository import RuntimeRevisionConflictError, RuntimeSessionNotFoundError
 
@@ -153,7 +158,7 @@ class SpatialQuestionService:
                 view,
                 answer=SpatialQuestionAnswer(
                     status=output.status,
-                    statement=_deterministic_statement(cited_facts),
+                    statement=_deterministic_statement(cited_facts, grounding, view),
                     fact_ids=[fact.fact_id for fact in cited_facts],
                     matched_entity_ids=list(grounding.matched_entity_ids),
                 ),
@@ -211,7 +216,7 @@ class SpatialQuestionService:
             answer_facts = _bounded_deterministic_facts(relevant)
             answer = SpatialQuestionAnswer(
                 status=grounding.status,
-                statement=_deterministic_statement(answer_facts),
+                statement=_deterministic_statement(answer_facts, grounding, view),
                 fact_ids=[fact.fact_id for fact in answer_facts],
                 matched_entity_ids=list(grounding.matched_entity_ids),
             )
@@ -256,12 +261,15 @@ class SpatialQuestionService:
 
 _TOPIC_KEYWORDS: dict[str, tuple[str, ...]] = {
     "overview": ("总体", "整体", "现在", "当前", "态势", "什么情况", "概况"),
-    "location": ("位置", "地图", "哪里", "在哪", "区域", "登机口", "路线"),
+    "location": ("位置", "地图", "哪里", "在哪", "区域", "登机口"),
+    "route": ("路线", "路径", "下一段", "怎么走", "途经"),
     "event": ("事件", "突发", "延误", "扰动", "航班", "登机口变更"),
     "resource": ("资源", "车辆", "设备", "谁执行", "哪个资源"),
+    "assignment": ("谁执行", "哪个资源", "由谁", "分配给", "负责"),
     "progress": ("进度", "走到", "到哪", "移动", "保障中"),
     "task": ("任务", "作业", "task", "执行路线"),
     "candidate": ("候选", "虚线", "变化", "调整", "采用前", "方案"),
+    "impact": ("影响", "关联", "波及"),
     "manual": ("人工", "确认", "协调", "怎么处理", "下一步", "应对"),
     "status": ("状态", "完成", "等待", "处理到", "正在做"),
 }
@@ -348,7 +356,10 @@ def ground_spatial_question(
         fact for fact in view.facts if matched_set.intersection(fact.entity_ids)
     ]
     categories = _categories_for_topics(topics)
-    if matched_facts:
+    direct_facts = _direct_entity_facts(matched_facts, matched_set, topics, view)
+    if direct_facts:
+        relevant = direct_facts
+    elif matched_facts:
         narrowed = [fact for fact in matched_facts if fact.category in categories]
         relevant = narrowed or matched_facts
     elif categories:
@@ -372,6 +383,39 @@ def ground_spatial_question(
     )
 
 
+def _direct_entity_facts(
+    facts: list[SpatialFact],
+    matched_entities: set[str],
+    topics: tuple[str, ...],
+    view: RuntimeSpatialView,
+) -> list[SpatialFact]:
+    if set(topics).intersection({"candidate", "impact", "manual"}):
+        return []
+    entity_categories = (
+        (
+            {route.task_id for route in view.overlay.task_routes},
+            SpatialFactCategory.TASK,
+        ),
+        (
+            {marker.resource_id for marker in view.overlay.resource_markers},
+            SpatialFactCategory.RESOURCE,
+        ),
+        (
+            {marker.event_id for marker in view.overlay.event_markers},
+            SpatialFactCategory.EVENT,
+        ),
+    )
+    matched_categories = {
+        category
+        for entity_ids, category in entity_categories
+        if matched_entities.intersection(entity_ids)
+    }
+    if len(matched_categories) != 1:
+        return []
+    category = next(iter(matched_categories))
+    return [fact for fact in facts if fact.category is category]
+
+
 def _categories_for_topics(topics: tuple[str, ...]) -> set[SpatialFactCategory]:
     categories: set[SpatialFactCategory] = set()
     for topic in topics:
@@ -387,9 +431,9 @@ def _categories_for_topics(topics: tuple[str, ...]) -> set[SpatialFactCategory]:
                     SpatialFactCategory.PLAN,
                 }
             )
-        elif topic in {"resource", "progress"}:
+        elif topic in {"resource", "progress", "assignment"}:
             categories.add(SpatialFactCategory.RESOURCE)
-        elif topic in {"task", "location", "status"}:
+        elif topic in {"task", "location", "route", "status", "impact"}:
             categories.update(
                 {
                     SpatialFactCategory.TASK,
@@ -453,7 +497,7 @@ def _selected_ids_for_topics(
     topic_set = set(topics)
     if "task" in topic_set:
         return [selection.task_id] if selection.task_id else []
-    if topic_set.intersection({"resource", "progress"}):
+    if topic_set.intersection({"resource", "progress", "assignment"}):
         return [selection.resource_id] if selection.resource_id else []
     if "event" in topic_set:
         return [selection.event_id] if selection.event_id else []
@@ -471,26 +515,205 @@ def _selected_ids_for_topics(
 
 
 def _prioritize_topics(topics: tuple[str, ...]) -> tuple[str, ...]:
-    topic_set = set(topics)
-    if topic_set.intersection({"resource", "progress"}):
-        return tuple(topic for topic in topics if topic in {"resource", "progress"})
-    if "event" in topic_set:
-        return ("event",)
-    if "candidate" in topic_set:
-        return ("candidate",)
-    if "task" in topic_set:
-        return ("task",)
-    if "manual" in topic_set:
-        return ("manual",)
-    if "overview" in topic_set:
-        return ("overview",)
-    return topics
+    unique = tuple(dict.fromkeys(topics))
+    if len(unique) > 1:
+        unique = tuple(topic for topic in unique if topic != "overview")
+    priority = {
+        "event": 0,
+        "candidate": 1,
+        "task": 2,
+        "resource": 3,
+        "assignment": 4,
+        "location": 5,
+        "route": 6,
+        "status": 7,
+        "progress": 8,
+        "impact": 9,
+        "manual": 10,
+        "overview": 11,
+    }
+    return tuple(sorted(unique, key=lambda topic: priority.get(topic, 99)))
 
 
-def _deterministic_statement(facts: list[SpatialFact]) -> str:
+def _deterministic_statement(
+    facts: list[SpatialFact],
+    grounding: SpatialQuestionGrounding,
+    view: RuntimeSpatialView,
+) -> str:
     if not facts:
         return "当前空间事实不足，系统不会猜测。"
-    return " ".join(fact.claim for fact in facts)
+    cited_fact_ids = {fact.fact_id for fact in facts}
+    topic_set = set(grounding.topics)
+    fact_categories = {fact.category for fact in facts}
+    task_routes = [
+        route
+        for route in view.overlay.task_routes
+        if f"SPATIAL-FACT-{route.task_id}-{route.route_kind.value.upper()}"
+        in cited_fact_ids
+    ]
+    task_statements = (
+        _task_statements(task_routes, topic_set)
+        if fact_categories == {SpatialFactCategory.TASK}
+        else []
+    )
+    if task_statements:
+        return _join_statements(task_statements)
+    resource_statements = (
+        _resource_statements(facts, topic_set, view)
+        if fact_categories == {SpatialFactCategory.RESOURCE}
+        else []
+    )
+    if resource_statements:
+        return _join_statements(resource_statements)
+    event_statements = (
+        _event_statements(facts, topic_set, view)
+        if fact_categories == {SpatialFactCategory.EVENT}
+        else []
+    )
+    if event_statements:
+        return _join_statements(event_statements)
+    return _join_statements([fact.claim for fact in facts])
+
+
+def _join_statements(
+    statements: list[str],
+    max_characters: int = 1450,
+) -> str:
+    selected: list[str] = []
+    length = 0
+    for statement in statements:
+        separator = 1 if selected else 0
+        if selected and length + separator + len(statement) > max_characters:
+            break
+        selected.append(statement)
+        length += separator + len(statement)
+    return " ".join(selected or statements[:1])
+
+
+def _task_statements(
+    task_routes: list[SpatialTaskRoute],
+    topic_set: set[str],
+) -> list[str]:
+    statements: list[str] = []
+    for route in task_routes:
+        if route.route_kind.value == "candidate":
+            statements.append(
+                f"任务 {route.task_id} 的待确认候选路线从 {route.origin_zone_id} "
+                f"到 {route.destination_zone_id}；采用前不替换当前路线。"
+            )
+            continue
+        details: list[str] = []
+        if "location" in topic_set:
+            details.append(
+                f"任务 {route.task_id} 的当前空间范围为 {route.origin_zone_id} "
+                f"至 {route.destination_zone_id}。"
+            )
+        if topic_set.intersection({"resource", "assignment"}):
+            details.append(
+                f"任务 {route.task_id} 当前由资源 {route.resource_id} 执行。"
+                if route.resource_id is not None
+                else f"任务 {route.task_id} 当前未分配资源，仍待人工协调。"
+            )
+        if "status" in topic_set:
+            details.append(
+                f"任务 {route.task_id} 当前运行状态为 {route.task_status.value}。"
+            )
+        if "route" in topic_set:
+            details.append(
+                f"任务 {route.task_id} 当前路线从 {route.origin_zone_id} "
+                f"到 {route.destination_zone_id}。"
+            )
+        if not details:
+            assignment = (
+                f"由资源 {route.resource_id} 执行"
+                if route.resource_id is not None
+                else "当前未分配资源，仍待人工协调"
+            )
+            details.append(
+                f"任务 {route.task_id} 当前路线从 {route.origin_zone_id} 到 "
+                f"{route.destination_zone_id}，{assignment}，运行状态为 "
+                f"{route.task_status.value}。"
+            )
+        statements.extend(details)
+    return statements
+
+
+def _resource_statements(
+    facts: list[SpatialFact],
+    topic_set: set[str],
+    view: RuntimeSpatialView,
+) -> list[str]:
+    cited_fact_ids = {fact.fact_id for fact in facts}
+    markers = [
+        marker
+        for marker in view.overlay.resource_markers
+        if f"SPATIAL-FACT-{marker.resource_id}" in cited_fact_ids
+    ]
+    statements: list[str] = []
+    for marker in markers:
+        details: list[str] = []
+        if "location" in topic_set:
+            location = marker.from_zone_id
+            if marker.to_zone_id is not None:
+                location = f"{marker.from_zone_id} 至 {marker.to_zone_id} 的移动路径"
+            details.append(f"资源 {marker.resource_id} 当前位于 {location}。")
+        if "progress" in topic_set:
+            details.append(
+                f"资源 {marker.resource_id} 当前移动进度为 {marker.progress_pct:.2f}%。"
+                if marker.to_zone_id is not None
+                else f"资源 {marker.resource_id} 当前未在路径上移动。"
+            )
+        if "status" in topic_set:
+            details.append(
+                f"资源 {marker.resource_id} 当前状态为 {marker.status.value}。"
+            )
+        if not details:
+            details.append(
+                next(
+                    fact.claim
+                    for fact in facts
+                    if fact.fact_id == f"SPATIAL-FACT-{marker.resource_id}"
+                )
+            )
+        statements.extend(details)
+    return statements
+
+
+def _event_statements(
+    facts: list[SpatialFact],
+    topic_set: set[str],
+    view: RuntimeSpatialView,
+) -> list[str]:
+    cited_facts = {fact.fact_id: fact for fact in facts}
+    markers = [
+        marker
+        for marker in view.overlay.event_markers
+        if f"SPATIAL-FACT-{marker.event_id}" in cited_facts
+    ]
+    statements: list[str] = []
+    task_ids = {route.task_id for route in view.overlay.task_routes}
+    for marker in markers:
+        details: list[str] = []
+        if "location" in topic_set:
+            details.append(
+                f"事件 {marker.event_id} 当前定位于 {marker.primary_zone_id}。"
+            )
+        if "status" in topic_set:
+            details.append(
+                f"事件 {marker.event_id} 当前事件状态为 {marker.status.value}。"
+            )
+        if "impact" in topic_set:
+            fact = cited_facts[f"SPATIAL-FACT-{marker.event_id}"]
+            affected = sorted(set(fact.entity_ids).intersection(task_ids))
+            details.append(
+                f"事件 {marker.event_id} 当前关联任务为 {', '.join(affected)}。"
+                if affected
+                else f"事件 {marker.event_id} 当前没有登记关联任务。"
+            )
+        if not details:
+            details.append(cited_facts[f"SPATIAL-FACT-{marker.event_id}"].claim)
+        statements.extend(details)
+    return statements
 
 
 def _unresolved_for_facts(facts: list[SpatialFact]) -> list[str]:
