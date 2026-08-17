@@ -94,7 +94,9 @@ def build_spatial_layout(scenario: Scenario) -> SpatialLayout:
         scenario_version=scenario.version,
         canvas=SpatialCanvas(width=1000, height=620),
         asset=SpatialAsset(
-            public_path="/assets/anonymous-hub-layout.svg",
+            public_path=(
+                "/assets/anonymous-hub-layout.svg?v=" + ANONYMOUS_HUB_ASSET_SHA256
+            ),
             integrity_sha256=ANONYMOUS_HUB_ASSET_SHA256,
         ),
         zones=zones,

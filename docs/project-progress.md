@@ -965,3 +965,12 @@ M3 已关闭，M4-0 契约冻结、M4-1 运行会话、M4-2 确定性状态投�
 - 数据与安全：沿用单容器、单 Uvicorn worker、`ican-joint-assurance-data` SQLite 命名卷、健康检查和失败回滚；本轮未删除或迁移命名卷，未读取、输出、提交或重新粘贴任何密钥，仍仅使用匿名合成教学数据和原创虚构空间图。
 - 同步状态：GitHub 已同步并驱动公网更新；Gitee `main` 仍为 `8346b5e`，因本次授权明确指定 GitHub，未越权写入 Gitee。后续如需恢复双远端一致，须在操作前取得当次明确确认。
 - 地址边界：当前公网入口仍为 `http://39.107.97.67/`，只属于 HTTP 公网 IP；未配置自有域名、ICP备案或 HTTPS，不能描述为永久地址或安全域名。
+
+### 2026-08-17 / 空间底图长期缓存失效修复
+
+- 现象与根因：公网服务器已返回新版机场 SVG，但已访问过旧图的浏览器仍可能显示旧内容。实际响应头为 `Cache-Control: public, max-age=31536000, immutable`，而空间契约长期使用固定 `/assets/anonymous-hub-layout.svg` URL；旧浏览器因此被允许一年内不重新验证该资源。
+- 修复：后端空间契约改为输出 `/assets/anonymous-hub-layout.svg?v=<完整 SHA-256>`；`SpatialAsset` 同时强制 URL 必须携带 64 位十六进制版本，且版本值必须与 `integrity_sha256` 完全一致。未来只要 SVG 内容变化，缓存键就会随内容哈希变化。
+- 防回归：后端测试覆盖缺失版本、错误版本哈希和实际文件指纹；前端渲染测试确认版本参数保留在 SVG `href`；单 origin 部署测试确认带查询参数的版本化资产仍返回同一文件并保留长期 immutable 缓存。
+- 验证：后端空间与部署专项 `17 passed`，后端全量 `306 passed in 35.17s`；前端 8 个测试文件 `42 passed`，TypeScript 类型检查、Vite 生产构建和 `git diff --check` 通过。
+- 边界：未修改空间锚点、任务路径、资源进度、事件位置、SSE/revision、运行时钟、AI 权限、SQLite 或服务器配置；未读取 Cookie、浏览器密码、Gitee/GitHub 令牌或 AI 密钥。
+- 发布准备：Microsoft Edge 已连接并确认 Gitee 登录态正常，镜像仓库仍为 `8346b5e`，页面提供从 GitHub 强制同步入口。公开 GitHub 推送、公网容器替换和 Gitee 强制同步仍须在执行前取得当次明确确认。

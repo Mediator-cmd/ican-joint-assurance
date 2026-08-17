@@ -94,6 +94,7 @@ def test_single_origin_serves_frontend_assets_and_preserves_api_json_errors(
         head = client.head("/")
         frontend_route = client.get("/workspace/dispatch")
         asset = client.get("/assets/app-A1B2C3.js")
+        versioned_asset = client.get("/assets/app-A1B2C3.js?v=" + "0" * 64)
         demo = client.get("/demo-output.json")
         missing_asset = client.get("/assets/missing.js")
         missing_api = client.get("/api/v1/missing")
@@ -111,6 +112,9 @@ def test_single_origin_serves_frontend_assets_and_preserves_api_json_errors(
     assert asset.status_code == 200
     assert asset.headers["cache-control"] == "public, max-age=31536000, immutable"
     assert asset.headers["x-content-type-options"] == "nosniff"
+    assert versioned_asset.status_code == 200
+    assert versioned_asset.content == asset.content
+    assert versioned_asset.headers["cache-control"] == asset.headers["cache-control"]
     assert demo.headers["cache-control"] == "no-store"
 
     for response in (missing_asset, missing_api):

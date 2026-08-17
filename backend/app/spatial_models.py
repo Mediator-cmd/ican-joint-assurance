@@ -30,7 +30,7 @@ class SpatialCanvas(ModelBase):
 class SpatialAsset(ModelBase):
     kind: Literal["svg"] = "svg"
     source_class: Literal["original_local"] = "original_local"
-    public_path: str = Field(pattern=r"^/assets/[a-z0-9-]+\.svg$")
+    public_path: str = Field(pattern=r"^/assets/[a-z0-9-]+\.svg\?v=[a-f0-9]{64}$")
     license_id: Literal["project-original"] = "project-original"
     integrity_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     safety_classification: Literal["anonymous_training_simulation"] = (
@@ -44,6 +44,13 @@ class SpatialAsset(ModelBase):
         if "://" in lowered or "javascript:" in lowered:
             raise ValueError("spatial assets must be local and script-free")
         return value
+
+    @model_validator(mode="after")
+    def require_content_addressed_url(self) -> SpatialAsset:
+        version = self.public_path.rsplit("?v=", maxsplit=1)[-1]
+        if version != self.integrity_sha256:
+            raise ValueError("spatial asset URL version must match its content hash")
+        return self
 
 
 class SpatialZone(ModelBase):

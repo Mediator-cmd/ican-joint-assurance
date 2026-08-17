@@ -16,7 +16,7 @@ const layout = {
   asset: {
     kind: "svg",
     source_class: "original_local",
-    public_path: "/assets/anonymous-hub-layout.svg",
+    public_path: `/assets/anonymous-hub-layout.svg?v=${"0".repeat(64)}`,
     license_id: "project-original",
     integrity_sha256: "0".repeat(64),
     safety_classification: "anonymous_training_simulation",
@@ -140,6 +140,7 @@ describe("RuntimeSpatialMap", () => {
     expect(markup.match(/data-route-id=/g)).toHaveLength(2);
     expect(markup.match(/data-resource-id=/g)).toHaveLength(1);
     expect(markup.match(/data-event-id=/g)).toHaveLength(1);
+    expect(markup).toContain(`/assets/anonymous-hub-layout.svg?v=${"0".repeat(64)}`);
     expect(markup).toContain("一一对应完整");
     expect(markup).toContain("当前方案始终为实线");
     expect(markup).toContain("候选只显示真实变化");

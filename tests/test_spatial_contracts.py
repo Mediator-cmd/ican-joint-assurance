@@ -20,7 +20,9 @@ def test_anonymous_layout_is_local_hashed_and_graph_complete() -> None:
     scenario = load_scenario(SCENARIO_PATH)
     layout = build_spatial_layout(scenario)
 
-    assert layout.asset.public_path == "/assets/anonymous-hub-layout.svg"
+    assert layout.asset.public_path == (
+        "/assets/anonymous-hub-layout.svg?v=" + layout.asset.integrity_sha256
+    )
     assert layout.asset.source_class == "original_local"
     assert len(layout.asset.integrity_sha256) == 64
     assert sha256(Path("frontend/public/assets/anonymous-hub-layout.svg").read_bytes()).hexdigest() == (
@@ -56,6 +58,16 @@ def test_layout_rejects_unknown_endpoints_and_remote_assets() -> None:
     with pytest.raises(ValidationError):
         SpatialAsset(
             public_path="https://example.invalid/layout.svg",
+            integrity_sha256=layout.asset.integrity_sha256,
+        )
+    with pytest.raises(ValidationError):
+        SpatialAsset(
+            public_path="/assets/anonymous-hub-layout.svg",
+            integrity_sha256=layout.asset.integrity_sha256,
+        )
+    with pytest.raises(ValidationError, match="content hash"):
+        SpatialAsset(
+            public_path="/assets/anonymous-hub-layout.svg?v=" + "0" * 64,
             integrity_sha256=layout.asset.integrity_sha256,
         )
 
