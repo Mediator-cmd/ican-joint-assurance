@@ -18,7 +18,7 @@
 
 ## 评委快速体验
 
-- **Windows 离线演示包**：[一键下载最新离线包](https://github.com/Mediator-cmd/ican-joint-assurance/releases/latest/download/%E8%81%94%E4%BF%9D%E6%99%BA%E8%B0%83-%E7%A6%BB%E7%BA%BF%E6%BC%94%E7%A4%BA-Windows-x64.zip)。下载后解压，双击 `启动联保智调离线版.cmd` 即可；无需安装 Python、Node.js 或 Docker。
+- **Windows 离线演示包**：[一键下载最新离线包](https://github.com/Mediator-cmd/ican-joint-assurance/releases/latest/download/LianBaoZhiDiao-Offline-Windows-x64.zip)。下载后解压，双击 `启动联保智调离线版.cmd` 即可；无需安装 Python、Node.js 或 Docker。
 - 离线包运行在本机 `127.0.0.1`，默认启用不联网、不含密钥的确定性 AI 辅助。它完整保留匿名会话、仿真时钟、事件、候选方案、空间态势和只读问答；不调用公网 DeepSeek。
 - 首个 `offline-v*` 发布标签生成前，上述下载链接尚不可用。发行版会同时附带 SHA-256 校验文件，确保评委下载的是完整、未篡改的 ZIP。
 - 源码、架构、测试和开发日志可直接在本仓库查阅；公网演示入口仅作补充，不作为离线包的运行前提。

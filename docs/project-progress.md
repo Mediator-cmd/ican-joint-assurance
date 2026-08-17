@@ -1004,7 +1004,7 @@ M3 已关闭，M4-0 契约冻结、M4-1 运行会话、M4-2 确定性状态投�
 
 ### 2026-08-17 / GitHub 一键下载 Windows 离线演示包
 
-- 完成：新增 Windows x64 便携发行链路。GitHub 的 `offline-v*` 标签或手工工作流可在干净 Windows runner 构建前端、封装 Python/FastAPI/OR-Tools 运行时与匿名场景，并发布固定文件名 `联保智调-离线演示-Windows-x64.zip` 和 `SHA256SUMS.txt`；README 已增加评委一键下载入口。
+- 完成：新增 Windows x64 便携发行链路。GitHub 的 `offline-v*` 标签或手工工作流可在干净 Windows runner 构建前端、封装 Python/FastAPI/OR-Tools 运行时与匿名场景，并发布固定资产名 `LianBaoZhiDiao-Offline-Windows-x64.zip` 和 `SHA256SUMS.txt`；README 已增加评委一键下载入口。压缩包内部继续使用中文项目名，外层使用 ASCII 名称以避免 GitHub 净化非 ASCII 资产名后破坏固定下载链接。
 - 使用：评委下载并解压后双击 `启动联保智调离线版.cmd`，无需预装 Python、Node.js 或 Docker；程序只监听 `127.0.0.1`，优先打开 Microsoft Edge。`停止联保智调离线版.cmd` 会核验应用标识、PID、可执行路径和启动时间后才结束进程。
 - AI 与数据边界：启动器主动移除当前进程继承的 AI provider 环境变量，离线问答固定使用后端权威事实的确定性解释；发行包不包含、读取或要求 API key，不接真实机场数据、真实坐标、内部地图、PII 或外部控制系统。SQLite 仅写入解压目录自身的 `.runtime`，不接触公网服务器或命名卷。
 - 本机发行验证：PyInstaller 6.22.1 构建成功，ZIP 约 `66.8 MB`；从新目录解压后经批处理入口启动，首页与 `/api/v1/health` 返回 HTTP 200、`status=ok`，匿名会话创建成功，SSE 返回 `event: runtime.snapshot`。空间问题“task4现在在哪里？”返回 `trace.source=deterministic_rules`、`provider_attempted=false` 和当前权威路线事实，调用前后 revision 均为 `1`、`modifies_runtime=false`；停止入口结束了目标进程并移除状态文件。
