@@ -992,3 +992,12 @@ M3 已关闭，M4-0 契约冻结、M4-1 运行会话、M4-2 确定性状态投�
 - 防回归：新增规则模式的任务多问法、资源/事件多问法，以及模型对不同问题引用同一任务事实的测试；验证回答内容互不相同、引用仍属于当前 facts、地图聚焦仍受引用约束、运行快照不变化。
 - 验证：空间问答 API `14 passed`；后端全量 `309 passed in 35.14s`；前端 `42 passed`，TypeScript 类型检查、Vite 生产构建、Python `compileall`、`pip check` 和 `git diff --check` 通过。Microsoft Edge 在隔离的 `8016` 单 origin 实例验证“task4现在在哪里？”与“task4当前是什么状态？”分别输出空间范围和运行状态，控制台 0 error、0 warning；隔离实例和浏览器会话已停止，正式本地会话未重启。
 - 安全与发布：未修改前端权威状态、SSE、时钟、规划器、候选确认、SQLite 卷或服务器配置；AI 仍只能解释事实，不能应用事件、推进时间、采用候选或控制资源。本单元尚未提交、推送 GitHub/Gitee 或更新公网，后续外部同步仍需操作前明确确认。
+
+### 2026-08-17 / 空间态势 AI 相关性修复双远端与公网发布
+
+- 代码同步：经项目负责人明确授权，将 `68f831e fix: tailor spatial answers to question intent` 推送至公开 GitHub `main`；Gitee 命令行凭据再次卡住且没有产生部分推送，项目负责人随后在 Microsoft Edge 的已登录页面手工执行 GitHub 强制同步。最终 `origin/main` 与 `gitee/main` 均核验为 `68f831e62176fdd4d53dfd526c26c2e24052f99c`。
+- CI 与镜像：GitHub Actions `CI` 运行 `32014692209`、`Publish container` 运行 `32014692611` 均成功，后端、前端、构建、差异与敏感信息检查通过，并将目标提交镜像发布到既有仓库。公网 `/api/v1/health` 在发布后保持 HTTP 200、`status=ok`。
+- 公网规则模式：在既有只读会话 `RUN-F6EB2975FC164783 / R1 / ready` 上依次询问 `task4` 的位置、状态、执行资源和路线，分别返回 `TRANSFER-DESK 至 GATE-W03`、`pending`、`WC-01` 和 `TRANSFER-DESK 到 GATE-W03`；四次均引用 `SPATIAL-FACT-TASK-004-ACTIVE`，答案互不相同。
+- 公网真实模型：`auto` 模式下 `deepseek-v4-flash` 对“task4现在在哪里？”和“task4当前是什么状态？”分别返回空间范围与运行状态，`trace.source=language_model`；服务端继续按同一白名单事实重建最终文字，没有直接展示模型自由文本。
+- 只读与数据安全：规则与模型调用前后会话均保持 `ready / R1`，响应 `modifies_runtime=false`、`requires_human_confirmation=true`；未应用事件、推进时间、采用候选、修改 SQLite 卷或读取/输出任何 AI 密钥、远端令牌和浏览器凭据。
+- 地址边界：当前公网入口仍为 `http://39.107.97.67/`，属于 HTTP 公网 IP；本次没有配置自有域名、ICP备案或 HTTPS，不能描述为永久域名或安全地址。
