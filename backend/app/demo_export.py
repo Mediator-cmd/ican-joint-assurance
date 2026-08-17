@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from .events import apply_events
@@ -10,18 +9,14 @@ from .fifo_scheduler import build_fifo_plan
 from .models import FlightEvent, FlightEventType, Scenario
 from .optimizer import build_optimized_plan
 from .planning_models import Plan
+from .runtime_paths import project_root
 from .scenario_loader import load_scenario
 
 
 SAFETY_NOTICE = (
     "仅供教学仿真与辅助决策使用，不构成真实机场运行、放行、登机、改签或车辆控制指令。"
 )
-DEMO_SCENARIO_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "data"
-    / "scenarios"
-    / "terminal-disturbance-demo.json"
-)
+DEMO_SCENARIO_PATH = project_root() / "data" / "scenarios" / "terminal-disturbance-demo.json"
 
 
 def _event_view(event: FlightEvent) -> dict[str, Any]:

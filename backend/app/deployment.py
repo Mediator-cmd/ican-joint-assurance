@@ -13,8 +13,9 @@ from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from .runtime_paths import project_root
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = project_root()
 DEFAULT_RUNTIME_DATABASE_PATH = PROJECT_ROOT / ".runtime" / "runtime-sessions.sqlite3"
 DEFAULT_MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024
 MIN_MAX_REQUEST_BODY_BYTES = 64 * 1024

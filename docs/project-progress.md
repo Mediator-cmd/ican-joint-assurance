@@ -1001,3 +1001,12 @@ M3 已关闭，M4-0 契约冻结、M4-1 运行会话、M4-2 确定性状态投�
 - 公网真实模型：`auto` 模式下 `deepseek-v4-flash` 对“task4现在在哪里？”和“task4当前是什么状态？”分别返回空间范围与运行状态，`trace.source=language_model`；服务端继续按同一白名单事实重建最终文字，没有直接展示模型自由文本。
 - 只读与数据安全：规则与模型调用前后会话均保持 `ready / R1`，响应 `modifies_runtime=false`、`requires_human_confirmation=true`；未应用事件、推进时间、采用候选、修改 SQLite 卷或读取/输出任何 AI 密钥、远端令牌和浏览器凭据。
 - 地址边界：当前公网入口仍为 `http://39.107.97.67/`，属于 HTTP 公网 IP；本次没有配置自有域名、ICP备案或 HTTPS，不能描述为永久域名或安全地址。
+
+### 2026-08-17 / GitHub 一键下载 Windows 离线演示包
+
+- 完成：新增 Windows x64 便携发行链路。GitHub 的 `offline-v*` 标签或手工工作流可在干净 Windows runner 构建前端、封装 Python/FastAPI/OR-Tools 运行时与匿名场景，并发布固定文件名 `联保智调-离线演示-Windows-x64.zip` 和 `SHA256SUMS.txt`；README 已增加评委一键下载入口。
+- 使用：评委下载并解压后双击 `启动联保智调离线版.cmd`，无需预装 Python、Node.js 或 Docker；程序只监听 `127.0.0.1`，优先打开 Microsoft Edge。`停止联保智调离线版.cmd` 会核验应用标识、PID、可执行路径和启动时间后才结束进程。
+- AI 与数据边界：启动器主动移除当前进程继承的 AI provider 环境变量，离线问答固定使用后端权威事实的确定性解释；发行包不包含、读取或要求 API key，不接真实机场数据、真实坐标、内部地图、PII 或外部控制系统。SQLite 仅写入解压目录自身的 `.runtime`，不接触公网服务器或命名卷。
+- 本机发行验证：PyInstaller 6.22.1 构建成功，ZIP 约 `66.8 MB`；从新目录解压后经批处理入口启动，首页与 `/api/v1/health` 返回 HTTP 200、`status=ok`，匿名会话创建成功，SSE 返回 `event: runtime.snapshot`。空间问题“task4现在在哪里？”返回 `trace.source=deterministic_rules`、`provider_attempted=false` 和当前权威路线事实，调用前后 revision 均为 `1`、`modifies_runtime=false`；停止入口结束了目标进程并移除状态文件。
+- 自动验证：后端 `313 passed`（含 4 项离线发行契约），前端 `42 passed`，TypeScript 类型检查、Vite 生产构建、Python `compileall` 和 `git diff --check` 通过。最终本地候选 ZIP 为 `66,778,929` 字节，SHA-256 为 `e6b636c06f0872d2368167081c443130ff4a778ea1bf75278d468256bac26414`；该哈希只对应本地候选，正式 GitHub runner 产物将发布自己的校验值。便携包当前未购买 Windows 代码签名证书，说明文件要求先核对 Release SHA-256，再处理可能出现的 SmartScreen 首次提示。
+- 发布状态与下一步：本地收口提交不等同于外部发布；当前尚未推送、创建标签或 GitHub Release，README 的最新下载链接要在首次 `offline-v*` Release 创建后才可用。提交 GitHub、创建发行标签、发布 Release、同步 Gitee 和由 `main` 触发公网镜像更新仍需在执行前取得当次明确确认。

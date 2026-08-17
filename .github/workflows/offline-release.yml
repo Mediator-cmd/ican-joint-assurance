@@ -1,0 +1,62 @@
+name: Build Windows offline package
+
+on:
+  push:
+    tags: ["offline-v*"]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag, for example offline-v1.0.0
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-offline-package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements-runtime.txt
+      - name: Install offline runtime builder
+        run: python -m pip install -r backend/requirements-runtime.txt pyinstaller
+      - name: Build release ZIP and checksum
+        id: package
+        shell: pwsh
+        run: |
+          $tag = "${{ inputs.release_tag || github.ref_name }}"
+          if ($tag -notmatch '^offline-v[0-9A-Za-z._-]+$') {
+            throw "Release tag must start with offline-v."
+          }
+          $archive = Join-Path $env:RUNNER_TEMP "联保智调-离线演示-Windows-x64.zip"
+          $staging = Join-Path $env:RUNNER_TEMP "ican-offline-package"
+          python scripts/build_offline_package.py --version $tag --output $staging --archive $archive
+          $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          $checksumPath = Join-Path $env:RUNNER_TEMP "SHA256SUMS.txt"
+          "$hash  联保智调-离线演示-Windows-x64.zip" | Set-Content -LiteralPath $checksumPath -Encoding ascii
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "archive=$archive" >> $env:GITHUB_OUTPUT
+          "checksum=$checksumPath" >> $env:GITHUB_OUTPUT
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release create "${{ steps.package.outputs.tag }}" "${{ steps.package.outputs.archive }}" "${{ steps.package.outputs.checksum }}" --title "联保智调离线演示 ${{ steps.package.outputs.tag }}" --generate-notes
