@@ -50,7 +50,7 @@ jobs:
           python scripts/build_offline_package.py --version $tag --output $staging --archive $archive
           $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $checksumPath = Join-Path $env:RUNNER_TEMP "SHA256SUMS.txt"
-          "$hash  联保智调-离线演示-Windows-x64.zip" | Set-Content -LiteralPath $checksumPath -Encoding ascii
+          "$hash  联保智调-离线演示-Windows-x64.zip" | Set-Content -LiteralPath $checksumPath -Encoding utf8
           "tag=$tag" >> $env:GITHUB_OUTPUT
           "archive=$archive" >> $env:GITHUB_OUTPUT
           "checksum=$checksumPath" >> $env:GITHUB_OUTPUT

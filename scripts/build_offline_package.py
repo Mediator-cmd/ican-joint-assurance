@@ -101,7 +101,7 @@ def main() -> None:
         encoding="utf-8",
     )
     package_zip(package_root, args.archive)
-    print(f"Built offline package: {args.archive}")
+    print("Built Windows offline package successfully.")
 
 
 if __name__ == "__main__":

@@ -54,4 +54,5 @@ def test_release_workflow_publishes_stable_download_names() -> None:
     assert "contents: write" in workflow
     assert "联保智调-离线演示-Windows-x64.zip" in workflow
     assert "SHA256SUMS.txt" in workflow
+    assert "Set-Content -LiteralPath $checksumPath -Encoding utf8" in workflow
     assert "gh release create" in workflow
