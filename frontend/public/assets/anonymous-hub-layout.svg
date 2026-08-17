@@ -1,21 +1,177 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" role="img" aria-label="Anonymous terminal simulation layout">
-  <rect width="1000" height="620" fill="#f4f7f8"/>
-  <path d="M500 350 L500 248 L500 174" fill="none" stroke="#d9e3e5" stroke-width="86" stroke-linecap="round"/>
-  <path d="M500 350 L314 300 L176 194" fill="none" stroke="#d9e3e5" stroke-width="66" stroke-linecap="round"/>
-  <path d="M500 350 L686 300 L824 194" fill="none" stroke="#d9e3e5" stroke-width="66" stroke-linecap="round"/>
-  <path d="M500 350 L500 248 L500 174" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
-  <path d="M500 350 L314 300 L176 194" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
-  <path d="M500 350 L686 300 L824 194" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
-  <rect x="414" y="312" width="172" height="84" rx="18" fill="#ffffff" stroke="#9fb1b5" stroke-width="3"/>
-  <rect x="112" y="150" width="128" height="88" rx="12" fill="#ffffff" stroke="#9fb1b5" stroke-width="3"/>
-  <rect x="760" y="150" width="128" height="88" rx="12" fill="#ffffff" stroke="#9fb1b5" stroke-width="3"/>
-  <circle cx="500" cy="350" r="9" fill="#2e6f68"/>
-  <circle cx="176" cy="194" r="9" fill="#2e6f68"/>
-  <circle cx="824" cy="194" r="9" fill="#2e6f68"/>
-  <g fill="#819296" font-family="Segoe UI, sans-serif" font-size="16" text-anchor="middle">
-    <text x="500" y="360">TRANSFER DESK</text>
-    <text x="176" y="201">WEST GATE</text>
-    <text x="824" y="201">EAST GATE</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" role="img" aria-labelledby="title description">
+  <title id="title">Anonymous teaching-simulation airport operations layout</title>
+  <desc id="description">Original fictional airport diagram with runway, apron, terminal concourses, gate stands, service roads and ground-support staging areas.</desc>
+
+  <defs>
+    <pattern id="map-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M20 0H0V20" fill="none" stroke="#66736d" stroke-opacity="0.10" stroke-width="1"/>
+    </pattern>
+    <pattern id="apron-grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#7f8b86" stroke-opacity="0.12" stroke-width="1"/>
+      <circle cx="1" cy="1" r="1" fill="#6f7d77" fill-opacity="0.16"/>
+    </pattern>
+    <pattern id="restricted-hatch" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="12" height="12" fill="#e6e9e6"/>
+      <rect width="3" height="12" fill="#c9cfcc" fill-opacity="0.54"/>
+    </pattern>
+    <pattern id="terminal-floor" width="18" height="18" patternUnits="userSpaceOnUse">
+      <path d="M18 0H0V18" fill="none" stroke="#c4ccc8" stroke-opacity="0.36" stroke-width="1"/>
+    </pattern>
+    <g id="stand-marking" fill="none">
+      <circle cx="0" cy="0" r="38" stroke="#9da8a3" stroke-width="1.5" stroke-dasharray="5 6"/>
+      <path d="M0 36V-26M-12-12L0-26 12-12" stroke="#aa8d45" stroke-width="2"/>
+      <path d="M-29 28H29" stroke="#b9c1bd" stroke-width="1"/>
+    </g>
+    <g id="service-bay">
+      <rect width="32" height="16" fill="#f7f8f6" stroke="#9ca7a2"/>
+      <path d="M8 0V16M16 0V16M24 0V16" stroke="#c0c7c3"/>
+    </g>
+  </defs>
+
+  <rect width="1000" height="620" fill="#eef1ef"/>
+  <rect width="1000" height="620" fill="url(#map-grid)"/>
+
+  <g id="map-identification" font-family="Cascadia Mono, Consolas, monospace">
+    <text x="28" y="24" fill="#35413c" font-size="13" font-weight="700" letter-spacing="1.4">ANON HUB / AIRSIDE L1</text>
+    <text x="28" y="42" fill="#7c8882" font-size="9" letter-spacing="1">ORIGINAL TEACHING-SIMULATION GEOMETRY</text>
+    <path d="M28 51H230" stroke="#34413b" stroke-width="2"/>
+    <path d="M28 56H102" stroke="#8b659f" stroke-width="3"/>
+    <g transform="translate(952 20)">
+      <path d="M0 27V0M0 0L-6 9M0 0L6 9" fill="none" stroke="#35413c" stroke-width="2"/>
+      <text x="0" y="42" fill="#35413c" font-size="10" text-anchor="middle">N</text>
+    </g>
   </g>
-  <text x="32" y="570" fill="#718187" font-family="Segoe UI, sans-serif" font-size="14">ANONYMOUS TRAINING SIMULATION · NOT A REAL AIRPORT MAP</text>
+
+  <g id="runway-and-taxiway">
+    <rect x="42" y="56" width="916" height="58" fill="#c7cfcb" stroke="#727e78" stroke-width="2"/>
+    <rect x="55" y="66" width="890" height="38" fill="#aeb8b3" stroke="#eef1ef" stroke-width="1"/>
+    <path d="M118 85H882" stroke="#f7f8f6" stroke-width="3" stroke-dasharray="30 19"/>
+    <path d="M69 73H100M69 80H100M69 87H100M69 94H100M900 73H931M900 80H931M900 87H931M900 94H931" stroke="#f7f8f6" stroke-width="4"/>
+    <text x="112" y="78" fill="#ffffff" font-family="Cascadia Mono, Consolas, monospace" font-size="12" font-weight="700">08</text>
+    <text x="872" y="98" fill="#ffffff" font-family="Cascadia Mono, Consolas, monospace" font-size="12" font-weight="700">26</text>
+    <path d="M70 130H930" fill="none" stroke="#c3ccc8" stroke-width="24" stroke-linecap="round"/>
+    <path d="M70 130H930" fill="none" stroke="#b29142" stroke-width="2" stroke-dasharray="11 10"/>
+    <path d="M176 108V154M824 108V154M342 118V174M658 118V174" fill="none" stroke="#c3ccc8" stroke-width="20" stroke-linecap="round"/>
+    <path d="M176 108V154M824 108V154M342 118V174M658 118V174" fill="none" stroke="#b29142" stroke-width="2" stroke-dasharray="7 7"/>
+    <text x="490" y="126" fill="#7b8781" font-family="Cascadia Mono, Consolas, monospace" font-size="9" letter-spacing="1">TWY-A</text>
+  </g>
+
+  <g id="apron">
+    <path d="M42 147H958V286L879 323H121L42 286Z" fill="#dde3e0" stroke="#a2ada7" stroke-width="2"/>
+    <path d="M42 147H958V286L879 323H121L42 286Z" fill="url(#apron-grid)"/>
+    <path d="M60 276H940" stroke="#b8c1bd" stroke-width="2" stroke-dasharray="7 8"/>
+    <text x="55" y="170" fill="#7c8983" font-family="Cascadia Mono, Consolas, monospace" font-size="9" letter-spacing="1">APRON / CONTROLLED GROUND MOVEMENT</text>
+
+    <use href="#stand-marking" transform="translate(176 156)"/>
+    <use href="#stand-marking" transform="translate(342 170) scale(.82)" opacity=".72"/>
+    <use href="#stand-marking" transform="translate(658 170) scale(.82)" opacity=".72"/>
+    <use href="#stand-marking" transform="translate(824 156)"/>
+
+    <path d="M176 118V145M824 118V145" stroke="#aa8d45" stroke-width="2"/>
+    <path d="M342 130V160M658 130V160" stroke="#aa8d45" stroke-width="1.5" stroke-dasharray="5 4"/>
+
+    <g font-family="Cascadia Mono, Consolas, monospace" font-size="8" fill="#7d8883" letter-spacing=".8">
+      <text x="148" y="111">STAND W03</text>
+      <text x="314" y="113">REMOTE W</text>
+      <text x="630" y="113">REMOTE E</text>
+      <text x="796" y="111">STAND E01</text>
+    </g>
+
+    <g transform="translate(86 244)"><use href="#service-bay"/><text x="16" y="29" fill="#7b8781" font-family="Cascadia Mono, Consolas, monospace" font-size="7" text-anchor="middle">GPU</text></g>
+    <g transform="translate(126 244)"><use href="#service-bay"/><text x="16" y="29" fill="#7b8781" font-family="Cascadia Mono, Consolas, monospace" font-size="7" text-anchor="middle">BAG</text></g>
+    <g transform="translate(810 244)"><use href="#service-bay"/><text x="16" y="29" fill="#7b8781" font-family="Cascadia Mono, Consolas, monospace" font-size="7" text-anchor="middle">BAG</text></g>
+    <g transform="translate(850 244)"><use href="#service-bay"/><text x="16" y="29" fill="#7b8781" font-family="Cascadia Mono, Consolas, monospace" font-size="7" text-anchor="middle">GPU</text></g>
+  </g>
+
+  <g id="terminal-circulation">
+    <path d="M500 350L500 246L500 185" fill="none" stroke="#aebbb5" stroke-width="96" stroke-linecap="square" stroke-linejoin="round"/>
+    <path d="M500 350L314 300L176 194" fill="none" stroke="#aebbb5" stroke-width="84" stroke-linecap="square" stroke-linejoin="round"/>
+    <path d="M500 350L686 300L824 194" fill="none" stroke="#aebbb5" stroke-width="84" stroke-linecap="square" stroke-linejoin="round"/>
+
+    <path d="M500 350L500 246L500 185" fill="none" stroke="#f8f9f7" stroke-width="76" stroke-linecap="square" stroke-linejoin="round"/>
+    <path d="M500 350L314 300L176 194" fill="none" stroke="#f8f9f7" stroke-width="64" stroke-linecap="square" stroke-linejoin="round"/>
+    <path d="M500 350L686 300L824 194" fill="none" stroke="#f8f9f7" stroke-width="64" stroke-linecap="square" stroke-linejoin="round"/>
+
+    <path d="M500 350L500 246L500 185M500 350L314 300L176 194M500 350L686 300L824 194" fill="none" stroke="#cbd3cf" stroke-width="2" stroke-dasharray="3 8"/>
+
+    <g fill="#97a49e">
+      <circle cx="454" cy="338" r="3"/><circle cx="474" cy="344" r="3"/><circle cx="526" cy="344" r="3"/><circle cx="546" cy="338" r="3"/>
+      <circle cx="370" cy="317" r="3"/><circle cx="340" cy="305" r="3"/><circle cx="630" cy="317" r="3"/><circle cx="660" cy="305" r="3"/>
+      <circle cx="500" cy="270" r="3"/><circle cx="500" cy="235" r="3"/>
+    </g>
+  </g>
+
+  <g id="terminal-buildings">
+    <rect x="92" y="146" width="168" height="106" fill="#fbfcfa" stroke="#65736d" stroke-width="2"/>
+    <rect x="99" y="153" width="154" height="92" fill="url(#terminal-floor)" stroke="#c0c9c4"/>
+    <path d="M113 177H239M113 221H239M145 153V245M207 153V245" stroke="#c4ccc8"/>
+    <rect x="109" y="184" width="26" height="27" fill="#e5ebe8" stroke="#a9b5af"/>
+    <rect x="217" y="184" width="26" height="27" fill="#e5ebe8" stroke="#a9b5af"/>
+    <path d="M156 164H196" stroke="#8b659f" stroke-width="4"/>
+
+    <rect x="740" y="146" width="168" height="106" fill="#fbfcfa" stroke="#65736d" stroke-width="2"/>
+    <rect x="747" y="153" width="154" height="92" fill="url(#terminal-floor)" stroke="#c0c9c4"/>
+    <path d="M761 177H887M761 221H887M793 153V245M855 153V245" stroke="#c4ccc8"/>
+    <rect x="757" y="184" width="26" height="27" fill="#e5ebe8" stroke="#a9b5af"/>
+    <rect x="865" y="184" width="26" height="27" fill="#e5ebe8" stroke="#a9b5af"/>
+    <path d="M804 164H844" stroke="#8b659f" stroke-width="4"/>
+
+    <path d="M164 146V130H188V146M812 146V130H836V146" fill="#f7f8f6" stroke="#65736d" stroke-width="2"/>
+    <path d="M176 130V116M824 130V116" stroke="#8c9892" stroke-width="8"/>
+
+    <rect x="398" y="298" width="204" height="116" fill="#fbfcfa" stroke="#65736d" stroke-width="2"/>
+    <rect x="407" y="307" width="186" height="98" fill="url(#terminal-floor)" stroke="#c0c9c4"/>
+    <path d="M407 338H593M407 378H593M452 307V405M548 307V405" stroke="#c4ccc8"/>
+    <rect x="462" y="318" width="76" height="18" fill="#e1d6e8" stroke="#8b659f"/>
+    <path d="M468 327H532" stroke="#8b659f" stroke-width="2" stroke-dasharray="4 4"/>
+    <rect x="416" y="348" width="25" height="19" fill="#e5ebe8" stroke="#a9b5af"/>
+    <rect x="559" y="348" width="25" height="19" fill="#e5ebe8" stroke="#a9b5af"/>
+
+    <g font-family="Cascadia Mono, Consolas, monospace" fill="#53615a">
+      <text x="108" y="168" font-size="9" font-weight="700" letter-spacing="1">WEST PIER / W03</text>
+      <text x="756" y="168" font-size="9" font-weight="700" letter-spacing="1">EAST PIER / E01</text>
+      <text x="414" y="326" font-size="9" font-weight="700" letter-spacing="1">TRANSFER CORE</text>
+      <text x="500" y="358" font-size="8" text-anchor="middle" letter-spacing=".8">ASSISTANCE DESK</text>
+      <text x="176" y="238" font-size="7" text-anchor="middle">WAITING / BOARDING</text>
+      <text x="824" y="238" font-size="7" text-anchor="middle">WAITING / BOARDING</text>
+    </g>
+  </g>
+
+  <g id="landside-and-service-zone">
+    <path d="M108 446C250 420 356 432 500 450C644 432 750 420 892 446" fill="none" stroke="#abb6b0" stroke-width="34"/>
+    <path d="M108 446C250 420 356 432 500 450C644 432 750 420 892 446" fill="none" stroke="#f7f8f6" stroke-width="22"/>
+    <path d="M108 446C250 420 356 432 500 450C644 432 750 420 892 446" fill="none" stroke="#818e87" stroke-width="1.5" stroke-dasharray="11 9"/>
+
+    <rect x="44" y="486" width="270" height="86" fill="#e7ebe8" stroke="#a2ada7"/>
+    <rect x="686" y="486" width="270" height="86" fill="#e7ebe8" stroke="#a2ada7"/>
+    <rect x="62" y="502" width="232" height="52" fill="url(#restricted-hatch)" stroke="#b1bbb6"/>
+    <rect x="706" y="502" width="232" height="52" fill="url(#restricted-hatch)" stroke="#b1bbb6"/>
+
+    <g stroke="#8c9892" fill="#f7f8f6">
+      <rect x="75" y="513" width="42" height="24"/><rect x="127" y="513" width="42" height="24"/><rect x="179" y="513" width="42" height="24"/><rect x="231" y="513" width="42" height="24"/>
+      <rect x="719" y="513" width="42" height="24"/><rect x="771" y="513" width="42" height="24"/><rect x="823" y="513" width="42" height="24"/><rect x="875" y="513" width="42" height="24"/>
+    </g>
+
+    <rect x="366" y="475" width="268" height="94" fill="#f7f8f6" stroke="#8d9993" stroke-width="2"/>
+    <path d="M380 489H620M380 520H620M434 475V569M500 475V569M566 475V569" stroke="#c1c9c5"/>
+    <rect x="445" y="489" width="110" height="22" fill="#e1d6e8" stroke="#8b659f"/>
+    <text x="500" y="504" fill="#594369" font-family="Cascadia Mono, Consolas, monospace" font-size="9" text-anchor="middle" font-weight="700">GROUND OPS CONTROL</text>
+
+    <g font-family="Cascadia Mono, Consolas, monospace" fill="#66736d" font-size="9" letter-spacing=".8">
+      <text x="58" y="480">WEST SERVICE STAGING</text>
+      <text x="700" y="480">EAST SERVICE STAGING</text>
+      <text x="392" y="589">LANDSIDE SUPPORT / STAFF ACCESS</text>
+    </g>
+  </g>
+
+  <g id="wayfinding-and-scale" font-family="Cascadia Mono, Consolas, monospace">
+    <g transform="translate(34 586)">
+      <path d="M0 0H120" stroke="#44514b" stroke-width="3"/>
+      <path d="M0-5V5M40-5V5M80-5V5M120-5V5" stroke="#44514b"/>
+      <text x="0" y="16" fill="#6e7b75" font-size="8">0</text>
+      <text x="102" y="16" fill="#6e7b75" font-size="8">SIM SCALE</text>
+    </g>
+    <rect x="764" y="584" width="202" height="22" fill="#f8f9f7" stroke="#7c8882"/>
+    <text x="865" y="599" fill="#52605a" font-size="8" text-anchor="middle" letter-spacing=".8">ANONYMOUS TRAINING MAP / NOT REAL</text>
+  </g>
 </svg>
