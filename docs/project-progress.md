@@ -974,3 +974,12 @@ M3 已关闭，M4-0 契约冻结、M4-1 运行会话、M4-2 确定性状态投�
 - 验证：后端空间与部署专项 `17 passed`，后端全量 `306 passed in 35.17s`；前端 8 个测试文件 `42 passed`，TypeScript 类型检查、Vite 生产构建和 `git diff --check` 通过。
 - 边界：未修改空间锚点、任务路径、资源进度、事件位置、SSE/revision、运行时钟、AI 权限、SQLite 或服务器配置；未读取 Cookie、浏览器密码、Gitee/GitHub 令牌或 AI 密钥。
 - 发布准备：Microsoft Edge 已连接并确认 Gitee 登录态正常，镜像仓库仍为 `8346b5e`，页面提供从 GitHub 强制同步入口。公开 GitHub 推送、公网容器替换和 Gitee 强制同步仍须在执行前取得当次明确确认。
+
+### 2026-08-17 / 空间底图缓存修复双远端发布
+
+- GitHub：经项目负责人明确确认，将 `4034fe7 fix: version immutable spatial assets` 推送至公开 `origin/main`；首次连接遇到短时 `github.com:443` 网络失败，未产生部分推送，网络恢复后重试成功。GitHub Actions `CI` 运行 `32003548013`、`Publish container` 运行 `32003547950` 均成功。
+- Gitee：命令行 HTTPS 凭据仍被拒绝，但 Microsoft Edge 扩展成功连接到用户已登录的 Gitee 项目页；在保持“删除远端不存在分支和标签”及“同步 Wiki”均未勾选的前提下，经最终确认从 GitHub 强制同步。公开 `gitee/main` 已由 `8346b5e` 追平至 `4034fe7`。
+- 公网：阿里云自动更新链路完成镜像替换，健康检查保持 HTTP 200、`status=ok`；真实空间接口返回 `/assets/anonymous-hub-layout.svg?v=04372de43554f509f509e0605b1782f8599c0400b8277445a0b23da26df6c0d5`，证明内容版本 URL 已在生产环境生效。
+- Edge 验收：Microsoft Edge 直接打开 `http://39.107.97.67/`，实际 DOM 的 SVG `href` 与上述版本化 URL 一致；新版跑道、机坪、航站指廊与地服区域可见，10/10 任务、5/5 资源、6/6 事件正常，页面宽度无横向溢出，控制台 0 error、0 warning。
+- 数据与安全：服务器继续保持单容器、单 worker、SQLite 命名卷、健康检查与失败回滚；未删除或迁移命名卷，未读取 Cookie、浏览器密码、远端令牌、AI key 或服务器秘密文件。
+- 浏览器偏好：后续浏览器任务优先连接用户的 Microsoft Edge（用户称“ME 浏览器”）及其已有标签和登录态；Edge 不可用时先说明原因并征求替代方案，不再默认选择 Chrome。
