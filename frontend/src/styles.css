@@ -6072,3 +6072,342 @@ tbody tr.selected-row { background: #e7e7e1; box-shadow: inset 4px 0 0 var(--bla
   .spatial-question-presets { grid-template-columns: 1fr 1fr; }
   .safety-footer strong { display: none; }
 }
+
+/* AI identity and brand refinement: purple is reserved for assistant surfaces. */
+:root {
+  --ai-deep: #382545;
+  --ai: #694682;
+  --ai-bright: #8b66a3;
+  --ai-soft: #f4eef7;
+  --ai-soft-strong: #ebe0f1;
+  --ai-line: #c9b5d6;
+  --ai-muted: #74657d;
+}
+
+.brand-block {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgb(255 255 255 / 4%) 1px, transparent 1px),
+    var(--black);
+  background-size: 16px 100%;
+}
+
+.brand-block::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  right: 0;
+  width: 48px;
+  height: 5px;
+  background: var(--ai);
+}
+
+.brand-block::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 10px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--ai-bright) 0 34%, #41413e 34% 100%);
+}
+
+.brand-mark {
+  position: relative;
+  color: var(--black);
+  background: #ffffff;
+  border: 1px solid #ffffff;
+  box-shadow: 5px 5px 0 var(--ai) !important;
+  transform: translateY(-2px);
+}
+
+.brand-mark::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 5px;
+  height: 5px;
+  background: var(--ai);
+}
+
+.brand-copy {
+  position: relative;
+  padding-top: 10px;
+}
+
+.brand-copy::before {
+  content: "OPS / 01";
+  position: absolute;
+  top: -3px;
+  left: 0;
+  color: #bea3cd;
+  font-family: var(--mono);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+
+.brand-copy strong {
+  letter-spacing: .055em;
+}
+
+.brand-copy span {
+  color: #d1d1cc;
+  letter-spacing: .18em;
+}
+
+.event-assistant-panel,
+.plan-explanation-panel,
+.spatial-assistant-panel {
+  position: relative;
+  background: #fbf9fc;
+  border-color: var(--ai);
+}
+
+.event-assistant-panel::before,
+.plan-explanation-panel::before,
+.spatial-assistant-panel::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 44px;
+  background: var(--ai-bright);
+  pointer-events: none;
+}
+
+.assistant-heading,
+.spatial-assistant-heading {
+  padding: 14px 16px;
+  color: #ffffff;
+  background:
+    linear-gradient(112deg, rgb(55 37 68 / 99%), rgb(83 54 101 / 98%)),
+    repeating-linear-gradient(90deg, transparent 0 41px, rgb(255 255 255 / 6%) 41px 42px);
+  border-bottom: 1px solid var(--ai-deep);
+}
+
+.assistant-heading .assistant-symbol,
+.spatial-assistant-heading .assistant-symbol {
+  color: #ffffff;
+  background: rgb(255 255 255 / 9%);
+  border-color: rgb(255 255 255 / 32%);
+}
+
+.assistant-heading .eyebrow,
+.spatial-assistant-heading .eyebrow { color: #d2bee0; }
+
+.assistant-heading h2,
+.assistant-heading p:not(.eyebrow),
+.spatial-assistant-heading h2,
+.spatial-assistant-heading > div:nth-child(2) > p:last-child { color: #ffffff; }
+
+.assistant-heading p:not(.eyebrow),
+.spatial-assistant-heading > div:nth-child(2) > p:last-child { opacity: .78; }
+
+.assistant-mode {
+  background: rgb(255 255 255 / 7%);
+  border-color: rgb(255 255 255 / 46%);
+}
+
+.assistant-mode button {
+  color: #eee5f3;
+  background: transparent;
+  border-color: rgb(255 255 255 / 38%);
+}
+
+.assistant-mode button:hover:not(:disabled) { background: rgb(255 255 255 / 11%); }
+.assistant-mode button.active {
+  color: var(--ai-deep);
+  background: #ffffff;
+}
+
+.event-assistant-compose label > span,
+.explanation-question > span,
+.spatial-question-compose > label > span {
+  color: var(--ai-muted);
+}
+
+.event-assistant-compose textarea,
+.explanation-question textarea,
+.spatial-question-compose textarea {
+  color: #2f2634;
+  background: #ffffff;
+  border-color: var(--ai-line);
+}
+
+.event-assistant-compose textarea:focus,
+.explanation-question textarea:focus,
+.spatial-question-compose textarea:focus {
+  border-color: var(--ai);
+  outline-color: var(--ai);
+}
+
+.assistant-primary-action,
+.spatial-question-compose > .assistant-primary-action {
+  color: #ffffff;
+  background: var(--ai);
+  border-color: var(--ai-deep);
+}
+
+.assistant-primary-action:hover:not(:disabled),
+.spatial-question-compose > .assistant-primary-action:hover:not(:disabled) {
+  color: #ffffff;
+  background: var(--ai-deep);
+  border-color: var(--ai-deep);
+}
+
+.assistant-primary-action:disabled,
+.spatial-question-compose > .assistant-primary-action:disabled {
+  color: #8d8491;
+  background: #ece8ee;
+  border-color: #d8cfdc;
+}
+
+.explanation-focus {
+  background: #ffffff;
+  border-color: var(--ai);
+}
+
+.explanation-focus button {
+  color: var(--ai-muted);
+  border-color: var(--ai);
+}
+
+.explanation-focus button.active,
+.plan-target-switch button.active,
+.clarification-options button:hover {
+  color: #ffffff;
+  background: var(--ai);
+  border-color: var(--ai);
+}
+
+.plan-target-switch button.active span,
+.plan-target-switch button.active strong { color: #ffffff; }
+
+.clarification-panel,
+.event-review-panel,
+.plan-explanation-result { border-color: var(--ai-line); }
+
+.question-answer-card {
+  color: var(--ai-deep);
+  background: var(--ai-soft);
+  border-color: var(--ai-line);
+  border-left-color: var(--ai);
+}
+
+.question-answer-card blockquote {
+  color: #62566a;
+  border-color: var(--ai-bright);
+}
+
+.question-answer-card > p { color: #302636; }
+
+.matched-entities code,
+.spatial-answer-entities code {
+  color: var(--ai-deep);
+  background: var(--ai-soft);
+  border-color: var(--ai-line);
+}
+
+.explanation-claim.emphasized,
+.explanation-section.emphasized {
+  background: var(--ai-soft);
+  border-color: var(--ai);
+  box-shadow: inset 5px 0 0 var(--ai) !important;
+}
+
+.claim-evidence code,
+.assistant-result-title strong,
+.spatial-answer-meta strong { color: var(--ai); }
+
+.objective-options label.selected {
+  color: #ffffff;
+  background: var(--ai);
+  border-color: var(--ai-deep);
+}
+
+.objective-options input,
+.review-confirmations input { accent-color: var(--ai); }
+
+.spatial-question-compose,
+.spatial-answer-result { border-color: var(--ai-line); }
+
+.spatial-question-presets button,
+.spatial-answer-focus button {
+  color: var(--ai-deep);
+  background: var(--ai-soft);
+  border-color: var(--ai-line);
+}
+
+.spatial-question-presets button:hover,
+.spatial-answer-focus button:hover {
+  color: #ffffff;
+  background: var(--ai);
+  border-color: var(--ai);
+}
+
+.spatial-answer-result > blockquote {
+  color: #62566a;
+  background: var(--ai-soft);
+  border-color: var(--ai-bright);
+}
+
+.spatial-direct-answer {
+  background: #ffffff;
+  border-color: var(--ai-line);
+  border-left-color: var(--ai);
+}
+
+.spatial-direct-answer > div { color: var(--ai); }
+.spatial-direct-answer p { color: #302636; }
+
+.spatial-answer-focus {
+  color: var(--ai-deep);
+  background: var(--ai-soft);
+  border-color: var(--ai-line);
+}
+
+.spatial-answer-facts button { border-color: var(--ai-line); }
+.spatial-answer-facts button:not(:disabled):hover {
+  color: #ffffff;
+  background: var(--ai);
+  border-color: var(--ai);
+}
+
+.spatial-task-register-grid button.assistant-focus {
+  color: var(--ai-deep);
+  background: var(--ai-soft-strong);
+  border-color: var(--ai);
+  box-shadow: inset 4px 0 0 var(--ai) !important;
+}
+
+.spatial-task-register-grid button.assistant-focus * { color: inherit !important; }
+.spatial-zone-label.assistant-focus circle,
+.spatial-resource-marker.assistant-focus rect,
+.spatial-event-marker.assistant-focus circle { stroke: var(--ai-bright); }
+.spatial-task-route.assistant-focus .route-line { stroke: var(--ai); }
+
+@media (max-width: 840px) {
+  .brand-block { padding-left: 14px; }
+  .brand-block::after { left: 14px; right: 14px; bottom: 3px; }
+  .brand-mark { box-shadow: 3px 3px 0 var(--ai) !important; transform: none; }
+  .brand-copy { padding-top: 0; }
+  .brand-copy::before { display: none; }
+  .assistant-heading,
+  .spatial-assistant-heading { padding: 12px 13px; }
+}
+
+@media (max-width: 520px) {
+  .brand-block::before { width: 34px; height: 4px; }
+  .brand-block::after { bottom: 2px; }
+  .brand-mark::before { top: 4px; right: 4px; width: 4px; height: 4px; }
+  .event-assistant-panel::before,
+  .plan-explanation-panel::before,
+  .spatial-assistant-panel::before { width: 4px; height: 34px; }
+}
