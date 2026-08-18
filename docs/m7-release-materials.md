@@ -8,8 +8,8 @@
 | --- | --- | --- |
 | 应用方案 PDF | 项目定位、问题、架构、调度约束、AI 边界、指标、风险和部署方式 | 待制作 |
 | 5 分钟以内演示视频 | 连续展示加载场景、时钟推进、扰动、重规划、人工确认、地图过程和只读问答 | 待制作 |
-| 源代码 | GitHub 仓库与版本标签指向同一已验收提交 | 公开 GitHub 已具备；离线发行标签待首次创建 |
-| 运行说明 | Windows 本地启动、Docker 单 origin、健康检查、AI Secret 配置和回滚 | README + M7 发布计划已具备；Windows x64 离线 ZIP 本地验收完成，待首次 GitHub Release 验证 |
+| 源代码 | GitHub 仓库与版本标签指向同一已验收提交 | 公开 GitHub 已具备；`offline-v1.0.2` 指向已验收离线发行提交 |
+| 运行说明 | Windows 本地启动、Docker 单 origin、健康检查、AI Secret 配置和回滚 | README + M7 发布计划已具备；Windows x64 离线 ZIP 已完成 GitHub Release 下载与解压验收 |
 | 开发日志 | 按 M0-M7 记录决策、验证证据、已知限制和未做事项 | `docs/project-progress.md` 已具备，待整理提交版 |
 | 原创证明 | 说明代码、匿名数据和 2D SVG 布局的来源；列出第三方依赖许可证 | `docs/originality-and-assets.md` |
 | 风险声明 | 仿真教学用途、AI 只读、无生产数据、单实例限制和失败回退 | `docs/risk-and-safety.md` |

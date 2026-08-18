@@ -1010,3 +1010,12 @@ M3 已关闭，M4-0 契约冻结、M4-1 运行会话、M4-2 确定性状态投�
 - 本机发行验证：PyInstaller 6.22.1 构建成功，ZIP 约 `66.8 MB`；从新目录解压后经批处理入口启动，首页与 `/api/v1/health` 返回 HTTP 200、`status=ok`，匿名会话创建成功，SSE 返回 `event: runtime.snapshot`。空间问题“task4现在在哪里？”返回 `trace.source=deterministic_rules`、`provider_attempted=false` 和当前权威路线事实，调用前后 revision 均为 `1`、`modifies_runtime=false`；停止入口结束了目标进程并移除状态文件。
 - 自动验证：后端 `313 passed`（含 4 项离线发行契约），前端 `42 passed`，TypeScript 类型检查、Vite 生产构建、Python `compileall` 和 `git diff --check` 通过。最终本地候选 ZIP 为 `66,778,929` 字节，SHA-256 为 `e6b636c06f0872d2368167081c443130ff4a778ea1bf75278d468256bac26414`；该哈希只对应本地候选，正式 GitHub runner 产物将发布自己的校验值。便携包当前未购买 Windows 代码签名证书，说明文件要求先核对 Release SHA-256，再处理可能出现的 SmartScreen 首次提示。
 - 发布状态与下一步：本地收口提交不等同于外部发布；当前尚未推送、创建标签或 GitHub Release，README 的最新下载链接要在首次 `offline-v*` Release 创建后才可用。提交 GitHub、创建发行标签、发布 Release、同步 Gitee 和由 `main` 触发公网镜像更新仍需在执行前取得当次明确确认。
+
+### 2026-08-18 / Windows 离线包 GitHub Release 发布与正式资产验收
+
+- GitHub 主线：经项目负责人明确确认，将离线发行实现 `9a3a96e` 推送至公开 `origin/main`；CI `32032994012` 与容器发布 `32032993987` 成功。干净 Windows runner 首次构建 `offline-v1.0.0` 时，PyInstaller 与 ZIP 实际生成完成，但 Python 3.13 的 `cp1252` 控制台在打印中文路径时报 `UnicodeEncodeError`，因此工作流 `32033915644` 失败且没有创建 Release。
+- Runner 修复：提交 `19de67d` 将构建日志改为 ASCII，并将带文件名的校验清单明确写为 UTF-8；CI `32034456152` 与容器发布 `32034455999` 成功。`offline-v1.0.1` 工作流 `32034646931` 成功发布，但 GitHub 将中文资产名净化为 `-.-Windows-x64.zip`，与 README 预设固定直链不一致。
+- 稳定下载名：提交 `68feb8c` 将 Release 外层资产固定为 ASCII 名 `LianBaoZhiDiao-Offline-Windows-x64.zip`，压缩包内部继续保留中文项目名与中文一键启停入口；CI `32035549502`、容器发布 `32035549667` 和 `offline-v1.0.2` 工作流 `32035784604` 均成功。`offline-v1.0.2` 已成为 GitHub 最新正式 Release，README 的 `/releases/latest/download/` 直链与实际资产名一致。
+- 正式资产证据：GitHub Release ZIP 为 `63,688,760` 字节，SHA-256 为 `0577fc177089163dae201aa52b9f0325318be7d76b09acef6c3c8bf5740240dc`；第一次下载在约 41 MB 处遭本机网络中断，未执行残缺文件，随后从断点续传完成。本机计算值与 Release 的 `SHA256SUMS.txt` 及 GitHub 资产 digest 三者一致。
+- 正式包运行验收：从实际下载的 `offline-v1.0.2` ZIP 解压至全新目录并通过中文批处理入口启动；首页、`/api/v1/health` 和版本化空间 SVG 均返回 HTTP 200，健康状态为 `ok`。匿名运行会话 `RUN-711E820DDB8D45BB` 创建成功，SSE 返回 `runtime.snapshot`；“task4现在在哪里？”返回 `deterministic_rules`、`provider_attempted=false`、`modifies_runtime=false`，调用前后 revision 均为 `1`。停止入口只结束目标进程并移除状态文件。
+- 安全与遗留：所有发行包均不包含、读取或要求 AI key，离线 AI 继续只解释当前后端权威事实；未接真实机场数据、真实坐标、内部地图、PII 或外部控制系统。旧 `offline-v1.0.0` 仅保留失败标签/工作流证据、无 Release；`offline-v1.0.1` 为较早成功 Release，但 GitHub 最新入口与 README 均指向已验收的 `offline-v1.0.2`，未执行删除或覆盖历史标签/资产。
